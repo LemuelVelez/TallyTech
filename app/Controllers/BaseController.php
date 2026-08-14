@@ -6,6 +6,8 @@ use CodeIgniter\Controller;
 use CodeIgniter\HTTP\RequestInterface;
 use CodeIgniter\HTTP\ResponseInterface;
 use Psr\Log\LoggerInterface;
+use App\Infrastructure\Persistence\MySqlScoringRepository;
+use App\Application\Services\ScoringService;
 
 /**
  * BaseController provides a convenient place for loading components
@@ -30,11 +32,21 @@ abstract class BaseController extends Controller
     /**
      * @return void
      */
+    protected function repository(): MySqlScoringRepository
+    {
+        return new MySqlScoringRepository();
+    }
+
+    protected function scoringService(): ScoringService
+    {
+        return new ScoringService($this->repository());
+    }
+
     public function initController(RequestInterface $request, ResponseInterface $response, LoggerInterface $logger)
     {
         // Load here all helpers you want to be available in your controllers that extend BaseController.
         // Caution: Do not put the this below the parent::initController() call below.
-        // $this->helpers = ['form', 'url'];
+        $this->helpers = ['form', 'url'];
 
         // Caution: Do not edit this line.
         parent::initController($request, $response, $logger);
