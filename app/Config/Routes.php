@@ -12,48 +12,68 @@ $routes->get('logout', 'AuthController::logout');
 $routes->group('', ['filter' => 'auth'], static function (RouteCollection $routes): void {
     $routes->get('dashboard', 'DashboardController::index');
     $routes->get('notifications', 'NotificationsController::index');
-    $routes->get('team-ranking', 'DashboardController::ranking', ['filter' => 'role:admin,manager,facilitator']);
+    $routes->get('team-ranking', 'DashboardController::ranking', ['filter' => 'role:admin,manager,validator,facilitator']);
     $routes->get('settings', 'SettingsController::index');
     $routes->post('settings', 'SettingsController::update');
 
     $routes->group('', ['filter' => 'role:admin'], static function (RouteCollection $routes): void {
         $routes->get('teams', 'TeamsController::index');
         $routes->post('teams', 'TeamsController::store');
+        $routes->post('teams/(:num)/update', 'TeamsController::update/$1');
         $routes->post('teams/(:num)/delete', 'TeamsController::delete/$1');
+
         $routes->get('events', 'EventsController::index');
         $routes->post('events', 'EventsController::store');
+        $routes->post('events/(:num)/update', 'EventsController::update/$1');
         $routes->post('events/(:num)/activate', 'EventsController::activate/$1');
+        $routes->post('events/(:num)/delete', 'EventsController::delete/$1');
+
         $routes->get('sports', 'SportsController::index');
         $routes->post('sports', 'SportsController::store');
+        $routes->post('sports/(:num)/update', 'SportsController::update/$1');
+        $routes->post('sports/(:num)/delete', 'SportsController::delete/$1');
+
         $routes->get('schedules', 'SchedulesController::index');
         $routes->post('schedules', 'SchedulesController::store');
+        $routes->post('schedules/(:num)/update', 'SchedulesController::update/$1');
+        $routes->post('schedules/(:num)/delete', 'SchedulesController::delete/$1');
+
         $routes->get('sports-managers', 'UsersController::sportsManagers');
         $routes->post('sports-managers', 'UsersController::storeSportsManager');
+        $routes->post('sports-managers/(:num)/update', 'UsersController::updateSportsManager/$1');
+        $routes->post('sports-managers/(:num)/delete', 'UsersController::deleteSportsManager/$1');
     });
 
     $routes->group('', ['filter' => 'role:admin,manager'], static function (RouteCollection $routes): void {
         $routes->get('reports', 'ReportsController::index');
     });
 
-    $routes->group('', ['filter' => 'role:manager,validator'], static function (RouteCollection $routes): void {
-        $routes->get('weighted-points', 'WeightedPointsController::index');
-        $routes->post('weighted-points', 'WeightedPointsController::store');
-        $routes->post('weighted-points/(:num)/validate', 'WeightedPointsController::validatePoints/$1');
-    });
+    $routes->get('weighted-points', 'WeightedPointsController::index', ['filter' => 'role:manager,validator']);
 
     $routes->group('', ['filter' => 'role:manager'], static function (RouteCollection $routes): void {
+        $routes->post('weighted-points', 'WeightedPointsController::store');
+        $routes->post('weighted-points/(:num)/update', 'WeightedPointsController::update/$1');
+        $routes->post('weighted-points/(:num)/delete', 'WeightedPointsController::delete/$1');
+
         $routes->get('facilitators', 'UsersController::facilitators');
         $routes->post('facilitators', 'UsersController::storeFacilitator');
+        $routes->post('facilitators/(:num)/update', 'UsersController::updateFacilitator/$1');
+        $routes->post('facilitators/(:num)/delete', 'UsersController::deleteFacilitator/$1');
     });
 
     $routes->group('', ['filter' => 'role:manager,validator,facilitator'], static function (RouteCollection $routes): void {
         $routes->get('match-results', 'ResultsController::matches');
         $routes->get('judged-results', 'ResultsController::judged');
     });
+
     $routes->group('', ['filter' => 'role:manager,facilitator'], static function (RouteCollection $routes): void {
         $routes->post('results', 'ResultsController::store');
+        $routes->post('results/(:num)/update', 'ResultsController::update/$1');
+        $routes->post('results/(:num)/delete', 'ResultsController::delete/$1');
     });
+
     $routes->group('', ['filter' => 'role:validator'], static function (RouteCollection $routes): void {
+        $routes->post('weighted-points/(:num)/validate', 'WeightedPointsController::validatePoints/$1');
         $routes->post('results/(:num)/validate', 'ResultsController::validateResult/$1');
     });
 });

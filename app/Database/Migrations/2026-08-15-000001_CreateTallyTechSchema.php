@@ -69,13 +69,13 @@ class CreateTallyTechSchema extends Migration
             'type'=>['type'=>'ENUM','constraint'=>['match','judged']], 'status'=>['type'=>'ENUM','constraint'=>['pending','validated'],'default'=>'pending'], 'notes'=>['type'=>'TEXT','null'=>true],
             'submitted_by'=>['type'=>'INT','unsigned'=>true,'null'=>true], 'validated_by'=>['type'=>'INT','unsigned'=>true,'null'=>true], 'submitted_at'=>['type'=>'DATETIME','null'=>true], 'validated_at'=>['type'=>'DATETIME','null'=>true],
         ]);
-        $this->forge->addKey('id',true); $this->forge->addForeignKey('event_id','events','id','CASCADE','CASCADE'); $this->forge->addForeignKey('schedule_id','schedules','id','CASCADE','CASCADE'); $this->forge->addForeignKey('submitted_by','users','id','SET NULL','CASCADE'); $this->forge->addForeignKey('validated_by','users','id','SET NULL','CASCADE'); $this->forge->createTable('results',true);
+        $this->forge->addKey('id',true); $this->forge->addUniqueKey('schedule_id'); $this->forge->addForeignKey('event_id','events','id','CASCADE','CASCADE'); $this->forge->addForeignKey('schedule_id','schedules','id','CASCADE','CASCADE'); $this->forge->addForeignKey('submitted_by','users','id','SET NULL','CASCADE'); $this->forge->addForeignKey('validated_by','users','id','SET NULL','CASCADE'); $this->forge->createTable('results',true);
 
         $this->forge->addField([
             'id'=>['type'=>'INT','unsigned'=>true,'auto_increment'=>true], 'result_id'=>['type'=>'INT','unsigned'=>true], 'team_id'=>['type'=>'INT','unsigned'=>true],
             'raw_score'=>['type'=>'DECIMAL','constraint'=>'10,2','default'=>0], 'placement'=>['type'=>'INT','null'=>true], 'allocated_points'=>['type'=>'DECIMAL','constraint'=>'8,2','default'=>0],
         ]);
-        $this->forge->addKey('id',true); $this->forge->addForeignKey('result_id','results','id','CASCADE','CASCADE'); $this->forge->addForeignKey('team_id','teams','id','CASCADE','CASCADE'); $this->forge->createTable('result_entries',true);
+        $this->forge->addKey('id',true); $this->forge->addUniqueKey(['result_id','team_id']); $this->forge->addForeignKey('result_id','results','id','CASCADE','CASCADE'); $this->forge->addForeignKey('team_id','teams','id','CASCADE','CASCADE'); $this->forge->createTable('result_entries',true);
 
         $this->forge->addField([
             'id'=>['type'=>'INT','unsigned'=>true,'auto_increment'=>true], 'actor_user_id'=>['type'=>'INT','unsigned'=>true,'null'=>true],

@@ -19,17 +19,38 @@ interface ScoringRepositoryInterface
     public function resultEntries(int $resultId): array;
     public function ranking(?int $eventId = null): array;
     public function reportSummary(?int $eventId = null): array;
+
     public function createTeam(array $data, int $actorId): int;
+    public function updateTeam(int $id, array $data, int $actorId): void;
+    public function deleteTeam(int $id, int $actorId): void;
+
     public function createEvent(array $data, int $actorId): int;
+    public function updateEvent(int $id, array $data, int $actorId): void;
     public function activateEvent(int $eventId, int $actorId): void;
+    public function deleteEvent(int $id, int $actorId): void;
+
     public function createSport(array $data, int $actorId): int;
+    public function updateSport(int $id, array $data, int $actorId): void;
+    public function deleteSport(int $id, int $actorId): void;
+
     public function createSchedule(array $data, int $actorId): int;
+    public function updateSchedule(int $id, array $data, int $actorId): void;
+    public function deleteSchedule(int $id, int $actorId): void;
+
     public function createUser(array $data, array $sportIds, int $actorId): int;
+    public function updateUser(int $id, array $data, array $sportIds, int $actorId): void;
+    public function deleteUser(int $id, int $actorId): void;
+
     public function saveWeightedPoints(array $data, int $actorId): int;
+    public function updateWeightedPoints(int $id, array $data, int $actorId): void;
     public function validateWeightedPoints(int $id, int $actorId): void;
+    public function deleteWeightedPoints(int $id, int $actorId): void;
+
     public function createResult(array $data, int $actorId): int;
+    public function updateResult(int $id, array $data, int $actorId): void;
     public function validateResult(int $id, int $actorId): void;
+    public function deleteResult(int $id, int $actorId): void;
+
     public function updateUserSettings(int $userId, array $settings): void;
     public function getUserSettings(int $userId): array;
-    public function deleteTeam(int $id, int $actorId): void;
 }

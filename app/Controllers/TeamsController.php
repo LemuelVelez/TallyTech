@@ -1,16 +1,62 @@
 <?php
+
 namespace App\Controllers;
+
 class TeamsController extends BaseController
 {
-    public function index(){ return view('teams/index',['title'=>'Teams','teams'=>$this->repository()->teams()]); }
-    public function store(){
-        $name=trim((string)$this->request->getPost('name')); $code=strtoupper(trim((string)$this->request->getPost('code')));
-        if($name===''||$code==='') return redirect()->back()->with('error','Team name and code are required.');
-        $this->repository()->createTeam(['name'=>$name,'code'=>$code,'created_at'=>date('Y-m-d H:i:s')],(int)session()->get('user_id'));
-        return redirect()->back()->with('success','Team added.');
+    public function index()
+    {
+        return view('teams/index', ['title' => 'Teams', 'teams' => $this->repository()->teams()]);
     }
-    public function delete(int $id){
-        try{$this->repository()->deleteTeam($id,(int)session()->get('user_id')); return redirect()->back()->with('success','Team removed.');}
-        catch(\Throwable $e){return redirect()->back()->with('error','Team cannot be removed while it is used by schedules/results.');}
+
+    public function store()
+    {
+        $payload = $this->teamPayload();
+        if (isset($payload['error'])) {
+            return redirect()->back()->withInput()->with('error', $payload['error']);
+        }
+        try {
+            $this->repository()->createTeam($payload, (int) session()->get('user_id'));
+        } catch (\Throwable $e) {
+            return redirect()->back()->withInput()->with('error', 'Team name or code already exists.');
+        }
+        return redirect()->back()->with('success', 'Team added.');
+    }
+
+    public function update(int $id)
+    {
+        $payload = $this->teamPayload();
+        if (isset($payload['error'])) {
+            return redirect()->back()->with('error', $payload['error']);
+        }
+        try {
+            $this->repository()->updateTeam($id, $payload, (int) session()->get('user_id'));
+        } catch (\Throwable $e) {
+            return redirect()->back()->with('error', 'Team could not be updated. Make sure its name and code are unique.');
+        }
+        return redirect()->back()->with('success', 'Team updated.');
+    }
+
+    public function delete(int $id)
+    {
+        try {
+            $this->repository()->deleteTeam($id, (int) session()->get('user_id'));
+        } catch (\Throwable $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+        return redirect()->back()->with('success', 'Team removed.');
+    }
+
+    private function teamPayload(): array
+    {
+        $name = trim((string) $this->request->getPost('name'));
+        $code = strtoupper(trim((string) $this->request->getPost('code')));
+        if ($name === '' || $code === '') {
+            return ['error' => 'Team name and code are required.'];
+        }
+        if (strlen($name) > 150 || strlen($code) > 30) {
+            return ['error' => 'Team name or code is too long.'];
+        }
+        return ['name' => $name, 'code' => $code];
     }
 }
