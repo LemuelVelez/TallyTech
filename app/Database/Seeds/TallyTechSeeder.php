@@ -8,12 +8,16 @@ class TallyTechSeeder extends Seeder
 {
     public function run()
     {
+        if (ENVIRONMENT === 'production') {
+            throw new \RuntimeException('TallyTech development seed data must not be loaded in production.');
+        }
+
         $now=date('Y-m-d H:i:s');
         $users=[
-            ['username'=>'admin','password_hash'=>password_hash('admin123',PASSWORD_DEFAULT),'display_name'=>'System Admin','role'=>'admin','status'=>'active','created_at'=>$now],
-            ['username'=>'manager','password_hash'=>password_hash('manager123',PASSWORD_DEFAULT),'display_name'=>'Joy Tournament Manager','role'=>'manager','status'=>'active','created_at'=>$now],
-            ['username'=>'validator','password_hash'=>password_hash('validator123',PASSWORD_DEFAULT),'display_name'=>'ISF Validator','role'=>'validator','status'=>'active','created_at'=>$now],
-            ['username'=>'facilitator','password_hash'=>password_hash('facilitator123',PASSWORD_DEFAULT),'display_name'=>'Game Facilitator','role'=>'facilitator','status'=>'active','created_at'=>$now],
+            ['username'=>'admin','password_hash'=>password_hash('Admin@12345',PASSWORD_DEFAULT),'display_name'=>'System Admin','role'=>'admin','status'=>'active','created_at'=>$now],
+            ['username'=>'manager','password_hash'=>password_hash('Manager@12345',PASSWORD_DEFAULT),'display_name'=>'Joy Tournament Manager','role'=>'manager','status'=>'active','created_at'=>$now],
+            ['username'=>'validator','password_hash'=>password_hash('Validator@12345',PASSWORD_DEFAULT),'display_name'=>'ISF Validator','role'=>'validator','status'=>'active','created_at'=>$now],
+            ['username'=>'facilitator','password_hash'=>password_hash('Facilitator@12345',PASSWORD_DEFAULT),'display_name'=>'Game Facilitator','role'=>'facilitator','status'=>'active','created_at'=>$now],
         ];
         $this->db->table('users')->insertBatch($users);
         $ids=[]; foreach($this->db->table('users')->get()->getResultArray() as $u) $ids[$u['username']]=$u['id'];

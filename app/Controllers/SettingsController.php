@@ -14,15 +14,19 @@ class SettingsController extends BaseController
 
     public function update()
     {
-        $density = (string) ($this->request->getPost('result_density') ?: 'comfortable');
+        $density = $this->postString('result_density') ?: 'comfortable';
         if (! in_array($density, ['comfortable', 'compact'], true)) {
             return redirect()->back()->with('error', 'Select a valid display density.');
         }
         $settings = [
-            'compact_sidebar' => $this->request->getPost('compact_sidebar') ? '1' : '0',
+            'compact_sidebar' => $this->postString('compact_sidebar') === '1' ? '1' : '0',
             'result_density' => $density,
         ];
-        $this->repository()->updateUserSettings((int) session()->get('user_id'), $settings);
+        try {
+            $this->repository()->updateUserSettings((int) session()->get('user_id'), $settings);
+        } catch (\Throwable $e) {
+            return redirect()->back()->with('error', 'Settings could not be saved.');
+        }
         session()->set([
             'compact_sidebar' => $settings['compact_sidebar'] === '1',
             'result_density' => $settings['result_density'],

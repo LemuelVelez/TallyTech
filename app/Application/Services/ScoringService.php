@@ -13,28 +13,29 @@ class ScoringService
     {
         $event = $this->repository->activeEvent();
         $eventId = (int) ($event['id'] ?? 0);
-        return ['activeEvent'=>$event,'teams'=>$this->repository->teams(),'sports'=>$this->repository->sports($eventId ?: null),'locations'=>$this->repository->locations()];
+        return ['activeEvent'=>$event,'teams'=>$this->repository->teams(),'sports'=>$this->repository->sports($eventId),'locations'=>$this->repository->locations()];
     }
 
     public function dashboard(string $role): array
     {
         $event = $this->repository->activeEvent(); $eventId=(int)($event['id']??0);
-        $ranking=$this->repository->ranking($eventId ?: null);
-        $results=$this->repository->results($eventId ?: null);
-        $schedules=$this->repository->schedules($eventId ?: null);
+        $ranking=$this->repository->ranking($eventId);
+        $results=$this->repository->results($eventId);
+        $schedules=$this->repository->schedules($eventId);
         return [
             'activeEvent'=>$event, 'ranking'=>$ranking, 'results'=>$results, 'schedules'=>$schedules,
-            'teams'=>$this->repository->teams(), 'sports'=>$this->repository->sports($eventId ?: null),
-            'notifications'=>$this->repository->notifications(5), 'weightedPoints'=>$this->repository->weightedPoints($eventId ?: null), 'role'=>$role,
+            'teams'=>$this->repository->teams(), 'sports'=>$this->repository->sports($eventId),
+            'notifications'=>$this->repository->notifications(5), 'weightedPoints'=>$this->repository->weightedPoints($eventId), 'role'=>$role,
         ];
     }
 
     public function scoreboard(): array
     {
         $event=$this->repository->activeEvent(); $eventId=(int)($event['id']??0);
-        $results=$this->repository->results($eventId ?: null);
-        $schedules=$this->repository->schedules($eventId ?: null);
-        return ['activeEvent'=>$event,'ranking'=>$this->repository->ranking($eventId ?: null),'results'=>$results,'schedules'=>$schedules];
+        $results=$this->repository->results($eventId);
+        $schedules=$this->repository->schedules($eventId);
+        usort($schedules, static fn(array $a, array $b): int => strcmp((string) $a['match_date'], (string) $b['match_date']));
+        return ['activeEvent'=>$event,'ranking'=>$this->repository->ranking($eventId),'results'=>$results,'schedules'=>$schedules];
     }
 
     public function saveResult(array $data, int $actorId): int

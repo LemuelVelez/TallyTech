@@ -16,15 +16,24 @@ class AuthController extends BaseController
 
     public function attempt()
     {
-        $username = trim((string) $this->request->getPost('username'));
-        $password = (string) $this->request->getPost('password');
-        $user = (new AuthService($this->repository()))->authenticate($username, $password);
+        $username = trim($this->postString('username'));
+        $password = $this->postString('password');
+        try {
+            $repository = $this->repository();
+            $user = (new AuthService($repository))->authenticate($username, $password);
+            $settings = $user ? $repository->getUserSettings((int) $user['id']) : [];
+        } catch (\Throwable $e) {
+            return redirect()->back()
+                ->with('error', 'Sign-in is temporarily unavailable. Please try again.')
+                ->with('login_username', $username);
+        }
         if (! $user) {
-            return redirect()->back()->withInput()->with('error', 'Invalid username or password.');
+            return redirect()->back()
+                ->with('error', 'Invalid username or password.')
+                ->with('login_username', $username);
         }
 
-        session()->regenerate();
-        $settings = $this->repository()->getUserSettings((int) $user['id']);
+        session()->regenerate(true);
         session()->set([
             'user_id' => $user['id'],
             'username' => $user['username'],

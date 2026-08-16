@@ -43,7 +43,7 @@ class SportsController extends BaseController
         try {
             $this->repository()->updateSport($id, $payload, (int) session()->get('user_id'));
         } catch (\Throwable $e) {
-            return redirect()->back()->with('error', $e->getMessage());
+            return redirect()->back()->with('error', $this->safeErrorMessage($e, 'The sport operation could not be completed.'));
         }
         return redirect()->back()->with('success', 'Sport updated.');
     }
@@ -53,17 +53,17 @@ class SportsController extends BaseController
         try {
             $this->repository()->deleteSport($id, (int) session()->get('user_id'));
         } catch (\Throwable $e) {
-            return redirect()->back()->with('error', $e->getMessage());
+            return redirect()->back()->with('error', $this->safeErrorMessage($e, 'The sport operation could not be completed.'));
         }
         return redirect()->back()->with('success', 'Sport removed.');
     }
 
     private function sportPayload(int $eventId): array
     {
-        $name = trim((string) $this->request->getPost('name'));
-        $category = (string) $this->request->getPost('category');
-        $type = (string) $this->request->getPost('result_type');
-        if ($name === '' || ! in_array($category, ['Men', 'Women', 'Mixed'], true) || ! in_array($type, ['match', 'judged'], true)) {
+        $name = trim($this->postString('name'));
+        $category = $this->postString('category');
+        $type = $this->postString('result_type');
+        if ($name === '' || mb_strlen($name) > 120 || ! in_array($category, ['Men', 'Women', 'Mixed'], true) || ! in_array($type, ['match', 'judged'], true)) {
             return ['error' => 'Complete all sport fields.'];
         }
         return ['event_id' => $eventId, 'name' => $name, 'category' => $category, 'result_type' => $type];

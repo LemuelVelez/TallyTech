@@ -52,6 +52,7 @@ class UsersController extends BaseController
             'roleType' => $role,
             'users' => $this->repository()->usersByRole($role),
             'sports' => $this->repository()->sports((int) ($event['id'] ?? 0)),
+            'activeEvent' => $event,
         ]);
     }
 
@@ -59,12 +60,14 @@ class UsersController extends BaseController
     {
         $payload = $this->userPayload($role, true);
         if (isset($payload['error'])) {
-            return redirect()->back()->withInput()->with('error', $payload['error']);
+            return redirect()->back()->with('error', $payload['error']);
         }
         try {
             $this->repository()->createUser($payload['user'], $payload['sport_ids'], (int) session()->get('user_id'));
+        } catch (\RuntimeException $e) {
+            return redirect()->back()->with('error', $this->safeErrorMessage($e, 'The account could not be created.'));
         } catch (\Throwable $e) {
-            return redirect()->back()->withInput()->with('error', 'Username already exists or the account could not be created.');
+            return redirect()->back()->with('error', 'Username already exists or the account could not be created.');
         }
         return redirect()->back()->with('success', ucfirst($role) . ' account added.');
     }
@@ -78,7 +81,7 @@ class UsersController extends BaseController
         try {
             $this->repository()->updateUser($id, $payload['user'], $payload['sport_ids'], (int) session()->get('user_id'));
         } catch (\Throwable $e) {
-            return redirect()->back()->with('error', $e->getMessage());
+            return redirect()->back()->with('error', $this->safeErrorMessage($e, 'The account operation could not be completed.'));
         }
         return redirect()->back()->with('success', ucfirst($role) . ' account updated.');
     }
@@ -92,19 +95,19 @@ class UsersController extends BaseController
         try {
             $this->repository()->deleteUser($id, (int) session()->get('user_id'));
         } catch (\Throwable $e) {
-            return redirect()->back()->with('error', $e->getMessage());
+            return redirect()->back()->with('error', $this->safeErrorMessage($e, 'The account operation could not be completed.'));
         }
         return redirect()->back()->with('success', ucfirst($role) . ' account removed.');
     }
 
     private function userPayload(string $role, bool $passwordRequired): array
     {
-        $username = trim((string) $this->request->getPost('username'));
-        $displayName = trim((string) $this->request->getPost('display_name'));
-        $password = (string) $this->request->getPost('password');
-        $status = (string) ($this->request->getPost('status') ?: 'active');
-        if (strlen($username) < 3 || $displayName === '') {
-            return ['error' => 'Username and name are required.'];
+        $username = trim($this->postString('username'));
+        $displayName = trim($this->postString('display_name'));
+        $password = $this->postString('password');
+        $status = $this->postString('status') ?: 'active';
+        if (mb_strlen($username) < 3 || mb_strlen($username) > 80 || $displayName === '' || mb_strlen($displayName) > 120) {
+            return ['error' => 'Username must be 3–80 characters and name must be 1–120 characters.'];
         }
         if (! preg_match('/^[A-Za-z0-9._-]+$/', $username)) {
             return ['error' => 'Username may only contain letters, numbers, dots, underscores, and hyphens.'];
@@ -118,10 +121,33 @@ class UsersController extends BaseController
         if ($password !== '' && ! preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/', $password)) {
             return ['error' => 'Password must be 8+ characters with uppercase, lowercase, number, and special character.'];
         }
-        $sportIds = $role === 'facilitator' ? (array) $this->request->getPost('sport_ids') : [];
-        if ($role === 'facilitator' && ! array_filter($sportIds)) {
-            return ['error' => 'Assign at least one sport to the facilitator.'];
+
+        $sportIds = [];
+        if ($role === 'facilitator') {
+            $rawSportIds = $this->request->getPost('sport_ids');
+            if (! is_array($rawSportIds)) {
+                return ['error' => 'Assign at least one sport to the facilitator.'];
+            }
+            foreach ($rawSportIds as $rawSportId) {
+                if (! is_scalar($rawSportId)) {
+                    return ['error' => 'One or more assigned sports are invalid.'];
+                }
+                $rawSportId = trim((string) $rawSportId);
+                if (! preg_match('/^[1-9]\d*$/', $rawSportId)) {
+                    return ['error' => 'One or more assigned sports are invalid.'];
+                }
+                $sportId = filter_var($rawSportId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+                if ($sportId === false) {
+                    return ['error' => 'One or more assigned sports are invalid.'];
+                }
+                $sportIds[] = (int) $sportId;
+            }
+            $sportIds = array_values(array_unique($sportIds));
+            if (! $sportIds) {
+                return ['error' => 'Assign at least one sport to the facilitator.'];
+            }
         }
+
         $user = [
             'username' => $username,
             'display_name' => $displayName,
@@ -136,4 +162,5 @@ class UsersController extends BaseController
         }
         return ['user' => $user, 'sport_ids' => $sportIds];
     }
+
 }

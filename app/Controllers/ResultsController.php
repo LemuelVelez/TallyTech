@@ -19,7 +19,7 @@ class ResultsController extends BaseController
         try {
             $this->scoringService()->saveResult($this->resultPayload(), (int) session()->get('user_id'));
         } catch (\Throwable $e) {
-            return redirect()->back()->withInput()->with('error', $e->getMessage());
+            return redirect()->back()->withInput()->with('error', $this->safeErrorMessage($e, 'The result could not be submitted.'));
         }
         return redirect()->back()->with('success', 'Unofficial result submitted for validation.');
     }
@@ -29,7 +29,7 @@ class ResultsController extends BaseController
         try {
             $this->repository()->updateResult($id, $this->resultPayload(), (int) session()->get('user_id'));
         } catch (\Throwable $e) {
-            return redirect()->back()->with('error', $e->getMessage());
+            return redirect()->back()->with('error', $this->safeErrorMessage($e, 'The result operation could not be completed.'));
         }
         return redirect()->back()->with('success', 'Unofficial result updated.');
     }
@@ -39,20 +39,20 @@ class ResultsController extends BaseController
         try {
             $this->repository()->deleteResult($id, (int) session()->get('user_id'));
         } catch (\Throwable $e) {
-            return redirect()->back()->with('error', $e->getMessage());
+            return redirect()->back()->with('error', $this->safeErrorMessage($e, 'The result operation could not be completed.'));
         }
         return redirect()->back()->with('success', 'Unofficial result removed.');
     }
 
     public function validateResult(int $id)
     {
-        if (! $this->request->getPost('confirmed_sheet')) {
+        if ($this->postString('confirmed_sheet') !== '1') {
             return redirect()->back()->with('error', 'Confirm comparison with the official score sheet/form before validation.');
         }
         try {
             $this->repository()->validateResult($id, (int) session()->get('user_id'));
         } catch (\Throwable $e) {
-            return redirect()->back()->with('error', $e->getMessage());
+            return redirect()->back()->with('error', $this->safeErrorMessage($e, 'The result operation could not be completed.'));
         }
         return redirect()->back()->with('success', 'Result validated and published as official.');
     }
@@ -82,12 +82,14 @@ class ResultsController extends BaseController
 
     private function resultPayload(): array
     {
+        $judged = $this->request->getPost('judged');
+
         return [
-            'schedule_id' => (int) $this->request->getPost('schedule_id'),
-            'team_a_score' => $this->request->getPost('team_a_score'),
-            'team_b_score' => $this->request->getPost('team_b_score'),
-            'judged' => (array) $this->request->getPost('judged'),
-            'notes' => $this->request->getPost('notes'),
+            'schedule_id' => $this->postPositiveInt('schedule_id'),
+            'team_a_score' => $this->postString('team_a_score'),
+            'team_b_score' => $this->postString('team_b_score'),
+            'judged' => is_array($judged) ? $judged : [],
+            'notes' => $this->postString('notes'),
         ];
     }
 }

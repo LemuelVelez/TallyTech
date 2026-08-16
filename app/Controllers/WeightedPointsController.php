@@ -4,6 +4,8 @@ namespace App\Controllers;
 
 class WeightedPointsController extends BaseController
 {
+    private const MAX_POINTS = 999999.99;
+
     public function index()
     {
         $event = $this->repository()->activeEvent();
@@ -25,7 +27,7 @@ class WeightedPointsController extends BaseController
         try {
             $this->repository()->saveWeightedPoints($payload, (int) session()->get('user_id'));
         } catch (\Throwable $e) {
-            return redirect()->back()->withInput()->with('error', $e->getMessage());
+            return redirect()->back()->withInput()->with('error', $this->safeErrorMessage($e, 'Weighted points could not be saved.'));
         }
         return redirect()->back()->with('success', 'Weighted points submitted for validation.');
     }
@@ -34,12 +36,12 @@ class WeightedPointsController extends BaseController
     {
         $payload = $this->pointsPayload();
         if (isset($payload['error'])) {
-            return redirect()->back()->with('error', $payload['error']);
+            return redirect()->back()->withInput()->with('error', $payload['error']);
         }
         try {
             $this->repository()->updateWeightedPoints($id, $payload, (int) session()->get('user_id'));
         } catch (\Throwable $e) {
-            return redirect()->back()->with('error', $e->getMessage());
+            return redirect()->back()->withInput()->with('error', $this->safeErrorMessage($e, 'Weighted points could not be saved.'));
         }
         return redirect()->back()->with('success', 'Weighted points updated and returned to pending validation.');
     }
@@ -49,7 +51,7 @@ class WeightedPointsController extends BaseController
         try {
             $this->repository()->validateWeightedPoints($id, (int) session()->get('user_id'));
         } catch (\Throwable $e) {
-            return redirect()->back()->with('error', $e->getMessage());
+            return redirect()->back()->with('error', $this->safeErrorMessage($e, 'The weighted-points operation could not be completed.'));
         }
         return redirect()->back()->with('success', 'Weighted points validated.');
     }
@@ -59,7 +61,7 @@ class WeightedPointsController extends BaseController
         try {
             $this->repository()->deleteWeightedPoints($id, (int) session()->get('user_id'));
         } catch (\Throwable $e) {
-            return redirect()->back()->with('error', $e->getMessage());
+            return redirect()->back()->with('error', $this->safeErrorMessage($e, 'The weighted-points operation could not be completed.'));
         }
         return redirect()->back()->with('success', 'Weighted points removed.');
     }
@@ -70,18 +72,33 @@ class WeightedPointsController extends BaseController
         if (! $event) {
             return ['error' => 'No active event.'];
         }
-        $sportId = (int) $this->request->getPost('sport_id');
+        $sportId = $this->postPositiveInt('sport_id');
         if (! $sportId) {
             return ['error' => 'Select a sport.'];
         }
+
         $values = [];
         foreach (['first_points', 'second_points', 'third_points', 'participation_points'] as $field) {
-            $value = filter_var($this->request->getPost($field), FILTER_VALIDATE_FLOAT);
-            if ($value === false || $value < 0) {
-                return ['error' => 'All point values must be valid non-negative numbers.'];
+            $value = $this->validDecimal($this->postString($field), self::MAX_POINTS);
+            if ($value === null) {
+                return ['error' => 'All point values must be non-negative numbers with at most 2 decimal places and no more than 999999.99.'];
             }
-            $values[$field] = (float) $value;
+            $values[$field] = $value;
         }
+
         return ['event_id' => (int) $event['id'], 'sport_id' => $sportId] + $values;
+    }
+
+    private function validDecimal(string $raw, float $max): ?string
+    {
+        $value = trim($raw);
+        if ($value === '' || ! preg_match('/^\d+(?:\.\d{1,2})?$/', $value)) {
+            return null;
+        }
+        if ((float) $value > $max) {
+            return null;
+        }
+
+        return number_format((float) $value, 2, '.', '');
     }
 }

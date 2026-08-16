@@ -43,7 +43,7 @@ class EventsController extends BaseController
         try {
             $this->repository()->activateEvent($id, (int) session()->get('user_id'));
         } catch (\Throwable $e) {
-            return redirect()->back()->with('error', $e->getMessage());
+            return redirect()->back()->with('error', $this->safeErrorMessage($e, 'The event operation could not be completed.'));
         }
         return redirect()->back()->with('success', 'Active event updated.');
     }
@@ -53,19 +53,20 @@ class EventsController extends BaseController
         try {
             $this->repository()->deleteEvent($id, (int) session()->get('user_id'));
         } catch (\Throwable $e) {
-            return redirect()->back()->with('error', $e->getMessage());
+            return redirect()->back()->with('error', $this->safeErrorMessage($e, 'The event operation could not be completed.'));
         }
         return redirect()->back()->with('success', 'Event removed.');
     }
 
     private function eventPayload(): array
     {
-        $name = trim((string) $this->request->getPost('name'));
-        $year = (int) $this->request->getPost('year');
-        $start = trim((string) $this->request->getPost('start_date')) ?: null;
-        $end = trim((string) $this->request->getPost('end_date')) ?: null;
-        $status = (string) ($this->request->getPost('status') ?: 'active');
-        if ($name === '' || $year < 2000 || $year > 2100) {
+        $name = trim($this->postString('name'));
+        $yearRaw = trim($this->postString('year'));
+        $year = preg_match('/^\d{4}$/', $yearRaw) ? (int) $yearRaw : 0;
+        $start = trim($this->postString('start_date')) ?: null;
+        $end = trim($this->postString('end_date')) ?: null;
+        $status = $this->postString('status') ?: 'active';
+        if ($name === '' || mb_strlen($name) > 150 || $year < 2000 || $year > 2100) {
             return ['error' => 'Enter a valid event name and year.'];
         }
         if (! in_array($status, ['draft', 'active', 'completed'], true)) {
@@ -77,7 +78,7 @@ class EventsController extends BaseController
         if ($start && $end && $end < $start) {
             return ['error' => 'End date cannot be before the start date.'];
         }
-        $isActive = $this->request->getPost('is_active') ? 1 : 0;
+        $isActive = $this->postString('is_active') === '1' ? 1 : 0;
         if ($isActive) {
             $status = 'active';
         }

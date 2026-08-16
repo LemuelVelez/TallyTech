@@ -42,6 +42,46 @@ abstract class BaseController extends Controller
         return new ScoringService($this->repository());
     }
 
+    /**
+     * Return a scalar POST field as a string. Array/object payloads are treated
+     * as invalid input instead of being implicitly cast to values such as "1".
+     */
+    protected function postString(string $key): string
+    {
+        $value = $this->request->getPost($key);
+
+        return is_scalar($value) ? (string) $value : '';
+    }
+
+    /**
+     * Return a strictly positive integer POST field, or zero when malformed.
+     */
+    protected function postPositiveInt(string $key): int
+    {
+        $value = trim($this->postString($key));
+        if ($value === '' || ! preg_match('/^[1-9]\d*$/', $value)) {
+            return 0;
+        }
+
+        $validated = filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+
+        return $validated === false ? 0 : (int) $validated;
+    }
+
+    /**
+     * Surface expected business-rule errors while keeping database/internal
+     * exception details out of user-facing flash messages.
+     */
+    protected function safeErrorMessage(\Throwable $error, string $fallback): string
+    {
+        if ($error instanceof \RuntimeException
+            && ! $error instanceof \CodeIgniter\Database\Exceptions\DatabaseException) {
+            return $error->getMessage();
+        }
+
+        return $fallback;
+    }
+
     public function initController(RequestInterface $request, ResponseInterface $response, LoggerInterface $logger)
     {
         // Load here all helpers you want to be available in your controllers that extend BaseController.

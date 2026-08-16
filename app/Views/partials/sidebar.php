@@ -29,5 +29,8 @@ $menus = [
             <a class="nav-item <?= $path === $url ? 'active' : '' ?>" href="<?= site_url($url) ?>" title="<?= esc($label) ?>" <?= $path === $url ? 'aria-current="page"' : '' ?>><span class="nav-icon"><?= $icon ?></span><span class="nav-text"><?= esc($label) ?></span></a>
         <?php endforeach; ?>
     </nav>
-    <a class="nav-item logout" href="<?= site_url('logout') ?>"><span class="nav-icon">↪</span><span class="nav-text">Logout</span></a>
+    <form class="logout-form" method="post" action="<?= site_url('logout') ?>">
+        <?= csrf_field() ?>
+        <button class="nav-item logout" type="submit"><span class="nav-icon">↪</span><span class="nav-text">Logout</span></button>
+    </form>
 </aside>

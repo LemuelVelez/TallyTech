@@ -22,7 +22,7 @@ class SchedulesController extends BaseController
         try {
             $this->repository()->createSchedule($payload, (int) session()->get('user_id'));
         } catch (\Throwable $e) {
-            return redirect()->back()->withInput()->with('error', $e->getMessage());
+            return redirect()->back()->withInput()->with('error', $this->safeErrorMessage($e, 'The schedule could not be created.'));
         }
         return redirect()->back()->with('success', 'Schedule added.');
     }
@@ -36,7 +36,7 @@ class SchedulesController extends BaseController
         try {
             $this->repository()->updateSchedule($id, $payload, (int) session()->get('user_id'));
         } catch (\Throwable $e) {
-            return redirect()->back()->with('error', $e->getMessage());
+            return redirect()->back()->with('error', $this->safeErrorMessage($e, 'The schedule operation could not be completed.'));
         }
         return redirect()->back()->with('success', 'Schedule updated.');
     }
@@ -46,7 +46,7 @@ class SchedulesController extends BaseController
         try {
             $this->repository()->deleteSchedule($id, (int) session()->get('user_id'));
         } catch (\Throwable $e) {
-            return redirect()->back()->with('error', $e->getMessage());
+            return redirect()->back()->with('error', $this->safeErrorMessage($e, 'The schedule operation could not be completed.'));
         }
         return redirect()->back()->with('success', 'Schedule removed.');
     }
@@ -57,29 +57,50 @@ class SchedulesController extends BaseController
         if (! $event) {
             return ['error' => 'Add and activate an event first.'];
         }
-        $sportId = (int) $this->request->getPost('sport_id');
-        $locationId = (int) $this->request->getPost('location_id');
-        $date = trim((string) $this->request->getPost('match_date'));
-        $status = (string) ($this->request->getPost('status') ?: 'scheduled');
-        if (! $sportId || ! $locationId || ! $date) {
+
+        $sportId = $this->postPositiveInt('sport_id');
+        $locationId = $this->postPositiveInt('location_id');
+        $date = trim($this->postString('match_date'));
+        $status = $this->postString('status') ?: 'scheduled';
+        $round = trim($this->postString('round')) ?: 'Elimination';
+        if (! $sportId || ! $locationId || $date === '') {
             return ['error' => 'Sport, location, and match date are required.'];
         }
         if (! in_array($status, ['scheduled', 'played', 'cancelled'], true)) {
             return ['error' => 'Select a valid schedule status.'];
         }
-        $parsed = \DateTime::createFromFormat('Y-m-d\TH:i', $date) ?: \DateTime::createFromFormat('Y-m-d H:i:s', $date);
+        if (mb_strlen($round) > 80) {
+            return ['error' => 'Round name must be 80 characters or fewer.'];
+        }
+
+        $parsed = $this->parseDateTime($date);
         if (! $parsed) {
             return ['error' => 'Enter a valid match date and time.'];
         }
+
         return [
             'event_id' => (int) $event['id'],
             'sport_id' => $sportId,
             'location_id' => $locationId,
-            'round' => trim((string) $this->request->getPost('round')) ?: 'Elimination',
+            'round' => $round,
             'match_date' => $parsed->format('Y-m-d H:i:s'),
-            'team_a_id' => $this->request->getPost('team_a_id') ?: null,
-            'team_b_id' => $this->request->getPost('team_b_id') ?: null,
+            'team_a_id' => $this->postPositiveInt('team_a_id') ?: null,
+            'team_b_id' => $this->postPositiveInt('team_b_id') ?: null,
             'status' => $status,
         ];
+    }
+
+    private function parseDateTime(string $value): ?\DateTime
+    {
+        foreach (['Y-m-d\\TH:i', 'Y-m-d H:i:s'] as $format) {
+            $parsed = \DateTime::createFromFormat('!' . $format, $value);
+            $errors = \DateTime::getLastErrors();
+            $hasErrors = is_array($errors) && ($errors['warning_count'] > 0 || $errors['error_count'] > 0);
+            if ($parsed && ! $hasErrors && $parsed->format($format) === $value) {
+                return $parsed;
+            }
+        }
+
+        return null;
     }
 }

@@ -42,15 +42,15 @@ class TeamsController extends BaseController
         try {
             $this->repository()->deleteTeam($id, (int) session()->get('user_id'));
         } catch (\Throwable $e) {
-            return redirect()->back()->with('error', $e->getMessage());
+            return redirect()->back()->with('error', $this->safeErrorMessage($e, 'The team operation could not be completed.'));
         }
         return redirect()->back()->with('success', 'Team removed.');
     }
 
     private function teamPayload(): array
     {
-        $name = trim((string) $this->request->getPost('name'));
-        $code = strtoupper(trim((string) $this->request->getPost('code')));
+        $name = trim($this->postString('name'));
+        $code = strtoupper(trim($this->postString('code')));
         if ($name === '' || $code === '') {
             return ['error' => 'Team name and code are required.'];
         }
