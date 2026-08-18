@@ -199,6 +199,152 @@ class Database extends Config
         // we don't overwrite live data on accident.
         if (ENVIRONMENT === 'testing') {
             $this->defaultGroup = 'tests';
+            return;
         }
+
+        $this->applyRuntimeDatabaseConfiguration();
+    }
+
+    /**
+     * Use database credentials supplied by the deployment environment.
+     *
+     * Hosting/runtime variables take precedence over the starter defaults,
+     * followed by CodeIgniter-specific variables. This avoids
+     * falling back to the hard-coded "tallytech" database when the hosting
+     * provider grants the application user access to a different database name.
+     */
+    private function applyRuntimeDatabaseConfiguration(): void
+    {
+        $url = $this->parseDatabaseUrl($this->environmentValue([
+            'MYSQL_URL',
+            'DATABASE_URL',
+            'DB_URL',
+            'MYSQL_PUBLIC_URL',
+        ]));
+
+        $hostname = $this->environmentValue([
+            'DB_HOST',
+            'MYSQLHOST',
+            'MYSQL_HOST',
+        ]) ?? ($url['host'] ?? null) ?? $this->environmentValue([
+            'database.default.hostname',
+            'database_default_hostname',
+        ]);
+
+        $database = $this->environmentValue([
+            'DB_DATABASE',
+            'DB_NAME',
+            'MYSQLDATABASE',
+            'MYSQL_DATABASE',
+        ]) ?? ($url['database'] ?? null) ?? $this->environmentValue([
+            'database.default.database',
+            'database_default_database',
+        ]);
+
+        $username = $this->environmentValue([
+            'DB_USERNAME',
+            'DB_USER',
+            'MYSQLUSER',
+            'MYSQL_USER',
+        ]) ?? ($url['user'] ?? null) ?? $this->environmentValue([
+            'database.default.username',
+            'database_default_username',
+        ]);
+
+        $password = $this->environmentValue([
+            'DB_PASSWORD',
+            'MYSQLPASSWORD',
+            'MYSQL_PASSWORD',
+        ]) ?? ($url['pass'] ?? null) ?? $this->environmentValue([
+            'database.default.password',
+            'database_default_password',
+        ]);
+
+        $port = $this->environmentValue([
+            'DB_PORT',
+            'MYSQLPORT',
+            'MYSQL_PORT',
+        ]) ?? (isset($url['port']) ? (string) $url['port'] : null) ?? $this->environmentValue([
+            'database.default.port',
+            'database_default_port',
+        ]);
+
+        if ($hostname !== null) {
+            $this->default['hostname'] = $hostname;
+        }
+        if ($database !== null) {
+            $this->default['database'] = $database;
+        }
+        if ($username !== null) {
+            $this->default['username'] = $username;
+        }
+        if ($password !== null) {
+            $this->default['password'] = $password;
+        }
+        if ($port !== null && ctype_digit($port)) {
+            $this->default['port'] = (int) $port;
+        }
+    }
+
+    /**
+     * @param list<string> $keys
+     */
+    private function environmentValue(array $keys): ?string
+    {
+        foreach ($keys as $key) {
+            $value = getenv($key);
+
+            if ($value === false && array_key_exists($key, $_ENV)) {
+                $value = $_ENV[$key];
+            }
+            if ($value === false && array_key_exists($key, $_SERVER)) {
+                $value = $_SERVER[$key];
+            }
+            if ($value === false || ! is_scalar($value)) {
+                continue;
+            }
+
+            $value = trim((string) $value);
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{host?: string, port?: int, user?: string, pass?: string, database?: string}
+     */
+    private function parseDatabaseUrl(?string $url): array
+    {
+        if ($url === null || $url === '') {
+            return [];
+        }
+
+        $parts = parse_url($url);
+        if ($parts === false || ! isset($parts['host'])) {
+            return [];
+        }
+
+        $config = ['host' => $parts['host']];
+
+        if (isset($parts['port'])) {
+            $config['port'] = (int) $parts['port'];
+        }
+        if (isset($parts['user'])) {
+            $config['user'] = rawurldecode($parts['user']);
+        }
+        if (isset($parts['pass'])) {
+            $config['pass'] = rawurldecode($parts['pass']);
+        }
+        if (isset($parts['path'])) {
+            $database = rawurldecode(ltrim($parts['path'], '/'));
+            if ($database !== '') {
+                $config['database'] = $database;
+            }
+        }
+
+        return $config;
     }
 }
