@@ -8,6 +8,8 @@ RUN apt-get update \
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
 
 RUN a2enmod rewrite \
+    && sed -ri -e "s!Listen 80!Listen 3000!g" /etc/apache2/ports.conf \
+    && sed -ri -e "s!<VirtualHost \*:80>!<VirtualHost *:3000>!g" /etc/apache2/sites-available/*.conf \
     && sed -ri -e "s!/var/www/html!${APACHE_DOCUMENT_ROOT}!g" /etc/apache2/sites-available/*.conf \
     && printf '%s\n' \
         '<Directory /var/www/html/public>' \
@@ -45,6 +47,9 @@ RUN mkdir -p writable/cache writable/debugbar writable/logs writable/session wri
 
 ENV CI_ENVIRONMENT=production
 
-EXPOSE 80
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD php -r '$s = @fsockopen("127.0.0.1", 3000, $errno, $errstr, 2); if (! $s) { exit(1); } fclose($s);'
 
 CMD ["apache2-foreground"]
