@@ -33,6 +33,8 @@ class AuthController extends BaseController
                 ->with('login_username', $username);
         }
 
+        $resultDensity = $settings['result_density'] ?? 'comfortable';
+
         session()->regenerate(true);
         session()->set([
             'user_id' => $user['id'],
@@ -40,8 +42,8 @@ class AuthController extends BaseController
             'display_name' => $user['display_name'],
             'role' => $user['role'],
             'compact_sidebar' => ($settings['compact_sidebar'] ?? '0') === '1',
-            'result_density' => in_array(($settings['result_density'] ?? 'comfortable'), ['comfortable', 'compact'], true)
-                ? $settings['result_density']
+            'result_density' => in_array($resultDensity, ['comfortable', 'compact'], true)
+                ? $resultDensity
                 : 'comfortable',
         ]);
         return redirect()->to('/dashboard');
