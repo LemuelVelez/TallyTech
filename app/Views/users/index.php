@@ -104,6 +104,10 @@ $activeAdminCount = $isAdminManagement
 <?php foreach ($users as $user): ?>
     <?php
     $userRole = (string) ($user['role'] ?? $roleType ?? '');
+    $isOnlyActiveAdmin = $isAdminManagement
+        && $userRole === 'admin'
+        && ($user['status'] ?? '') === 'active'
+        && $activeAdminCount === 1;
     $assignedIds = array_map('intval', array_column($user['sports'] ?? [], 'id'));
     $updateAction = $isAdminManagement ? 'users/' . $user['id'] . '/update' : 'facilitators/' . $user['id'] . '/update';
     ?>
@@ -132,7 +136,7 @@ $activeAdminCount = $isAdminManagement
                             <?php foreach ($roleOptions as $optionRole): ?>
                                 <option value="<?= esc($optionRole) ?>"
                                         <?= $userRole === $optionRole ? 'selected' : '' ?>
-                                        <?= $optionRole === 'facilitator' && ! $hasActiveEvent && $userRole !== 'facilitator' ? 'disabled' : '' ?>>
+                                        <?= ($isOnlyActiveAdmin && $optionRole !== 'admin') || ($optionRole === 'facilitator' && ! $hasActiveEvent && $userRole !== 'facilitator') ? 'disabled' : '' ?>>
                                     <?= esc($roleLabels[$optionRole] ?? ucfirst($optionRole)) ?>
                                 </option>
                             <?php endforeach; ?>
@@ -145,7 +149,7 @@ $activeAdminCount = $isAdminManagement
                 <label>Status
                     <select name="status">
                         <option value="active" <?= $user['status'] === 'active' ? 'selected' : '' ?>>Active</option>
-                        <option value="inactive" <?= $user['status'] === 'inactive' ? 'selected' : '' ?>>Inactive</option>
+                        <option value="inactive" <?= $user['status'] === 'inactive' ? 'selected' : '' ?> <?= $isOnlyActiveAdmin ? 'disabled' : '' ?>>Inactive</option>
                     </select>
                 </label>
                 <label>New Password
