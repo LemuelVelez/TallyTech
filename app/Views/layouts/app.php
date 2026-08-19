@@ -11,7 +11,7 @@ $resultDensity = (string) (session()->get('result_density') ?: 'comfortable');
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
     <meta name="theme-color" content="#0c7e43">
     <title><?= esc($title ?? 'TallyTech') ?> · TallyTech</title>
-    <link rel="icon" href="<?= base_url('assets/img/logo.png') ?>">
+    <link rel="icon" type="image/png" href="<?= base_url('logo.png') ?>">
     <link rel="stylesheet" href="<?= base_url('assets/css/app.css') ?>">
 </head>
 <body class="app role-<?= esc($role) ?> <?= $compactSidebar ? 'sidebar-compact' : '' ?> density-<?= esc($resultDensity) ?>">

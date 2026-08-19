@@ -1,4 +1,12 @@
-<?php $hasActiveEvent = ! empty($activeEvent); ?>
+<?php
+$hasActiveEvent = ! empty($activeEvent);
+$heroImage = base_url('assets/img/logo.png');
+$heroSlides = [
+    ['image' => $heroImage, 'label' => 'TallyTech live event scoreboard'],
+    ['image' => $heroImage, 'label' => 'TallyTech tournament standings'],
+    ['image' => $heroImage, 'label' => 'TallyTech sports festival results'],
+];
+?>
 <!doctype html>
 <html lang="en">
 <head>
@@ -7,20 +15,44 @@
     <meta http-equiv="refresh" content="30">
     <meta name="theme-color" content="#061b3a">
     <title>Live Scoreboard · TallyTech</title>
+    <link rel="icon" type="image/png" href="<?= base_url('logo.png') ?>">
     <link rel="stylesheet" href="<?= base_url('assets/css/app.css') ?>">
 </head>
 <body class="viewer-page">
+<a class="skip-link" href="#scoreboard-content">Skip to scoreboard content</a>
 <header class="viewer-nav">
     <a class="viewer-brand" href="<?= site_url('scoreboard') ?>"><img src="<?= base_url('assets/img/logo.png') ?>" alt="TallyTech"><b>TallyTech</b></a>
     <div><span><?= $hasActiveEvent ? 'LIVE' : 'IDLE' ?></span><a href="<?= site_url('login') ?>" class="btn viewer-login">Login</a></div>
 </header>
-<section class="score-hero">
-    <div class="live-pill"><?= $hasActiveEvent ? '● LIVE · ' . esc($activeEvent['name']) : 'NO ACTIVE EVENT' ?></div>
-    <h1>Live Scoreboard</h1>
-    <p>Scores, rankings, and results — refreshed automatically every 30 seconds.</p>
-    <small><?= $hasActiveEvent ? 'Official standings use validated results only. Unofficial submissions remain visible and clearly marked.' : 'Standings and schedules will appear when an event is activated.' ?></small>
+
+<section class="score-hero" data-hero-carousel data-interval="6000" aria-roledescription="carousel" aria-label="TallyTech event highlights" tabindex="0">
+    <div class="hero-carousel" aria-live="off">
+        <div class="hero-track">
+            <?php foreach ($heroSlides as $i => $slide): ?>
+                <div class="hero-slide <?= $i === 0 ? 'is-active' : '' ?>" data-carousel-slide aria-hidden="<?= $i === 0 ? 'false' : 'true' ?>">
+                    <img src="<?= esc($slide['image']) ?>" alt="" aria-hidden="true">
+                </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
+
+    <div class="hero-content">
+        <div class="live-pill"><?= $hasActiveEvent ? '● LIVE · ' . esc($activeEvent['name']) : 'NO ACTIVE EVENT' ?></div>
+        <h1>Live Scoreboard</h1>
+        <p>Scores, rankings, and results — refreshed automatically every 30 seconds.</p>
+        <small><?= $hasActiveEvent ? 'Official standings use validated results only. Unofficial submissions remain visible and clearly marked.' : 'Standings and schedules will appear when an event is activated.' ?></small>
+    </div>
+
+    <button class="carousel-control prev" type="button" data-carousel-prev aria-label="Show previous hero slide">‹</button>
+    <button class="carousel-control next" type="button" data-carousel-next aria-label="Show next hero slide">›</button>
+    <div class="carousel-dots" aria-label="Choose hero slide">
+        <?php foreach ($heroSlides as $i => $slide): ?>
+            <button class="carousel-dot <?= $i === 0 ? 'is-active' : '' ?>" type="button" data-carousel-dot aria-label="Show slide <?= $i + 1 ?>" aria-current="<?= $i === 0 ? 'true' : 'false' ?>"></button>
+        <?php endforeach; ?>
+    </div>
 </section>
-<main class="viewer-content">
+
+<main class="viewer-content" id="scoreboard-content">
     <section>
         <div class="section-title"><h2>🏆 Team Standings</h2><span>Official ranking</span></div>
         <div class="viewer-podium">
@@ -58,5 +90,6 @@
     </div>
 </main>
 <footer class="viewer-footer">© 2026 TallyTech · Intramural Sports Festival Management System</footer>
+<script src="<?= base_url('assets/js/app.js') ?>"></script>
 </body>
 </html>
