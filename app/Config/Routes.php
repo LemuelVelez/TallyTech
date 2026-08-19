@@ -33,6 +33,18 @@ $routes->group('', ['filter' => 'auth'], static function (RouteCollection $route
         $routes->post('sports/(:num)/update', 'SportsController::update/$1');
         $routes->post('sports/(:num)/delete', 'SportsController::delete/$1');
 
+        $routes->get('sport-categories', 'SportCategoriesController::index');
+        $routes->post('sport-categories', 'SportCategoriesController::store');
+        $routes->post('sport-categories/(:num)/update', 'SportCategoriesController::update/$1');
+        $routes->post('sport-categories/(:num)/status', 'SportCategoriesController::setStatus/$1');
+        $routes->post('sport-categories/(:num)/delete', 'SportCategoriesController::delete/$1');
+
+        $routes->get('locations', 'LocationsController::index');
+        $routes->post('locations', 'LocationsController::store');
+        $routes->post('locations/(:num)/update', 'LocationsController::update/$1');
+        $routes->post('locations/(:num)/status', 'LocationsController::setStatus/$1');
+        $routes->post('locations/(:num)/delete', 'LocationsController::delete/$1');
+
         $routes->get('schedules', 'SchedulesController::index');
         $routes->post('schedules', 'SchedulesController::store');
         $routes->post('schedules/(:num)/update', 'SchedulesController::update/$1');

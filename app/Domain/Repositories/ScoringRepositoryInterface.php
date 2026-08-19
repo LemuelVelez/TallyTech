@@ -10,6 +10,9 @@ interface ScoringRepositoryInterface
     public function teams(): array;
     public function sports(?int $eventId = null): array;
     public function locations(): array;
+    public function allLocations(): array;
+    public function sportCategories(bool $includeInactive = false): array;
+    public function sportCategory(int $id): ?array;
     public function schedules(?int $eventId = null, ?string $resultType = null): array;
     public function usersByRole(string $role): array;
     public function assignedSportIds(int $userId): array;
@@ -28,6 +31,16 @@ interface ScoringRepositoryInterface
     public function updateEvent(int $id, array $data, int $actorId): void;
     public function activateEvent(int $eventId, int $actorId): void;
     public function deleteEvent(int $id, int $actorId): void;
+
+    public function createLocation(string $name, int $actorId): int;
+    public function updateLocation(int $id, string $name, int $actorId): void;
+    public function setLocationActive(int $id, bool $isActive, int $actorId): void;
+    public function deleteLocation(int $id, int $actorId): void;
+
+    public function createSportCategory(string $name, int $actorId): int;
+    public function updateSportCategory(int $id, string $name, int $actorId): void;
+    public function setSportCategoryActive(int $id, bool $isActive, int $actorId): void;
+    public function deleteSportCategory(int $id, int $actorId): void;
 
     public function createSport(array $data, int $actorId): int;
     public function updateSport(int $id, array $data, int $actorId): void;

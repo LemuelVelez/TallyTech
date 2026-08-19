@@ -8,6 +8,7 @@ class SportsController extends BaseController
     {
         $data = $this->scoringService()->commonData();
         $data['title'] = 'Sports';
+        $data['sportCategories'] = $this->repository()->sportCategories(true);
         return view('sports/index', $data);
     }
 
@@ -25,7 +26,7 @@ class SportsController extends BaseController
         try {
             $this->repository()->createSport($payload, (int) session()->get('user_id'));
         } catch (\Throwable $e) {
-            return redirect()->back()->withInput()->with('error', 'Sport already exists for this event or could not be created.');
+            return redirect()->back()->withInput()->with('error', $this->safeErrorMessage($e, 'Sport already exists for this event or could not be created.'));
         }
         return redirect()->back()->with('success', 'Sport added.');
     }
@@ -61,11 +62,11 @@ class SportsController extends BaseController
     private function sportPayload(int $eventId): array
     {
         $name = trim($this->postString('name'));
-        $category = $this->postString('category');
+        $categoryId = $this->postPositiveInt('category_id');
         $type = $this->postString('result_type');
-        if ($name === '' || mb_strlen($name) > 120 || ! in_array($category, ['Men', 'Women', 'Mixed'], true) || ! in_array($type, ['match', 'judged'], true)) {
+        if ($name === '' || mb_strlen($name) > 120 || ! $categoryId || ! in_array($type, ['match', 'judged'], true)) {
             return ['error' => 'Complete all sport fields.'];
         }
-        return ['event_id' => $eventId, 'name' => $name, 'category' => $category, 'result_type' => $type];
+        return ['event_id' => $eventId, 'name' => $name, 'category_id' => $categoryId, 'result_type' => $type];
     }
 }

@@ -4,9 +4,11 @@ namespace App\Infrastructure\Persistence;
 
 use App\Domain\Repositories\ScoringRepositoryInterface;
 use App\Models\EventModel;
+use App\Models\LocationModel;
 use App\Models\NotificationModel;
 use App\Models\ResultModel;
 use App\Models\ScheduleModel;
+use App\Models\SportCategoryModel;
 use App\Models\SportModel;
 use App\Models\TeamModel;
 use App\Models\UserModel;
@@ -20,6 +22,8 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
     private UserModel $users;
     private EventModel $eventsModel;
     private TeamModel $teamsModel;
+    private LocationModel $locationsModel;
+    private SportCategoryModel $sportCategoriesModel;
     private SportModel $sportsModel;
     private ScheduleModel $schedulesModel;
     private WeightedPointModel $weightedPointsModel;
@@ -32,6 +36,8 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         $this->users = new UserModel($this->db);
         $this->eventsModel = new EventModel($this->db);
         $this->teamsModel = new TeamModel($this->db);
+        $this->locationsModel = new LocationModel($this->db);
+        $this->sportCategoriesModel = new SportCategoryModel($this->db);
         $this->sportsModel = new SportModel($this->db);
         $this->schedulesModel = new ScheduleModel($this->db);
         $this->weightedPointsModel = new WeightedPointModel($this->db);
@@ -62,8 +68,9 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
     public function sports(?int $eventId = null): array
     {
         $builder = $this->db->table('sports s')
-            ->select('s.*, e.name event_name')
-            ->join('events e', 'e.id=s.event_id');
+            ->select('s.*, e.name event_name, c.id category_id')
+            ->join('events e', 'e.id=s.event_id')
+            ->join('sport_categories c', 'c.name=s.category', 'left');
         if ($eventId !== null) {
             $builder->where('s.event_id', $eventId);
         }
@@ -72,7 +79,35 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
 
     public function locations(): array
     {
-        return $this->db->table('locations')->orderBy('name')->get()->getResultArray();
+        return $this->locationsModel->where('is_active', 1)->orderBy('name')->findAll();
+    }
+
+    public function allLocations(): array
+    {
+        return $this->db->table('locations l')
+            ->select('l.*, COUNT(sc.id) schedule_count')
+            ->join('schedules sc', 'sc.location_id=l.id', 'left')
+            ->groupBy('l.id,l.name,l.is_active,l.created_at,l.updated_at')
+            ->orderBy('l.name')
+            ->get()
+            ->getResultArray();
+    }
+
+    public function sportCategories(bool $includeInactive = false): array
+    {
+        $builder = $this->db->table('sport_categories c')
+            ->select('c.*, COUNT(s.id) sport_count')
+            ->join('sports s', 's.category=c.name', 'left')
+            ->groupBy('c.id,c.name,c.is_active,c.created_at,c.updated_at');
+        if (! $includeInactive) {
+            $builder->where('c.is_active', 1);
+        }
+        return $builder->orderBy('c.name')->get()->getResultArray();
+    }
+
+    public function sportCategory(int $id): ?array
+    {
+        return $this->sportCategoriesModel->find($id) ?: null;
     }
 
     public function schedules(?int $eventId = null, ?string $resultType = null): array
@@ -303,13 +338,147 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         $this->finishTransaction();
     }
 
+    public function createLocation(string $name, int $actorId): int
+    {
+        $name = $this->normaliseReferenceName($name, 150, 'Location');
+        $this->assertUniqueReferenceName('locations', $name);
+        $now = date('Y-m-d H:i:s');
+
+        $this->db->transStart();
+        $this->locationsModel->insert([
+            'name' => $name,
+            'is_active' => 1,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+        $id = (int) $this->locationsModel->getInsertID();
+        $this->notify($actorId, 'location_created', 'Added location ' . $name);
+        $this->finishTransaction();
+        return $id;
+    }
+
+    public function updateLocation(int $id, string $name, int $actorId): void
+    {
+        $location = $this->requireRow('locations', $id, 'Location');
+        $name = $this->normaliseReferenceName($name, 150, 'Location');
+        $this->assertUniqueReferenceName('locations', $name, $id);
+
+        $this->db->transStart();
+        $this->locationsModel->update($id, ['name' => $name, 'updated_at' => date('Y-m-d H:i:s')]);
+        $this->notify($actorId, 'location_updated', 'Updated location ' . ($location['name'] ?? '#'.$id) . ' to ' . $name);
+        $this->finishTransaction();
+    }
+
+    public function setLocationActive(int $id, bool $isActive, int $actorId): void
+    {
+        $location = $this->requireRow('locations', $id, 'Location');
+        $this->db->transStart();
+        $this->locationsModel->update($id, [
+            'is_active' => $isActive ? 1 : 0,
+            'updated_at' => date('Y-m-d H:i:s'),
+        ]);
+        $this->notify($actorId, $isActive ? 'location_enabled' : 'location_disabled', ($isActive ? 'Enabled location ' : 'Disabled location ') . ($location['name'] ?? '#'.$id));
+        $this->finishTransaction();
+    }
+
+    public function deleteLocation(int $id, int $actorId): void
+    {
+        $location = $this->requireRow('locations', $id, 'Location');
+        if ($this->db->table('schedules')->where('location_id', $id)->countAllResults() > 0) {
+            throw new RuntimeException('Location cannot be removed while schedules reference it. Disable it instead.');
+        }
+
+        $this->db->transStart();
+        $this->locationsModel->delete($id);
+        $this->notify($actorId, 'location_deleted', 'Removed location ' . ($location['name'] ?? '#'.$id));
+        $this->finishTransaction();
+    }
+
+    public function createSportCategory(string $name, int $actorId): int
+    {
+        $name = $this->normaliseReferenceName($name, 80, 'Sport category');
+        $this->assertUniqueReferenceName('sport_categories', $name);
+        $now = date('Y-m-d H:i:s');
+
+        $this->db->transStart();
+        $this->sportCategoriesModel->insert([
+            'name' => $name,
+            'is_active' => 1,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+        $id = (int) $this->sportCategoriesModel->getInsertID();
+        $this->notify($actorId, 'sport_category_created', 'Added sport category ' . $name);
+        $this->finishTransaction();
+        return $id;
+    }
+
+    public function updateSportCategory(int $id, string $name, int $actorId): void
+    {
+        $category = $this->requireRow('sport_categories', $id, 'Sport category');
+        $name = $this->normaliseReferenceName($name, 80, 'Sport category');
+        $this->assertUniqueReferenceName('sport_categories', $name, $id);
+        $oldName = (string) $category['name'];
+
+        if ($oldName !== $name) {
+            $sports = $this->db->table('sports')->select('id,event_id,name')->where('category', $oldName)->get()->getResultArray();
+            foreach ($sports as $sport) {
+                $duplicate = $this->db->table('sports')
+                    ->where('event_id', $sport['event_id'])
+                    ->where('name', $sport['name'])
+                    ->where('category', $name)
+                    ->where('id !=', $sport['id'])
+                    ->countAllResults();
+                if ($duplicate > 0) {
+                    throw new RuntimeException('Category cannot be renamed because it would create a duplicate sport in an event.');
+                }
+            }
+        }
+
+        $this->db->transStart();
+        $this->sportCategoriesModel->update($id, ['name' => $name, 'updated_at' => date('Y-m-d H:i:s')]);
+        if ($oldName !== $name) {
+            $this->db->table('sports')->where('category', $oldName)->update(['category' => $name]);
+        }
+        $this->notify($actorId, 'sport_category_updated', 'Updated sport category ' . $oldName . ' to ' . $name);
+        $this->finishTransaction();
+    }
+
+    public function setSportCategoryActive(int $id, bool $isActive, int $actorId): void
+    {
+        $category = $this->requireRow('sport_categories', $id, 'Sport category');
+        $this->db->transStart();
+        $this->sportCategoriesModel->update($id, [
+            'is_active' => $isActive ? 1 : 0,
+            'updated_at' => date('Y-m-d H:i:s'),
+        ]);
+        $this->notify($actorId, $isActive ? 'sport_category_enabled' : 'sport_category_disabled', ($isActive ? 'Enabled sport category ' : 'Disabled sport category ') . ($category['name'] ?? '#'.$id));
+        $this->finishTransaction();
+    }
+
+    public function deleteSportCategory(int $id, int $actorId): void
+    {
+        $category = $this->requireRow('sport_categories', $id, 'Sport category');
+        if ($this->db->table('sports')->where('category', $category['name'])->countAllResults() > 0) {
+            throw new RuntimeException('Sport category cannot be removed while sports use it. Disable it instead.');
+        }
+
+        $this->db->transStart();
+        $this->sportCategoriesModel->delete($id);
+        $this->notify($actorId, 'sport_category_deleted', 'Removed sport category ' . ($category['name'] ?? '#'.$id));
+        $this->finishTransaction();
+    }
+
     public function createSport(array $data, int $actorId): int
     {
         $eventId = $this->positiveIntValue($data['event_id'] ?? null);
         if (! $eventId) {
             throw new RuntimeException('Sport requires a valid active event.');
         }
+        $category = $this->requireActiveSportCategory($this->positiveIntValue($data['category_id'] ?? null));
+        unset($data['category_id']);
         $data['event_id'] = $eventId;
+        $data['category'] = $category['name'];
         $this->assertActiveEvent($eventId);
         $this->db->transStart();
         $this->sportsModel->insert($data);
@@ -326,7 +495,17 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         if (! $eventId || (int) ($sport['event_id'] ?? 0) !== $eventId) {
             throw new RuntimeException('Sport does not belong to the active event.');
         }
+        $categoryId = $this->positiveIntValue($data['category_id'] ?? null);
+        $category = $this->sportCategory($categoryId);
+        if (! $category) {
+            throw new RuntimeException('Select a valid sport category.');
+        }
+        if (! (int) $category['is_active'] && (string) $category['name'] !== (string) ($sport['category'] ?? '')) {
+            throw new RuntimeException('Selected sport category is inactive.');
+        }
+        unset($data['category_id']);
         $data['event_id'] = $eventId;
+        $data['category'] = $category['name'];
         $this->assertActiveEvent((int) $sport['event_id']);
         if (($sport['result_type'] ?? '') !== $data['result_type'] && $this->db->table('schedules')->where('sport_id', $id)->countAllResults() > 0) {
             throw new RuntimeException('Sport type cannot be changed after schedules have been created.');
@@ -384,7 +563,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         if ($this->db->table('results')->where('schedule_id', $id)->countAllResults() > 0) {
             throw new RuntimeException('A schedule with submitted results cannot be edited.');
         }
-        $this->assertSchedulePayload($data);
+        $this->assertSchedulePayload($data, $id);
         $this->db->transStart();
         $this->schedulesModel->update($id, $data);
         $this->notify($actorId, 'schedule_updated', 'Updated schedule #' . ($schedule['id'] ?? $id));
@@ -731,7 +910,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         }
     }
 
-    private function assertSchedulePayload(array $data): void
+    private function assertSchedulePayload(array $data, ?int $existingScheduleId = null): void
     {
         $sportId = $this->positiveIntValue($data['sport_id'] ?? null);
         $locationId = $this->positiveIntValue($data['location_id'] ?? null);
@@ -741,7 +920,17 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         }
 
         $sport = $this->requireRow('sports', $sportId, 'Sport');
-        $this->requireRow('locations', $locationId, 'Location');
+        $location = $this->requireRow('locations', $locationId, 'Location');
+        if (! (int) ($location['is_active'] ?? 0)) {
+            $existingLocationId = 0;
+            if ($existingScheduleId !== null) {
+                $existingSchedule = $this->requireRow('schedules', $existingScheduleId, 'Schedule');
+                $existingLocationId = (int) ($existingSchedule['location_id'] ?? 0);
+            }
+            if ($existingLocationId !== $locationId) {
+                throw new RuntimeException('Selected location is inactive.');
+            }
+        }
         if ((int) $sport['event_id'] !== $eventId) {
             throw new RuntimeException('Selected sport does not belong to the active event.');
         }
@@ -1050,6 +1239,43 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         }
 
         return $data;
+    }
+
+    private function requireActiveSportCategory(int $categoryId): array
+    {
+        if (! $categoryId) {
+            throw new RuntimeException('Select a valid sport category.');
+        }
+        $category = $this->sportCategory($categoryId);
+        if (! $category) {
+            throw new RuntimeException('Select a valid sport category.');
+        }
+        if (! (int) ($category['is_active'] ?? 0)) {
+            throw new RuntimeException('Selected sport category is inactive.');
+        }
+        return $category;
+    }
+
+    private function normaliseReferenceName(string $name, int $maxLength, string $label): string
+    {
+        $name = trim(preg_replace('/\s+/u', ' ', $name) ?? $name);
+        if ($name === '' || mb_strlen($name) > $maxLength) {
+            throw new RuntimeException($label . ' name is invalid.');
+        }
+        return $name;
+    }
+
+    private function assertUniqueReferenceName(string $table, string $name, ?int $exceptId = null): void
+    {
+        $rows = $this->db->table($table)->select('id,name')->get()->getResultArray();
+        foreach ($rows as $row) {
+            if ($exceptId !== null && (int) $row['id'] === $exceptId) {
+                continue;
+            }
+            if (mb_strtolower(trim((string) $row['name'])) === mb_strtolower($name)) {
+                throw new RuntimeException('A record with this name already exists.');
+            }
+        }
     }
 
     private function positiveIntValue(mixed $value): int

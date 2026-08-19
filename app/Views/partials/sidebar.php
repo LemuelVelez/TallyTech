@@ -4,8 +4,8 @@ $path = trim(uri_string(), '/');
 $menus = [
     'admin' => [
         ['dashboard', 'Dashboard', 'dashboard'], ['notifications', 'Notifications', 'bell'], ['team-ranking', 'Team Ranking', 'trophy'],
-        ['teams', 'Teams', 'users'], ['events', 'Events', 'calendar'], ['sports', 'Sports', 'dumbbell'], ['schedules', 'Schedules', 'calendar-clock'],
-        ['users', 'User Management', 'user-cog'], ['reports', 'Reports', 'chart-bar'], ['settings', 'Settings', 'settings'],
+        ['teams', 'Teams', 'users'], ['events', 'Events', 'calendar'], ['sports', 'Sports', 'dumbbell'], ['sport-categories', 'Sport Categories', 'sliders'],
+        ['locations', 'Locations', 'target'], ['schedules', 'Schedules', 'calendar-clock'], ['users', 'User Management', 'user-cog'], ['reports', 'Reports', 'chart-bar'], ['settings', 'Settings', 'settings'],
     ],
     'manager' => [
         ['dashboard', 'Dashboard', 'dashboard'], ['notifications', 'Notifications', 'bell'], ['team-ranking', 'Team Ranking', 'trophy'],

@@ -9,6 +9,7 @@ class SchedulesController extends BaseController
         $data = $this->scoringService()->commonData();
         $data['title'] = 'Team Schedules';
         $data['schedules'] = $this->repository()->schedules((int) ($data['activeEvent']['id'] ?? 0));
+        $data['allLocations'] = $this->repository()->allLocations();
         return view('schedules/index', $data);
     }
 

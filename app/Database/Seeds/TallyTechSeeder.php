@@ -17,7 +17,10 @@ class TallyTechSeeder extends Seeder
             throw new RuntimeException('TallyTech development seed data must not be loaded in production.');
         }
 
-        if (! $this->db->tableExists('users') || ! $this->db->tableExists('events')) {
+        if (! $this->db->tableExists('users')
+            || ! $this->db->tableExists('events')
+            || ! $this->db->tableExists('sport_categories')
+            || ! $this->db->fieldExists('is_active', 'locations')) {
             throw new RuntimeException('Database schema is not ready. Run "php spark migrate" before seeding.');
         }
 
@@ -81,11 +84,15 @@ class TallyTechSeeder extends Seeder
             ];
 
             $locations = [
-                'Main Gymnasium' => $this->ensureLocation('Main Gymnasium'),
-                'Covered Court' => $this->ensureLocation('Covered Court'),
-                'ISF Field' => $this->ensureLocation('ISF Field'),
-                'Auditorium' => $this->ensureLocation('Auditorium'),
+                'Main Gymnasium' => $this->ensureLocation('Main Gymnasium', $now),
+                'Covered Court' => $this->ensureLocation('Covered Court', $now),
+                'ISF Field' => $this->ensureLocation('ISF Field', $now),
+                'Auditorium' => $this->ensureLocation('Auditorium', $now),
             ];
+
+            foreach (['Men', 'Women', 'Mixed'] as $category) {
+                $this->ensureSportCategory($category, $now);
+            }
 
             $sports = [
                 'Basketball' => $this->ensureSport($eventId, 'Basketball', 'Men', 'match', $now),
@@ -210,10 +217,26 @@ class TallyTechSeeder extends Seeder
         return $this->existingOrInsert('teams', $row, $data);
     }
 
-    private function ensureLocation(string $name): int
+    private function ensureLocation(string $name, string $now): int
     {
         $row = $this->db->table('locations')->select('id')->where('name', $name)->get()->getRowArray();
-        return $this->existingOrInsert('locations', $row, ['name' => $name]);
+        return $this->existingOrInsert('locations', $row, [
+            'name' => $name,
+            'is_active' => 1,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+    }
+
+    private function ensureSportCategory(string $name, string $now): int
+    {
+        $row = $this->db->table('sport_categories')->select('id')->where('name', $name)->get()->getRowArray();
+        return $this->existingOrInsert('sport_categories', $row, [
+            'name' => $name,
+            'is_active' => 1,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
     }
 
     private function ensureSport(int $eventId, string $name, string $category, string $resultType, string $now): int
