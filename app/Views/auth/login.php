@@ -17,10 +17,19 @@
         <form method="post" action="<?= site_url('login') ?>">
             <?= csrf_field() ?>
             <label>Username<input name="username" value="<?= esc((string) session()->getFlashdata('login_username')) ?>" required autocomplete="username"></label>
-            <label>Password<input type="password" name="password" required autocomplete="current-password"></label>
-            <button class="btn primary full" type="submit">Sign in</button>
+            <label>Password
+                <span class="password-field">
+                    <input type="password" name="password" required autocomplete="current-password" data-password-input>
+                    <button class="password-toggle" type="button" data-password-toggle aria-label="Show password" aria-pressed="false">
+                        <?= ui_icon('eye', 'password-icon password-icon-show') ?>
+                        <?= ui_icon('eye-off', 'password-icon password-icon-hide') ?>
+                    </button>
+                </span>
+            </label>
+            <button class="btn primary full" type="submit"><?= ui_icon('log-in') ?><span>Sign in</span></button>
         </form>
-        <a class="back-link" href="<?= site_url('scoreboard') ?>">← Back to live scoreboard</a>
+        <a class="back-link" href="<?= site_url('scoreboard') ?>"><?= ui_icon('arrow-left') ?><span>Back to live scoreboard</span></a>
     </main>
+    <script src="<?= base_url('assets/js/app.js') ?>"></script>
 </body>
 </html>

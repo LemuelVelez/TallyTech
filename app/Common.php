@@ -25,3 +25,17 @@ if (! function_exists('format_points')) {
         return rtrim(rtrim($formatted, '0'), '.');
     }
 }
+
+if (! function_exists('ui_icon')) {
+    /**
+     * Render a reusable SVG icon from the local TallyTech icon sprite.
+     */
+    function ui_icon(string $name, string $class = 'ui-icon'): string
+    {
+        $safeName = preg_replace('/[^a-z0-9-]/', '', strtolower($name)) ?: 'circle';
+        $safeClass = esc($class, 'attr');
+        $href = esc(base_url('assets/icons/ui.svg') . '#' . $safeName, 'attr');
+
+        return '<svg class="' . $safeClass . '" aria-hidden="true" focusable="false"><use href="' . $href . '"></use></svg>';
+    }
+}

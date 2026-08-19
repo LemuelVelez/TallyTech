@@ -20,7 +20,7 @@ $createAction = $isAdminManagement ? 'users' : 'facilitators';
         <p><?= $isAdminManagement ? 'Create and manage Sports Managers, Validators, and Facilitators.' : 'Create, update, deactivate, and remove facilitator accounts.' ?></p>
     </div>
     <button class="btn primary" data-modal="user-modal" <?= $canCreate ? '' : 'disabled' ?>>
-        + Add <?= $isAdminManagement ? 'User' : 'Facilitator' ?>
+        <?= ui_icon('plus') ?> <span>Add <?= $isAdminManagement ? 'User' : 'Facilitator' ?></span>
     </button>
 </div>
 
@@ -67,12 +67,12 @@ $createAction = $isAdminManagement ? 'users' : 'facilitators';
                     <td><?= esc(date('Y-m-d', strtotime($user['created_at']))) ?></td>
                     <td>
                         <div class="row-actions">
-                            <button class="btn tiny" data-modal="user-edit-<?= (int) $user['id'] ?>">Edit</button>
+                            <button class="btn tiny" data-modal="user-edit-<?= (int) $user['id'] ?>"><?= ui_icon('pencil') ?><span>Edit</span></button>
                             <form method="post"
                                   action="<?= site_url(($isAdminManagement ? 'users/' : 'facilitators/') . $user['id'] . '/delete') ?>"
                                   data-confirm="Delete <?= esc($user['display_name'], 'attr') ?>'s account? This cannot be undone, although supported audit references will remain.">
                                 <?= csrf_field() ?>
-                                <button class="btn tiny danger" type="submit">Delete</button>
+                                <button class="btn tiny danger" type="submit"><?= ui_icon('trash') ?><span>Delete</span></button>
                             </form>
                         </div>
                     </td>
@@ -98,11 +98,13 @@ $createAction = $isAdminManagement ? 'users' : 'facilitators';
               class="modal-card wide"
               data-role-managed-form
               data-original-status="<?= esc($user['status'], 'attr') ?>"
-              data-confirm-inactive="Deactivate <?= esc($user['display_name'], 'attr') ?>? They will no longer be able to sign in or use authenticated features.">
+              data-original-role="<?= esc($userRole, 'attr') ?>"
+              data-confirm-inactive="Deactivate <?= esc($user['display_name'], 'attr') ?>? They will no longer be able to sign in or use authenticated features."
+              data-confirm-role-change="Change <?= esc($user['display_name'], 'attr') ?>'s role? Their application permissions and available features will change immediately.">
             <?= csrf_field() ?>
             <div class="modal-head">
                 <h2>Edit <?= esc($roleLabels[$userRole] ?? 'User') ?></h2>
-                <button type="button" data-close aria-label="Close">×</button>
+                <button type="button" data-close aria-label="Close"><?= ui_icon('x') ?></button>
             </div>
 
             <div class="form-grid">
@@ -131,7 +133,15 @@ $createAction = $isAdminManagement ? 'users' : 'facilitators';
                         <option value="inactive" <?= $user['status'] === 'inactive' ? 'selected' : '' ?>>Inactive</option>
                     </select>
                 </label>
-                <label>New Password<input type="password" name="password" minlength="8" autocomplete="new-password" placeholder="Leave blank to keep current"></label>
+                <label>New Password
+                    <span class="password-field">
+                        <input type="password" name="password" minlength="8" autocomplete="new-password" placeholder="Leave blank to keep current" data-password-input>
+                        <button class="password-toggle" type="button" data-password-toggle aria-label="Show password" aria-pressed="false">
+                            <?= ui_icon('eye', 'password-icon password-icon-show') ?>
+                            <?= ui_icon('eye-off', 'password-icon password-icon-hide') ?>
+                        </button>
+                    </span>
+                </label>
             </div>
 
             <div data-sport-assignment <?= $userRole === 'facilitator' ? '' : 'hidden' ?>>
@@ -158,7 +168,7 @@ $createAction = $isAdminManagement ? 'users' : 'facilitators';
                 <span>One number</span>
                 <span>One special character</span>
             </div>
-            <button class="btn primary full" type="submit">Save Changes</button>
+            <button class="btn primary full" type="submit"><?= ui_icon('save') ?><span>Save Changes</span></button>
         </form>
     </dialog>
 <?php endforeach; ?>
@@ -169,7 +179,7 @@ $createAction = $isAdminManagement ? 'users' : 'facilitators';
             <?= csrf_field() ?>
             <div class="modal-head">
                 <h2>Add <?= $isAdminManagement ? 'User' : 'Facilitator' ?></h2>
-                <button type="button" data-close aria-label="Close">×</button>
+                <button type="button" data-close aria-label="Close"><?= ui_icon('x') ?></button>
             </div>
 
             <div class="form-grid">
@@ -196,7 +206,15 @@ $createAction = $isAdminManagement ? 'users' : 'facilitators';
                         <option value="inactive">Inactive</option>
                     </select>
                 </label>
-                <label>Password<input type="password" name="password" minlength="8" required autocomplete="new-password"></label>
+                <label>Password
+                    <span class="password-field">
+                        <input type="password" name="password" minlength="8" required autocomplete="new-password" data-password-input>
+                        <button class="password-toggle" type="button" data-password-toggle aria-label="Show password" aria-pressed="false">
+                            <?= ui_icon('eye', 'password-icon password-icon-show') ?>
+                            <?= ui_icon('eye-off', 'password-icon password-icon-hide') ?>
+                        </button>
+                    </span>
+                </label>
             </div>
 
             <div class="password-rules">
@@ -217,7 +235,7 @@ $createAction = $isAdminManagement ? 'users' : 'facilitators';
                 <p class="form-note">Facilitators require at least one sport from the active event.</p>
             </div>
 
-            <button class="btn primary full" type="submit">Create Account</button>
+            <button class="btn primary full" type="submit"><?= ui_icon('user-cog') ?><span>Create Account</span></button>
         </form>
     </dialog>
 <?php endif; ?>

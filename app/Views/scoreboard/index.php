@@ -22,7 +22,7 @@ $heroSlides = [
 <a class="skip-link" href="#scoreboard-content">Skip to scoreboard content</a>
 <header class="viewer-nav">
     <a class="viewer-brand" href="<?= site_url('scoreboard') ?>"><img src="<?= base_url('assets/img/logo.png') ?>" alt="TallyTech"><b>TallyTech</b></a>
-    <div><span><?= $hasActiveEvent ? 'LIVE' : 'IDLE' ?></span><a href="<?= site_url('login') ?>" class="btn viewer-login">Login</a></div>
+    <div><span><?= $hasActiveEvent ? 'LIVE' : 'IDLE' ?></span><a href="<?= site_url('login') ?>" class="btn viewer-login"><?= ui_icon('log-in') ?><span>Login</span></a></div>
 </header>
 
 <section class="score-hero" data-hero-carousel data-interval="6000" aria-roledescription="carousel" aria-label="TallyTech event highlights" tabindex="0">
@@ -43,8 +43,8 @@ $heroSlides = [
         <small><?= $hasActiveEvent ? 'Official standings use validated results only. Unofficial submissions remain visible and clearly marked.' : 'Standings and schedules will appear when an event is activated.' ?></small>
     </div>
 
-    <button class="carousel-control prev" type="button" data-carousel-prev aria-label="Show previous hero slide">‹</button>
-    <button class="carousel-control next" type="button" data-carousel-next aria-label="Show next hero slide">›</button>
+    <button class="carousel-control prev" type="button" data-carousel-prev aria-label="Show previous hero slide"><?= ui_icon('chevron-left') ?></button>
+    <button class="carousel-control next" type="button" data-carousel-next aria-label="Show next hero slide"><?= ui_icon('chevron-right') ?></button>
     <div class="carousel-dots" aria-label="Choose hero slide">
         <?php foreach ($heroSlides as $i => $slide): ?>
             <button class="carousel-dot <?= $i === 0 ? 'is-active' : '' ?>" type="button" data-carousel-dot aria-label="Show slide <?= $i + 1 ?>" aria-current="<?= $i === 0 ? 'true' : 'false' ?>"></button>
@@ -54,10 +54,10 @@ $heroSlides = [
 
 <main class="viewer-content" id="scoreboard-content">
     <section>
-        <div class="section-title"><h2>🏆 Team Standings</h2><span>Official ranking</span></div>
+        <div class="section-title"><h2 class="title-with-icon"><?= ui_icon('trophy') ?><span>Team Standings</span></h2><span>Official ranking</span></div>
         <div class="viewer-podium">
             <?php foreach (array_slice($ranking ?? [], 0, 4) as $i => $t): ?>
-                <article class="viewer-rank r<?= $i + 1 ?>"><span><?= ['🏆', '🥈', '🥉', '🎯'][$i] ?></span><b><?= $i + 1 ?></b><h3><?= esc($t['name']) ?></h3><strong><?= esc(format_points($t['total_points'])) ?></strong><small>points</small></article>
+                <article class="viewer-rank r<?= $i + 1 ?>"><span><?= ui_icon(['trophy', 'medal', 'award', 'target'][$i]) ?></span><b><?= $i + 1 ?></b><h3><?= esc($t['name']) ?></h3><strong><?= esc(format_points($t['total_points'])) ?></strong><small>points</small></article>
             <?php endforeach; ?>
         </div>
         <?php if (empty($ranking)): ?><div class="empty">No official standings are available for the active event.</div><?php endif; ?>

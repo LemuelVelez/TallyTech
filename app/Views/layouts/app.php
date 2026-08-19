@@ -19,7 +19,7 @@ $displayName = (string) session()->get('display_name');
 <body class="app role-<?= esc($role) ?> <?= $compactSidebar ? 'sidebar-compact' : '' ?> density-<?= esc($resultDensity) ?>">
 <a class="skip-link" href="#main-content">Skip to main content</a>
 <header class="topbar">
-    <button class="menu-toggle" type="button" data-nav-toggle aria-label="Open navigation" aria-controls="app-sidebar" aria-expanded="false">☰</button>
+    <button class="menu-toggle" type="button" data-nav-toggle aria-label="Open navigation" aria-controls="app-sidebar" aria-expanded="false"><?= ui_icon('menu') ?></button>
     <a class="brand" href="<?= site_url('dashboard') ?>"><img src="<?= base_url('assets/img/logo.png') ?>" alt="TallyTech"><span><?= esc($roleLabel) ?></span></a>
 
     <div class="account-menu" data-account-menu>
@@ -29,18 +29,18 @@ $displayName = (string) session()->get('display_name');
                 <span class="user-name"><?= esc($displayName) ?></span>
                 <small><?= esc($accountRoleLabel) ?></small>
             </span>
-            <span class="user-chevron" aria-hidden="true">⌄</span>
+            <span class="user-chevron" aria-hidden="true"><?= ui_icon('chevron-down') ?></span>
         </button>
         <div class="account-dropdown" id="account-dropdown" data-account-dropdown role="menu" hidden>
             <div class="account-dropdown-head">
                 <b><?= esc($displayName) ?></b>
                 <span><?= esc($accountRoleLabel) ?></span>
             </div>
-            <a href="<?= site_url('dashboard') ?>" role="menuitem">Dashboard</a>
-            <a href="<?= site_url('settings') ?>" role="menuitem">Settings</a>
-            <form method="post" action="<?= site_url('logout') ?>">
+            <a href="<?= site_url('dashboard') ?>" role="menuitem"><?= ui_icon('dashboard') ?><span>Dashboard</span></a>
+            <a href="<?= site_url('settings') ?>" role="menuitem"><?= ui_icon('settings') ?><span>Settings</span></a>
+            <form method="post" action="<?= site_url('logout') ?>" data-confirm="Log out of TallyTech now? Any unsaved changes on the current page will be lost.">
                 <?= csrf_field() ?>
-                <button type="submit" role="menuitem">Logout</button>
+                <button type="submit" role="menuitem"><?= ui_icon('log-out') ?><span>Logout</span></button>
             </form>
         </div>
     </div>
@@ -58,7 +58,7 @@ $displayName = (string) session()->get('display_name');
 
 <dialog class="confirmation-dialog" data-confirm-dialog aria-labelledby="confirmation-title" aria-describedby="confirmation-message">
     <div class="confirmation-card">
-        <div class="confirmation-icon" aria-hidden="true">!</div>
+        <div class="confirmation-icon" aria-hidden="true"><?= ui_icon('alert-triangle') ?></div>
         <div>
             <h2 id="confirmation-title">Confirm action</h2>
             <p id="confirmation-message" data-confirm-message>Are you sure you want to continue?</p>

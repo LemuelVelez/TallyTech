@@ -46,6 +46,21 @@
       return form.dataset.confirmInactive;
     }
 
+    const role = form.querySelector('select[name="role"]');
+    if (form.dataset.confirmRoleChange
+      && form.dataset.originalRole
+      && role?.value
+      && role.value !== form.dataset.originalRole) {
+      return form.dataset.confirmRoleChange;
+    }
+
+    if (form.dataset.confirmStatusChange
+      && form.dataset.originalStatus
+      && status?.value
+      && status.value !== form.dataset.originalStatus) {
+      return form.dataset.confirmStatusChange;
+    }
+
     return '';
   };
 
@@ -61,6 +76,7 @@
   const clearPendingConfirmation = () => {
     pendingConfirmForm = null;
     pendingConfirmSubmitter = null;
+    if (confirmProceed) confirmProceed.textContent = 'Confirm';
   };
 
   document.addEventListener('click', (event) => {
@@ -185,6 +201,24 @@
     syncSportSection();
   });
 
+
+  document.querySelectorAll('[data-password-toggle]').forEach((toggle) => {
+    const field = toggle.closest('.password-field');
+    const input = field?.querySelector('[data-password-input]');
+    if (!(input instanceof HTMLInputElement)) return;
+
+    toggle.addEventListener('click', () => {
+      const showing = input.type === 'text';
+      input.type = showing ? 'password' : 'text';
+      toggle.classList.toggle('is-visible', !showing);
+      toggle.setAttribute('aria-pressed', !showing ? 'true' : 'false');
+      toggle.setAttribute('aria-label', !showing ? 'Hide password' : 'Show password');
+      input.focus({ preventScroll: true });
+      const end = input.value.length;
+      input.setSelectionRange?.(end, end);
+    });
+  });
+
   document.addEventListener('submit', (event) => {
     const form = event.target;
     if (!(form instanceof HTMLFormElement) || event.defaultPrevented) return;
@@ -219,6 +253,10 @@
     pendingConfirmForm = form;
     pendingConfirmSubmitter = event.submitter || null;
     if (confirmMessage) confirmMessage.textContent = message;
+    if (confirmProceed) {
+      const actionLabel = pendingConfirmSubmitter?.textContent?.trim();
+      confirmProceed.textContent = actionLabel || 'Confirm';
+    }
     confirmDialog.showModal();
     window.setTimeout(() => confirmCancel?.focus(), 0);
   });
