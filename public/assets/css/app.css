@@ -572,6 +572,66 @@ textarea { min-height: 110px; resize: vertical; line-height: 1.5; }
 .password-toggle.is-visible .password-icon-hide { display: inline-block; }
 
 input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent), transparent 86%); }
+
+/* Sleek native select controls */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 3.2rem;
+  cursor: pointer;
+  background-color: #fff;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #7a8699 50%),
+    linear-gradient(135deg, #7a8699 50%, transparent 50%),
+    linear-gradient(to bottom, #e7ebf1, #e7ebf1);
+  background-position:
+    calc(100% - 19px) calc(50% - 1px),
+    calc(100% - 14px) calc(50% - 1px),
+    calc(100% - 42px) 50%;
+  background-size: 5px 5px, 5px 5px, 1px 24px;
+  background-repeat: no-repeat;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.03);
+  font-weight: 650;
+  text-overflow: ellipsis;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+select:hover:not(:disabled) {
+  border-color: #aeb8c7;
+  background-color: #fbfcfe;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--accent) 50%),
+    linear-gradient(135deg, var(--accent) 50%, transparent 50%),
+    linear-gradient(to bottom, #dfe5ed, #dfe5ed);
+}
+select:focus {
+  background-color: #fff;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--accent) 50%),
+    linear-gradient(135deg, var(--accent) 50%, transparent 50%),
+    linear-gradient(to bottom, color-mix(in srgb, var(--accent), transparent 78%), color-mix(in srgb, var(--accent), transparent 78%));
+}
+select:disabled {
+  cursor: not-allowed;
+  color: #98a2b3;
+  background-color: #f6f8fb;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #aab3c1 50%),
+    linear-gradient(135deg, #aab3c1 50%, transparent 50%),
+    linear-gradient(to bottom, #e4e9f0, #e4e9f0);
+}
+select option {
+  min-height: 42px;
+  padding: 10px 14px;
+  background: #fff;
+  color: #263247;
+  font-weight: 600;
+}
+select option:checked {
+  background: color-mix(in srgb, var(--accent), white 88%);
+  color: var(--accent-dark);
+  font-weight: 750;
+}
+select option:disabled { color: #98a2b3; }
 input[type="checkbox"], input[type="radio"] { width: 18px; min-height: 18px; height: 18px; padding: 0; accent-color: var(--accent); }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .check { flex-direction: row !important; align-items: center !important; gap: 9px !important; font-weight: 600 !important; }
