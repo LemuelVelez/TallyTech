@@ -689,6 +689,11 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
   color: var(--accent-dark);
   font-weight: 750;
 }
+.sleek-select-option.is-selected:hover:not(:disabled),
+.sleek-select-option.is-selected.is-focused:not(:disabled) {
+  background: color-mix(in srgb, var(--accent), white 85%);
+  color: var(--accent-dark);
+}
 .sleek-select-option.is-selected::after {
   content: "✓";
   margin-left: auto;

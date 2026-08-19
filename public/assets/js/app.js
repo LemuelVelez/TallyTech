@@ -300,7 +300,8 @@
     content.setAttribute('role', 'listbox');
     content.hidden = true;
     if (supportsPopover) content.setAttribute('popover', 'manual');
-    document.body.appendChild(content);
+    const contentHost = select.closest('dialog') || document.body;
+    contentHost.appendChild(content);
 
     const state = { select, wrapper, trigger, content, open: false };
     selectStates.set(select, state);
