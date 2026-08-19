@@ -38,6 +38,12 @@ $routes->group('', ['filter' => 'auth'], static function (RouteCollection $route
         $routes->post('schedules/(:num)/update', 'SchedulesController::update/$1');
         $routes->post('schedules/(:num)/delete', 'SchedulesController::delete/$1');
 
+        $routes->get('users', 'UsersController::index');
+        $routes->post('users', 'UsersController::store');
+        $routes->post('users/(:num)/update', 'UsersController::update/$1');
+        $routes->post('users/(:num)/delete', 'UsersController::delete/$1');
+
+        // Legacy Sports Manager URLs remain available for existing bookmarks/forms.
         $routes->get('sports-managers', 'UsersController::sportsManagers');
         $routes->post('sports-managers', 'UsersController::storeSportsManager');
         $routes->post('sports-managers/(:num)/update', 'UsersController::updateSportsManager/$1');

@@ -5,7 +5,7 @@ $menus = [
     'admin' => [
         ['dashboard', 'Dashboard', '▦'], ['notifications', 'Notifications', '◉'], ['team-ranking', 'Team Ranking', '♜'],
         ['teams', 'Teams', '♟'], ['events', 'Events', '◫'], ['sports', 'Sports', '◆'], ['schedules', 'Schedules', '▤'],
-        ['sports-managers', 'Sports Managers', '♙'], ['reports', 'Reports', '▥'], ['settings', 'Settings', '⚙'],
+        ['users', 'User Management', '♙'], ['reports', 'Reports', '▥'], ['settings', 'Settings', '⚙'],
     ],
     'manager' => [
         ['dashboard', 'Dashboard', '▦'], ['notifications', 'Notifications', '◉'], ['team-ranking', 'Team Ranking', '♜'],

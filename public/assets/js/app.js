@@ -1,12 +1,66 @@
 (() => {
   const body = document.body;
-  const toggle = document.querySelector('[data-nav-toggle]');
+  const navToggle = document.querySelector('[data-nav-toggle]');
+  const accountMenu = document.querySelector('[data-account-menu]');
+  const accountToggle = accountMenu?.querySelector('[data-account-toggle]');
+  const accountDropdown = accountMenu?.querySelector('[data-account-dropdown]');
+  const confirmDialog = document.querySelector('[data-confirm-dialog]');
+  const confirmMessage = confirmDialog?.querySelector('[data-confirm-message]');
+  const confirmCancel = confirmDialog?.querySelector('[data-confirm-cancel]');
+  const confirmProceed = confirmDialog?.querySelector('[data-confirm-proceed]');
+
   let lastDialogTrigger = null;
+  let pendingConfirmForm = null;
+  let pendingConfirmSubmitter = null;
 
   const setNavigation = (open) => {
     body.classList.toggle('nav-open', open);
-    toggle?.setAttribute('aria-expanded', open ? 'true' : 'false');
-    toggle?.setAttribute('aria-label', open ? 'Close navigation' : 'Open navigation');
+    navToggle?.setAttribute('aria-expanded', open ? 'true' : 'false');
+    navToggle?.setAttribute('aria-label', open ? 'Close navigation' : 'Open navigation');
+  };
+
+  const accountItems = () => accountDropdown
+    ? Array.from(accountDropdown.querySelectorAll('a[href], button:not([disabled])'))
+    : [];
+
+  const setAccountMenu = (open, focusFirst = false) => {
+    if (!accountToggle || !accountDropdown) return;
+    accountToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    accountDropdown.hidden = !open;
+    accountMenu?.classList.toggle('is-open', open);
+    if (open && focusFirst) accountItems()[0]?.focus();
+  };
+
+  const confirmationFor = (form) => {
+    if (form.dataset.confirm) return form.dataset.confirm;
+
+    const activeCheckbox = form.querySelector('input[type="checkbox"][name="is_active"]');
+    if (form.dataset.confirmActive && activeCheckbox?.checked) {
+      return form.dataset.confirmActive;
+    }
+
+    const status = form.querySelector('select[name="status"]');
+    if (form.dataset.confirmInactive
+      && form.dataset.originalStatus === 'active'
+      && status?.value === 'inactive') {
+      return form.dataset.confirmInactive;
+    }
+
+    return '';
+  };
+
+  const markSubmitting = (form) => {
+    if (form.dataset.submitting === '1') return false;
+    form.dataset.submitting = '1';
+    form.querySelectorAll('button[type="submit"], button:not([type])').forEach((button) => {
+      button.disabled = true;
+    });
+    return true;
+  };
+
+  const clearPendingConfirmation = () => {
+    pendingConfirmForm = null;
+    pendingConfirmSubmitter = null;
   };
 
   document.addEventListener('click', (event) => {
@@ -23,8 +77,61 @@
       event.target.closest('dialog')?.close();
     }
 
-    if (event.target.closest('[data-nav-toggle]')) setNavigation(!body.classList.contains('nav-open'));
+    if (event.target.closest('[data-nav-toggle]')) {
+      setAccountMenu(false);
+      setNavigation(!body.classList.contains('nav-open'));
+    }
     if (event.target.closest('[data-nav-close]')) setNavigation(false);
+
+    if (event.target.closest('[data-account-toggle]')) {
+      setNavigation(false);
+      setAccountMenu(accountDropdown?.hidden ?? true);
+      return;
+    }
+
+    if (accountMenu && !accountMenu.contains(event.target)) {
+      setAccountMenu(false);
+    }
+  });
+
+  accountToggle?.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setAccountMenu(true, true);
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      setAccountMenu(false);
+    }
+  });
+
+  accountDropdown?.addEventListener('keydown', (event) => {
+    const items = accountItems();
+    const index = items.indexOf(document.activeElement);
+    if (!items.length) return;
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      items[(index + 1 + items.length) % items.length]?.focus();
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      items[(index - 1 + items.length) % items.length]?.focus();
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      items[0]?.focus();
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      items[items.length - 1]?.focus();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      setAccountMenu(false);
+      accountToggle?.focus();
+    }
+  });
+
+  accountMenu?.addEventListener('focusout', () => {
+    window.setTimeout(() => {
+      if (accountMenu && !accountMenu.contains(document.activeElement)) setAccountMenu(false);
+    }, 0);
   });
 
   document.querySelectorAll('dialog').forEach((dialog, index) => {
@@ -39,32 +146,112 @@
     });
 
     dialog.addEventListener('close', () => {
+      if (dialog === confirmDialog) return;
       if (lastDialogTrigger?.isConnected) lastDialogTrigger.focus();
       lastDialogTrigger = null;
     });
   });
 
-  document.querySelectorAll('form[data-confirm]').forEach((form) => {
-    form.addEventListener('submit', (event) => {
-      if (form.dataset.submitting === '1') {
-        event.preventDefault();
-        return;
-      }
+  document.querySelectorAll('[data-role-managed-form]').forEach((form) => {
+    const roleSelect = form.querySelector('[data-user-role]');
+    const hiddenRole = form.querySelector('input[type="hidden"][name="role"]');
+    const sportSection = form.querySelector('[data-sport-assignment]');
+    const sportCheckboxes = sportSection ? Array.from(sportSection.querySelectorAll('input[name="sport_ids[]"]')) : [];
 
-      if (!window.confirm(form.dataset.confirm || 'Are you sure?')) {
-        event.preventDefault();
-        return;
-      }
-
-      form.dataset.submitting = '1';
-      form.querySelectorAll('button[type="submit"], button:not([type])').forEach((button) => {
-        button.disabled = true;
+    const selectedRole = () => roleSelect?.value || hiddenRole?.value || '';
+    const syncSportSection = () => {
+      const facilitator = selectedRole() === 'facilitator';
+      if (sportSection) sportSection.hidden = !facilitator;
+      sportCheckboxes.forEach((checkbox) => {
+        checkbox.disabled = !facilitator;
+        checkbox.setCustomValidity('');
       });
+    };
+
+    roleSelect?.addEventListener('change', syncSportSection);
+    sportCheckboxes.forEach((checkbox) => checkbox.addEventListener('change', () => {
+      sportCheckboxes.forEach((item) => item.setCustomValidity(''));
+    }));
+
+    form.addEventListener('submit', (event) => {
+      if (selectedRole() !== 'facilitator' || !sportCheckboxes.length) return;
+      if (sportCheckboxes.some((checkbox) => checkbox.checked)) return;
+
+      event.preventDefault();
+      sportCheckboxes[0].setCustomValidity('Assign at least one sport to the facilitator.');
+      sportCheckboxes[0].reportValidity();
     });
+
+    syncSportSection();
   });
 
+  document.addEventListener('submit', (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || event.defaultPrevented) return;
+
+    if (form.dataset.submitting === '1') {
+      event.preventDefault();
+      return;
+    }
+
+    if (form.dataset.confirmed === '1') {
+      delete form.dataset.confirmed;
+      markSubmitting(form);
+      return;
+    }
+
+    const message = confirmationFor(form);
+    if (!message) {
+      markSubmitting(form);
+      return;
+    }
+
+    if (!confirmDialog?.showModal) {
+      if (!window.confirm(message)) {
+        event.preventDefault();
+        return;
+      }
+      markSubmitting(form);
+      return;
+    }
+
+    event.preventDefault();
+    pendingConfirmForm = form;
+    pendingConfirmSubmitter = event.submitter || null;
+    if (confirmMessage) confirmMessage.textContent = message;
+    confirmDialog.showModal();
+    window.setTimeout(() => confirmCancel?.focus(), 0);
+  });
+
+  confirmCancel?.addEventListener('click', () => confirmDialog?.close());
+  confirmProceed?.addEventListener('click', () => {
+    const form = pendingConfirmForm;
+    const submitter = pendingConfirmSubmitter;
+    if (!form) {
+      confirmDialog?.close();
+      return;
+    }
+
+    form.dataset.confirmed = '1';
+    confirmDialog?.close();
+    if (typeof form.requestSubmit === 'function') {
+      if (submitter) form.requestSubmit(submitter); else form.requestSubmit();
+    } else {
+      markSubmitting(form);
+      form.submit();
+    }
+  });
+
+  confirmDialog?.addEventListener('close', clearPendingConfirmation);
+  confirmDialog?.addEventListener('cancel', clearPendingConfirmation);
+
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && body.classList.contains('nav-open')) setNavigation(false);
+    if (event.key !== 'Escape') return;
+    if (body.classList.contains('nav-open')) setNavigation(false);
+    if (accountDropdown && !accountDropdown.hidden) {
+      setAccountMenu(false);
+      accountToggle?.focus();
+    }
   });
 
   window.addEventListener('resize', () => {

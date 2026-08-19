@@ -288,6 +288,15 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         if ((int) ($event['is_active'] ?? 0) === 1) {
             throw new RuntimeException('Activate another event before deleting the active event.');
         }
+
+        $dependencies = $this->db->table('sports')->where('event_id', $id)->countAllResults();
+        $dependencies += $this->db->table('schedules')->where('event_id', $id)->countAllResults();
+        $dependencies += $this->db->table('weighted_points')->where('event_id', $id)->countAllResults();
+        $dependencies += $this->db->table('results')->where('event_id', $id)->countAllResults();
+        if ($dependencies > 0) {
+            throw new RuntimeException('Event cannot be deleted while sports, schedules, weighted points, or results are linked to it.');
+        }
+
         $this->db->transStart();
         $this->eventsModel->delete($id);
         $this->notify($actorId, 'event_deleted', 'Removed event ' . ($event['name'] ?? '#'.$id));
@@ -332,9 +341,14 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
     {
         $sport = $this->requireRow('sports', $id, 'Sport');
         $this->assertActiveEvent((int) $sport['event_id']);
-        if ($this->db->table('schedules')->where('sport_id', $id)->countAllResults() > 0) {
-            throw new RuntimeException('Sport cannot be removed while schedules or results exist for it.');
+
+        $dependencies = $this->db->table('schedules')->where('sport_id', $id)->countAllResults();
+        $dependencies += $this->db->table('weighted_points')->where('sport_id', $id)->countAllResults();
+        $dependencies += $this->db->table('user_sports')->where('sport_id', $id)->countAllResults();
+        if ($dependencies > 0) {
+            throw new RuntimeException('Sport cannot be removed while schedules, weighted points, results, or facilitator assignments depend on it.');
         }
+
         $this->db->transStart();
         $this->sportsModel->delete($id);
         $this->notify($actorId, 'sport_deleted', 'Removed sport ' . ($sport['name'] ?? '#'.$id));
@@ -412,17 +426,31 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
     public function updateUser(int $id, array $data, array $sportIds, int $actorId): void
     {
         $user = $this->requireRow('users', $id, 'User');
-        $role = (string) ($data['role'] ?? $user['role'] ?? '');
-        if (($user['role'] ?? '') !== $role) {
-            throw new RuntimeException('Account role cannot be changed from this page.');
-        }
+        $currentRole = (string) ($user['role'] ?? '');
+        $role = (string) ($data['role'] ?? $currentRole);
+        $actor = $this->requireRow('users', $actorId, 'User');
+
+        $this->assertAccountManagementPermission($currentRole, $actorId);
         $this->assertAccountManagementPermission($role, $actorId);
-        $sportIds = $this->normaliseManagedUserSports($role, $sportIds);
+        if ($currentRole !== $role && ($actor['role'] ?? '') !== 'admin') {
+            throw new RuntimeException('Only administrators can change an account role.');
+        }
+
+        $syncSports = true;
+        if ($role === 'facilitator' && $currentRole === 'facilitator' && ! $sportIds && ! $this->activeEvent()) {
+            // Allow status/profile maintenance while no event is active without erasing historical assignments.
+            $syncSports = false;
+        } else {
+            $sportIds = $this->normaliseManagedUserSports($role, $sportIds);
+        }
+
         $payload = array_intersect_key($data, array_flip(['username', 'password_hash', 'display_name', 'role', 'status']));
 
         $this->db->transStart();
         $this->db->table('users')->where('id', $id)->update($payload);
-        $this->syncUserSports($id, $sportIds);
+        if ($syncSports) {
+            $this->syncUserSports($id, $sportIds);
+        }
         $this->notify($actorId, 'user_updated', 'Updated account for ' . ($payload['display_name'] ?? $user['display_name']));
         $this->finishTransaction();
     }
@@ -745,8 +773,11 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         if (($actor['status'] ?? '') !== 'active') {
             throw new RuntimeException('Inactive accounts cannot manage users.');
         }
-        $allowed = (($actor['role'] ?? '') === 'admin' && $targetRole === 'manager')
-            || (($actor['role'] ?? '') === 'manager' && $targetRole === 'facilitator');
+
+        $actorRole = (string) ($actor['role'] ?? '');
+        $allowed = ($actorRole === 'admin' && in_array($targetRole, ['manager', 'validator', 'facilitator'], true))
+            || ($actorRole === 'manager' && $targetRole === 'facilitator');
+
         if (! $allowed) {
             throw new RuntimeException('You are not allowed to manage this account role.');
         }
@@ -754,11 +785,15 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
 
     private function normaliseManagedUserSports(string $role, array $sportIds): array
     {
-        if (! in_array($role, ['manager', 'facilitator'], true)) {
+        if (! in_array($role, ['manager', 'validator', 'facilitator'], true)) {
             throw new RuntimeException('Invalid managed account role.');
         }
-        if ($role === 'manager') {
+        if ($role !== 'facilitator') {
             return [];
+        }
+
+        if (! $this->activeEvent()) {
+            throw new RuntimeException('Activate an event before assigning sports to a facilitator.');
         }
 
         $sportIds = $this->validateActiveSportIds($sportIds);

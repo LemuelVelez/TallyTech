@@ -1,8 +1,10 @@
 <?php
 $role = (string) session()->get('role');
 $roleLabel = ['admin' => 'Admin Panel', 'manager' => 'Tournament Manager', 'validator' => 'Validator', 'facilitator' => 'Facilitator'][$role] ?? 'TallyTech';
+$accountRoleLabel = ['admin' => 'Administrator', 'manager' => 'Sports Manager', 'validator' => 'Validator', 'facilitator' => 'Facilitator'][$role] ?? ucfirst($role);
 $compactSidebar = (bool) session()->get('compact_sidebar');
 $resultDensity = (string) (session()->get('result_density') ?: 'comfortable');
+$displayName = (string) session()->get('display_name');
 ?>
 <!doctype html>
 <html lang="en">
@@ -19,7 +21,29 @@ $resultDensity = (string) (session()->get('result_density') ?: 'comfortable');
 <header class="topbar">
     <button class="menu-toggle" type="button" data-nav-toggle aria-label="Open navigation" aria-controls="app-sidebar" aria-expanded="false">☰</button>
     <a class="brand" href="<?= site_url('dashboard') ?>"><img src="<?= base_url('assets/img/logo.png') ?>" alt="TallyTech"><span><?= esc($roleLabel) ?></span></a>
-    <div class="topbar-user"><span class="user-avatar"><?= esc(strtoupper(substr((string) session()->get('display_name'), 0, 1))) ?></span><span><?= esc(session()->get('display_name')) ?></span></div>
+
+    <div class="account-menu" data-account-menu>
+        <button class="topbar-user" type="button" data-account-toggle aria-label="Open user menu for <?= esc($displayName, 'attr') ?>" aria-expanded="false" aria-controls="account-dropdown" aria-haspopup="menu">
+            <img class="user-avatar" src="<?= base_url('assets/img/logo.png') ?>" alt="">
+            <span class="user-identity">
+                <span class="user-name"><?= esc($displayName) ?></span>
+                <small><?= esc($accountRoleLabel) ?></small>
+            </span>
+            <span class="user-chevron" aria-hidden="true">⌄</span>
+        </button>
+        <div class="account-dropdown" id="account-dropdown" data-account-dropdown role="menu" hidden>
+            <div class="account-dropdown-head">
+                <b><?= esc($displayName) ?></b>
+                <span><?= esc($accountRoleLabel) ?></span>
+            </div>
+            <a href="<?= site_url('dashboard') ?>" role="menuitem">Dashboard</a>
+            <a href="<?= site_url('settings') ?>" role="menuitem">Settings</a>
+            <form method="post" action="<?= site_url('logout') ?>">
+                <?= csrf_field() ?>
+                <button type="submit" role="menuitem">Logout</button>
+            </form>
+        </div>
+    </div>
 </header>
 <div class="shell">
     <?= view('partials/sidebar') ?>
@@ -31,6 +55,21 @@ $resultDensity = (string) (session()->get('result_density') ?: 'comfortable');
         <footer>© 2026 TallyTech · Intramural Sports Festival Management System</footer>
     </main>
 </div>
+
+<dialog class="confirmation-dialog" data-confirm-dialog aria-labelledby="confirmation-title" aria-describedby="confirmation-message">
+    <div class="confirmation-card">
+        <div class="confirmation-icon" aria-hidden="true">!</div>
+        <div>
+            <h2 id="confirmation-title">Confirm action</h2>
+            <p id="confirmation-message" data-confirm-message>Are you sure you want to continue?</p>
+        </div>
+        <div class="confirmation-actions">
+            <button class="btn" type="button" data-confirm-cancel>Cancel</button>
+            <button class="btn danger" type="button" data-confirm-proceed>Confirm</button>
+        </div>
+    </div>
+</dialog>
+
 <script src="<?= base_url('assets/js/app.js') ?>"></script>
 </body>
 </html>

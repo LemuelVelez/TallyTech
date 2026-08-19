@@ -138,17 +138,75 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .menu-toggle:hover { background: rgba(255, 255, 255, 0.13); }
 .sidebar-close { display: none; color: #64748b; font-size: 27px; }
 .sidebar-close:hover { background: #f1f5f9; }
-.topbar-user { display: flex; align-items: center; gap: 11px; font-size: 0.9rem; font-weight: 700; }
+.account-menu { position: relative; }
+.topbar-user {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 13px;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-align: left;
+  transition: background 160ms ease;
+}
+.topbar-user:hover, .account-menu.is-open .topbar-user { background: rgba(255, 255, 255, 0.14); }
 .user-avatar {
   width: 38px;
   height: 38px;
-  display: grid;
-  place-items: center;
+  flex: 0 0 38px;
+  border: 2px solid rgba(255, 255, 255, 0.28);
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.18);
-  font-size: 0.875rem;
-  font-weight: 850;
+  background: #fff;
+  object-fit: cover;
 }
+.user-identity { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.user-name { max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.user-identity small { margin-top: 3px; color: rgba(255, 255, 255, 0.76); font-size: 0.7rem; font-weight: 650; }
+.user-chevron { font-size: 1rem; transition: transform 160ms ease; }
+.account-menu.is-open .user-chevron { transform: rotate(180deg); }
+.account-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: min(260px, calc(100vw - 24px));
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--text);
+  box-shadow: var(--shadow-lg);
+  z-index: 70;
+}
+.account-dropdown[hidden] { display: none; }
+.account-dropdown-head { padding: 10px 11px 12px; border-bottom: 1px solid var(--line); margin-bottom: 5px; }
+.account-dropdown-head b, .account-dropdown-head span { display: block; }
+.account-dropdown-head b { font-size: 0.9rem; }
+.account-dropdown-head span { margin-top: 2px; color: var(--muted); font-size: 0.76rem; }
+.account-dropdown a, .account-dropdown button {
+  width: 100%;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #344054;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+  text-align: left;
+}
+.account-dropdown a:hover, .account-dropdown button:hover { background: #f2f5f9; color: var(--accent-dark); }
+.account-dropdown form { margin: 4px 0 0; padding-top: 4px; border-top: 1px solid var(--line); }
+.account-dropdown form button:hover { background: #fff1f1; color: var(--danger-dark); }
 .shell { display: flex; padding-top: var(--topbar-height); min-height: 100vh; }
 .sidebar {
   width: var(--sidebar-width);
@@ -477,6 +535,25 @@ input[type="checkbox"], input[type="radio"] { width: 18px; min-height: 18px; hei
 .password-rules b { margin-bottom: 3px; color: #2a3443; font-size: 0.86rem; }
 .password-rules span::before { content: "✓ "; color: var(--accent); font-weight: 850; }
 
+
+.confirmation-dialog { width: min(480px, calc(100vw - 32px)); }
+.confirmation-card { padding: 24px; display: grid; grid-template-columns: auto 1fr; gap: 14px 16px; }
+.confirmation-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #fff0ef;
+  color: var(--danger-dark);
+  font-size: 1.15rem;
+  font-weight: 900;
+}
+.confirmation-card h2 { margin: 2px 0 6px; font-size: 1.15rem; }
+.confirmation-card p { margin: 0; color: var(--muted); font-size: 0.9rem; line-height: 1.55; }
+.confirmation-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
+[data-sport-assignment][hidden] { display: none !important; }
+
 /* Results and brackets */
 .result-list { display: grid; gap: 14px; }
 .result-card { padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
@@ -746,7 +823,8 @@ input[type="checkbox"], input[type="radio"] { width: 18px; min-height: 18px; hei
 }
 
 @media (max-width: 640px) {
-  .topbar-user > span:last-child { display: none; }
+  .user-identity, .user-chevron { display: none; }
+  .topbar-user { padding-inline: 5px; }
   .brand span { font-size: 0.9rem; }
   .content, .sidebar-compact .content { padding: 20px 14px 12px; }
   .page-head { align-items: flex-start; flex-direction: column; gap: 12px; }
