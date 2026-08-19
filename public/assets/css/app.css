@@ -26,20 +26,45 @@
 * {
   box-sizing: border-box;
   scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--accent), var(--accent-dark) 34%) transparent;
+  scrollbar-color: var(--accent) #dfe7ef;
 }
 html { scroll-behavior: smooth; scrollbar-gutter: stable; }
-*::-webkit-scrollbar { width: 8px; height: 8px; }
-*::-webkit-scrollbar-track { background: transparent; }
-*::-webkit-scrollbar-thumb {
-  min-height: 36px;
-  border: 2px solid transparent;
-  border-radius: 999px;
-  background: linear-gradient(180deg, var(--accent), var(--accent-dark));
-  background-clip: padding-box;
+
+/* Global scrollbar: slim, visible, and themed without blending into the page. */
+html,
+body {
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent) #dfe7ef;
 }
-*::-webkit-scrollbar-thumb:hover { border-width: 1px; }
-*::-webkit-scrollbar-corner { background: transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track {
+  background: #dfe7ef;
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb {
+  min-height: 44px;
+  border: 2px solid #dfe7ef;
+  border-radius: 999px;
+  background-color: var(--accent);
+}
+*::-webkit-scrollbar-thumb:hover { background-color: var(--accent-dark); }
+*::-webkit-scrollbar-thumb:active { background-color: var(--accent-dark); }
+*::-webkit-scrollbar-corner { background: #dfe7ef; }
+*::-webkit-scrollbar-button { width: 0; height: 0; display: none; }
+
+/* Keep the viewport scrollbar aligned with the active role theme. */
+body.role-manager { scrollbar-color: #f27419 #dfe7ef; }
+body.role-validator { scrollbar-color: #7b49d0 #dfe7ef; }
+body.role-facilitator { scrollbar-color: #1677d2 #dfe7ef; }
+body.role-manager::-webkit-scrollbar-thumb { background-color: #f27419; }
+body.role-manager::-webkit-scrollbar-thumb:hover,
+body.role-manager::-webkit-scrollbar-thumb:active { background-color: #d95600; }
+body.role-validator::-webkit-scrollbar-thumb { background-color: #7b49d0; }
+body.role-validator::-webkit-scrollbar-thumb:hover,
+body.role-validator::-webkit-scrollbar-thumb:active { background-color: #6035ae; }
+body.role-facilitator::-webkit-scrollbar-thumb { background-color: #1677d2; }
+body.role-facilitator::-webkit-scrollbar-thumb:hover,
+body.role-facilitator::-webkit-scrollbar-thumb:active { background-color: #0c5da8; }
 body { margin: 0; min-width: 0; background: var(--bg); color: var(--text); font-size: 16px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
 body.nav-open { overflow: hidden; }
 a { color: inherit; text-decoration: none; }
