@@ -47,6 +47,12 @@
     }
 
     const role = form.querySelector('select[name="role"]');
+    if (form.dataset.confirmAdminCreate
+      && !form.dataset.originalRole
+      && role?.value === 'admin') {
+      return form.dataset.confirmAdminCreate;
+    }
+
     if (form.dataset.confirmRoleChange
       && form.dataset.originalRole
       && role?.value

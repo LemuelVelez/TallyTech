@@ -4,6 +4,7 @@
 $manageMode = (string) ($manageMode ?? $roleType ?? '');
 $isAdminManagement = $manageMode === 'admin';
 $roleLabels = [
+    'admin' => 'Administrator',
     'manager' => 'Sports Manager',
     'validator' => 'Validator',
     'facilitator' => 'Facilitator',
@@ -17,7 +18,7 @@ $createAction = $isAdminManagement ? 'users' : 'facilitators';
 <div class="page-head">
     <div>
         <h1><?= esc($title) ?></h1>
-        <p><?= $isAdminManagement ? 'Create and manage Sports Managers, Validators, and Facilitators.' : 'Create, update, deactivate, and remove facilitator accounts.' ?></p>
+        <p><?= $isAdminManagement ? 'Create and manage Administrators, Sports Managers, Validators, and Facilitators.' : 'Create, update, deactivate, and remove facilitator accounts.' ?></p>
     </div>
     <button class="btn primary" data-modal="user-modal" <?= $canCreate ? '' : 'disabled' ?>>
         <?= ui_icon('plus') ?> <span>Add <?= $isAdminManagement ? 'User' : 'Facilitator' ?></span>
@@ -175,7 +176,8 @@ $createAction = $isAdminManagement ? 'users' : 'facilitators';
 
 <?php if ($canCreate): ?>
     <dialog id="user-modal">
-        <form method="post" action="<?= site_url($createAction) ?>" class="modal-card wide" data-role-managed-form>
+        <form method="post" action="<?= site_url($createAction) ?>" class="modal-card wide" data-role-managed-form
+              <?= $isAdminManagement ? 'data-confirm-admin-create="Create an Administrator account? This user will receive full administrative access to TallyTech."' : '' ?>>
             <?= csrf_field() ?>
             <div class="modal-head">
                 <h2>Add <?= $isAdminManagement ? 'User' : 'Facilitator' ?></h2>

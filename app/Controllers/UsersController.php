@@ -4,7 +4,7 @@ namespace App\Controllers;
 
 class UsersController extends BaseController
 {
-    private const ADMIN_MANAGED_ROLES = ['manager', 'validator', 'facilitator'];
+    private const ADMIN_MANAGED_ROLES = ['admin', 'manager', 'validator', 'facilitator'];
 
     public function index()
     {
@@ -172,6 +172,7 @@ class UsersController extends BaseController
     private function roleLabel(string $role): string
     {
         return match ($role) {
+            'admin' => 'Administrator',
             'manager' => 'Sports Manager',
             'validator' => 'Validator',
             'facilitator' => 'Facilitator',

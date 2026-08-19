@@ -435,6 +435,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         if ($currentRole !== $role && ($actor['role'] ?? '') !== 'admin') {
             throw new RuntimeException('Only administrators can change an account role.');
         }
+        $this->assertAdminContinuityOnUpdate($id, $currentRole, $role, (string) ($data['status'] ?? $user['status'] ?? 'active'));
 
         $syncSports = true;
         if ($role === 'facilitator' && $currentRole === 'facilitator' && ! $sportIds && ! $this->activeEvent()) {
@@ -462,6 +463,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             throw new RuntimeException('You cannot delete your own account.');
         }
         $this->assertAccountManagementPermission((string) ($user['role'] ?? ''), $actorId);
+        $this->assertAdminContinuityOnDelete($id, (string) ($user['role'] ?? ''));
 
         $this->db->transStart();
         $this->db->table('users')->where('id', $id)->delete();
@@ -775,7 +777,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         }
 
         $actorRole = (string) ($actor['role'] ?? '');
-        $allowed = ($actorRole === 'admin' && in_array($targetRole, ['manager', 'validator', 'facilitator'], true))
+        $allowed = ($actorRole === 'admin' && in_array($targetRole, ['admin', 'manager', 'validator', 'facilitator'], true))
             || ($actorRole === 'manager' && $targetRole === 'facilitator');
 
         if (! $allowed) {
@@ -783,9 +785,43 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         }
     }
 
+    private function assertAdminContinuityOnUpdate(int $userId, string $currentRole, string $newRole, string $newStatus): void
+    {
+        if ($currentRole !== 'admin' || ($newRole === 'admin' && $newStatus === 'active')) {
+            return;
+        }
+
+        $otherActiveAdmins = $this->db->table('users')
+            ->where('role', 'admin')
+            ->where('status', 'active')
+            ->where('id !=', $userId)
+            ->countAllResults();
+
+        if ($otherActiveAdmins < 1) {
+            throw new RuntimeException('At least one active administrator account must remain.');
+        }
+    }
+
+    private function assertAdminContinuityOnDelete(int $userId, string $role): void
+    {
+        if ($role !== 'admin') {
+            return;
+        }
+
+        $otherActiveAdmins = $this->db->table('users')
+            ->where('role', 'admin')
+            ->where('status', 'active')
+            ->where('id !=', $userId)
+            ->countAllResults();
+
+        if ($otherActiveAdmins < 1) {
+            throw new RuntimeException('The last active administrator account cannot be deleted.');
+        }
+    }
+
     private function normaliseManagedUserSports(string $role, array $sportIds): array
     {
-        if (! in_array($role, ['manager', 'validator', 'facilitator'], true)) {
+        if (! in_array($role, ['admin', 'manager', 'validator', 'facilitator'], true)) {
             throw new RuntimeException('Invalid managed account role.');
         }
         if ($role !== 'facilitator') {
