@@ -174,6 +174,216 @@
     });
   });
 
+  const selectStates = new Map();
+  let openSelectState = null;
+
+  const supportsPopover = 'showPopover' in HTMLElement.prototype;
+
+  const closeSleekSelect = (state, restoreFocus = false) => {
+    if (!state || !state.open) return;
+    state.open = false;
+    state.wrapper.classList.remove('is-open');
+    state.trigger.setAttribute('aria-expanded', 'false');
+
+    if (supportsPopover && state.content.matches(':popover-open')) {
+      state.content.hidePopover();
+    } else {
+      state.content.hidden = true;
+    }
+
+    if (openSelectState === state) openSelectState = null;
+    if (restoreFocus) state.trigger.focus();
+  };
+
+  const positionSleekSelect = (state) => {
+    if (!state?.open) return;
+    const rect = state.trigger.getBoundingClientRect();
+    const viewportGap = 10;
+    const desiredHeight = Math.min(state.content.scrollHeight || 280, 320);
+    const spaceBelow = window.innerHeight - rect.bottom - viewportGap;
+    const spaceAbove = rect.top - viewportGap;
+    const openAbove = spaceBelow < Math.min(desiredHeight, 180) && spaceAbove > spaceBelow;
+    const available = Math.max(120, Math.min(320, openAbove ? spaceAbove : spaceBelow));
+
+    const panelWidth = Math.max(180, Math.min(rect.width, window.innerWidth - (viewportGap * 2)));
+    const panelLeft = Math.max(viewportGap, Math.min(rect.left, window.innerWidth - panelWidth - viewportGap));
+    state.content.style.setProperty('--select-width', `${panelWidth}px`);
+    state.content.style.maxHeight = `${available}px`;
+    state.content.style.position = 'fixed';
+    state.content.style.left = `${panelLeft}px`;
+    state.content.style.top = openAbove ? 'auto' : `${rect.bottom + 6}px`;
+    state.content.style.bottom = openAbove ? `${window.innerHeight - rect.top + 6}px` : 'auto';
+  };
+
+  const refreshSleekSelect = (state) => {
+    const { select, trigger, content } = state;
+    const selected = select.options[select.selectedIndex];
+    trigger.textContent = selected?.textContent?.trim() || 'Select an option';
+    trigger.disabled = select.disabled;
+    trigger.setAttribute('aria-invalid', select.matches(':invalid') ? 'true' : 'false');
+    content.innerHTML = '';
+
+    Array.from(select.options).forEach((option, index) => {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'sleek-select-option';
+      item.dataset.selectIndex = String(index);
+      item.setAttribute('role', 'option');
+      item.setAttribute('aria-selected', option.selected ? 'true' : 'false');
+      item.disabled = option.disabled;
+      item.textContent = option.textContent;
+      item.classList.toggle('is-selected', option.selected);
+      content.appendChild(item);
+    });
+
+    if (state.open) positionSleekSelect(state);
+  };
+
+  const focusSelectOption = (state, index) => {
+    const options = Array.from(state.content.querySelectorAll('.sleek-select-option:not(:disabled)'));
+    if (!options.length) return;
+    const clamped = Math.max(0, Math.min(index, options.length - 1));
+    options.forEach((item) => item.classList.remove('is-focused'));
+    options[clamped].classList.add('is-focused');
+    options[clamped].focus({ preventScroll: true });
+    options[clamped].scrollIntoView({ block: 'nearest' });
+  };
+
+  const openSleekSelect = (state, focusSelected = false) => {
+    if (!state || state.select.disabled) return;
+    if (openSelectState && openSelectState !== state) closeSleekSelect(openSelectState);
+
+    refreshSleekSelect(state);
+    state.open = true;
+    openSelectState = state;
+    state.wrapper.classList.add('is-open');
+    state.trigger.setAttribute('aria-expanded', 'true');
+
+    if (supportsPopover) {
+      state.content.hidden = false;
+      state.content.showPopover();
+    } else {
+      state.content.hidden = false;
+    }
+
+    positionSleekSelect(state);
+
+    if (focusSelected) {
+      const enabledOptions = Array.from(state.content.querySelectorAll('.sleek-select-option:not(:disabled)'));
+      const selectedIndex = enabledOptions.findIndex((item) => item.classList.contains('is-selected'));
+      requestAnimationFrame(() => focusSelectOption(state, selectedIndex >= 0 ? selectedIndex : 0));
+    }
+  };
+
+  const initSleekSelect = (select, index) => {
+    if (!(select instanceof HTMLSelectElement) || select.multiple || select.dataset.sleekSelectReady === '1') return;
+    select.dataset.sleekSelectReady = '1';
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'sleek-select';
+    select.parentNode.insertBefore(wrapper, select);
+    wrapper.appendChild(select);
+    select.classList.add('sleek-select-native');
+    select.tabIndex = -1;
+
+    const trigger = document.createElement('button');
+    trigger.type = 'button';
+    trigger.className = 'sleek-select-trigger';
+    trigger.setAttribute('aria-haspopup', 'listbox');
+    trigger.setAttribute('aria-expanded', 'false');
+    trigger.setAttribute('aria-controls', `sleek-select-content-${index + 1}`);
+    wrapper.appendChild(trigger);
+
+    const content = document.createElement('div');
+    content.id = `sleek-select-content-${index + 1}`;
+    content.className = 'sleek-select-content';
+    content.setAttribute('role', 'listbox');
+    content.hidden = true;
+    if (supportsPopover) content.setAttribute('popover', 'manual');
+    document.body.appendChild(content);
+
+    const state = { select, wrapper, trigger, content, open: false };
+    selectStates.set(select, state);
+    refreshSleekSelect(state);
+
+    trigger.addEventListener('click', () => {
+      if (state.open) closeSleekSelect(state); else openSleekSelect(state);
+    });
+
+    trigger.addEventListener('keydown', (event) => {
+      if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(event.key)) {
+        event.preventDefault();
+        openSleekSelect(state, true);
+      } else if (event.key === 'Escape' && state.open) {
+        event.preventDefault();
+        closeSleekSelect(state, true);
+      } else if (event.key === 'Tab' && state.open) {
+        closeSleekSelect(state);
+      }
+    });
+
+    content.addEventListener('click', (event) => {
+      const item = event.target.closest('.sleek-select-option');
+      if (!item || item.disabled) return;
+      const optionIndex = Number(item.dataset.selectIndex);
+      if (!Number.isInteger(optionIndex) || !select.options[optionIndex]) return;
+
+      select.selectedIndex = optionIndex;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      refreshSleekSelect(state);
+      closeSleekSelect(state, true);
+    });
+
+    content.addEventListener('keydown', (event) => {
+      const options = Array.from(content.querySelectorAll('.sleek-select-option:not(:disabled)'));
+      const current = options.indexOf(document.activeElement);
+
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        focusSelectOption(state, current < 0 ? 0 : (current + 1) % options.length);
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        focusSelectOption(state, current < 0 ? options.length - 1 : (current - 1 + options.length) % options.length);
+      } else if (event.key === 'Home') {
+        event.preventDefault();
+        focusSelectOption(state, 0);
+      } else if (event.key === 'End') {
+        event.preventDefault();
+        focusSelectOption(state, options.length - 1);
+      } else if (event.key === 'Escape' || event.key === 'Tab') {
+        closeSleekSelect(state, event.key === 'Escape');
+      }
+    });
+
+    select.addEventListener('change', () => refreshSleekSelect(state));
+    select.addEventListener('focus', () => trigger.focus());
+    select.addEventListener('invalid', () => {
+      trigger.setAttribute('aria-invalid', 'true');
+      requestAnimationFrame(() => trigger.focus());
+    });
+
+    select.form?.addEventListener('reset', () => requestAnimationFrame(() => refreshSleekSelect(state)));
+
+    const observer = new MutationObserver(() => refreshSleekSelect(state));
+    observer.observe(select, { attributes: true, childList: true, subtree: true });
+  };
+
+  document.querySelectorAll('select').forEach(initSleekSelect);
+
+  document.addEventListener('pointerdown', (event) => {
+    if (!openSelectState) return;
+    if (openSelectState.wrapper.contains(event.target) || openSelectState.content.contains(event.target)) return;
+    closeSleekSelect(openSelectState);
+  });
+
+  window.addEventListener('resize', () => {
+    if (openSelectState) positionSleekSelect(openSelectState);
+  });
+
+  document.addEventListener('scroll', () => {
+    if (openSelectState) positionSleekSelect(openSelectState);
+  }, true);
+
   document.querySelectorAll('[data-role-managed-form]').forEach((form) => {
     const roleSelect = form.querySelector('[data-user-role]');
     const hiddenRole = form.querySelector('input[type="hidden"][name="role"]');
@@ -318,6 +528,7 @@
 
   document.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return;
+    if (openSelectState) closeSleekSelect(openSelectState, true);
     if (body.classList.contains('nav-open')) setNavigation(false);
     if (accountDropdown && !accountDropdown.hidden) {
       setAccountMenu(false);

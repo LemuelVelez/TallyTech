@@ -573,65 +573,139 @@ textarea { min-height: 110px; resize: vertical; line-height: 1.5; }
 
 input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent), transparent 86%); }
 
-/* Sleek native select controls */
-select {
-  appearance: none;
-  -webkit-appearance: none;
-  padding-right: 3.2rem;
-  cursor: pointer;
-  background-color: #fff;
-  background-image:
-    linear-gradient(45deg, transparent 50%, #7a8699 50%),
-    linear-gradient(135deg, #7a8699 50%, transparent 50%),
-    linear-gradient(to bottom, #e7ebf1, #e7ebf1);
-  background-position:
-    calc(100% - 19px) calc(50% - 1px),
-    calc(100% - 14px) calc(50% - 1px),
-    calc(100% - 42px) 50%;
-  background-size: 5px 5px, 5px 5px, 1px 24px;
-  background-repeat: no-repeat;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.03);
-  font-weight: 650;
-  text-overflow: ellipsis;
-  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+
+/* Sleek select dropdown content */
+.sleek-select {
+  position: relative;
+  width: 100%;
 }
-select:hover:not(:disabled) {
-  border-color: #aeb8c7;
-  background-color: #fbfcfe;
-  background-image:
-    linear-gradient(45deg, transparent 50%, var(--accent) 50%),
-    linear-gradient(135deg, var(--accent) 50%, transparent 50%),
-    linear-gradient(to bottom, #dfe5ed, #dfe5ed);
+.sleek-select-native {
+  position: absolute !important;
+  width: 1px !important;
+  min-height: 1px !important;
+  height: 1px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  opacity: 0;
+  pointer-events: none;
+  overflow: hidden;
 }
-select:focus {
-  background-color: #fff;
-  background-image:
-    linear-gradient(45deg, transparent 50%, var(--accent) 50%),
-    linear-gradient(135deg, var(--accent) 50%, transparent 50%),
-    linear-gradient(to bottom, color-mix(in srgb, var(--accent), transparent 78%), color-mix(in srgb, var(--accent), transparent 78%));
-}
-select:disabled {
-  cursor: not-allowed;
-  color: #98a2b3;
-  background-color: #f6f8fb;
-  background-image:
-    linear-gradient(45deg, transparent 50%, #aab3c1 50%),
-    linear-gradient(135deg, #aab3c1 50%, transparent 50%),
-    linear-gradient(to bottom, #e4e9f0, #e4e9f0);
-}
-select option {
-  min-height: 42px;
-  padding: 10px 14px;
+.sleek-select-trigger {
+  width: 100%;
+  min-height: 46px;
+  padding: 0.8rem 2.7rem 0.8rem 0.8rem;
+  border: 1px solid #d0d7e2;
+  border-radius: 11px;
   background: #fff;
   color: #263247;
-  font-weight: 600;
+  outline: none;
+  font: inherit;
+  font-size: 0.94rem;
+  text-align: left;
+  cursor: pointer;
+  position: relative;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
 }
-select option:checked {
-  background: color-mix(in srgb, var(--accent), white 88%);
+.sleek-select-trigger::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  position: absolute;
+  top: 50%;
+  right: 16px;
+  border-right: 2px solid #667085;
+  border-bottom: 2px solid #667085;
+  transform: translateY(-68%) rotate(45deg);
+  transition: transform 160ms ease;
+}
+.sleek-select.is-open .sleek-select-trigger::after {
+  transform: translateY(-30%) rotate(225deg);
+}
+.sleek-select-trigger:hover:not(:disabled) { border-color: #b8c1cf; }
+.sleek-select-trigger:focus-visible,
+.sleek-select.is-open .sleek-select-trigger {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent), transparent 86%);
+}
+.sleek-select-trigger:disabled {
+  cursor: not-allowed;
+  background: #f7f8fa;
+  color: #98a2b3;
+}
+.sleek-select-trigger:disabled::after { border-color: #aab2bf; }
+.sleek-select-trigger[aria-invalid="true"] { border-color: var(--danger); }
+
+.sleek-select-content {
+  min-width: var(--select-width, 220px);
+  max-width: min(420px, calc(100vw - 24px));
+  max-height: min(320px, calc(100vh - 24px));
+  margin: 0;
+  padding: 6px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid #e2e7ee;
+  border-radius: 13px;
+  background: #fff;
+  box-shadow: 0 14px 36px rgba(24, 35, 52, 0.16), 0 3px 10px rgba(24, 35, 52, 0.08);
+  z-index: 10000;
+  scrollbar-width: thin;
+  scrollbar-color: #c8d0dc transparent;
+}
+.sleek-select-content[hidden] { display: none !important; }
+.sleek-select-content:popover-open { display: block; }
+.sleek-select-content::-webkit-scrollbar { width: 8px; }
+.sleek-select-content::-webkit-scrollbar-track { background: transparent; }
+.sleek-select-content::-webkit-scrollbar-thumb {
+  border: 2px solid #fff;
+  border-radius: 999px;
+  background: #c8d0dc;
+}
+.sleek-select-option {
+  width: 100%;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px 9px 12px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #344054;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+}
+.sleek-select-option:hover:not(:disabled),
+.sleek-select-option.is-focused:not(:disabled) {
+  background: #f4f7fa;
+  color: #202b3c;
+}
+.sleek-select-option.is-selected {
+  background: color-mix(in srgb, var(--accent), white 91%);
   color: var(--accent-dark);
   font-weight: 750;
 }
-select option:disabled { color: #98a2b3; }
+.sleek-select-option.is-selected::after {
+  content: "✓";
+  margin-left: auto;
+  color: var(--accent);
+  font-size: 0.9rem;
+  font-weight: 900;
+}
+.sleek-select-option:disabled {
+  color: #a0a8b4;
+  cursor: not-allowed;
+}
+.sleek-select-option + .sleek-select-option { margin-top: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .sleek-select-trigger,
+  .sleek-select-trigger::after { transition: none; }
+}
 input[type="checkbox"], input[type="radio"] { width: 18px; min-height: 18px; height: 18px; padding: 0; accent-color: var(--accent); }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .check { flex-direction: row !important; align-items: center !important; gap: 9px !important; font-weight: 600 !important; }
