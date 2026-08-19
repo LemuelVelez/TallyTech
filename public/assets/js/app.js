@@ -225,6 +225,33 @@
     });
   });
 
+  document.querySelectorAll('[data-password-rules]').forEach((rules) => {
+    const form = rules.closest('form');
+    const input = form?.querySelector('[data-password-input]');
+    if (!(input instanceof HTMLInputElement)) return;
+
+    const checks = {
+      length: (value) => value.length >= 8,
+      case: (value) => /[a-z]/.test(value) && /[A-Z]/.test(value),
+      number: (value) => /\d/.test(value),
+      special: (value) => /[^A-Za-z0-9]/.test(value),
+    };
+
+    const syncPasswordRules = () => {
+      const value = input.value;
+      rules.querySelectorAll('[data-password-rule]').forEach((rule) => {
+        const check = checks[rule.dataset.passwordRule];
+        const isMet = typeof check === 'function' && check(value);
+        rule.classList.toggle('is-met', isMet);
+        rule.setAttribute('data-rule-met', isMet ? 'true' : 'false');
+      });
+    };
+
+    input.addEventListener('input', syncPasswordRules);
+    form?.addEventListener('reset', () => requestAnimationFrame(syncPasswordRules));
+    syncPasswordRules();
+  });
+
   document.addEventListener('submit', (event) => {
     const form = event.target;
     if (!(form instanceof HTMLFormElement) || event.defaultPrevented) return;

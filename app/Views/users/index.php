@@ -237,12 +237,12 @@ $activeAdminCount = $isAdminManagement
                 </label>
             </div>
 
-            <div class="password-rules">
+            <div class="password-rules" data-password-rules>
                 <b>Password Requirements</b>
-                <span>At least 8 characters</span>
-                <span>One uppercase and one lowercase letter</span>
-                <span>One number</span>
-                <span>One special character</span>
+                <span data-password-rule="length">At least 8 characters</span>
+                <span data-password-rule="case">One uppercase and one lowercase letter</span>
+                <span data-password-rule="number">One number</span>
+                <span data-password-rule="special">One special character</span>
             </div>
 
             <div data-sport-assignment <?= $isAdminManagement ? 'hidden' : '' ?>>

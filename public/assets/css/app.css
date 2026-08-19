@@ -581,7 +581,8 @@ input[type="checkbox"], input[type="radio"] { width: 18px; min-height: 18px; hei
 .result-context { margin-bottom: 15px; }
 .password-rules { display: grid; gap: 6px; margin: 0 0 15px; padding: 13px; border-radius: 10px; background: #f7f9fc; color: #5e6876; font-size: 0.8rem; }
 .password-rules b { margin-bottom: 3px; color: #2a3443; font-size: 0.86rem; }
-.password-rules span::before { content: "✓ "; color: var(--accent); font-weight: 850; }
+.password-rules span::before { content: "× "; color: var(--danger); font-weight: 850; }
+.password-rules span.is-met::before { content: "✓ "; color: var(--accent); }
 
 
 .confirmation-dialog { width: min(480px, calc(100vw - 32px)); }
