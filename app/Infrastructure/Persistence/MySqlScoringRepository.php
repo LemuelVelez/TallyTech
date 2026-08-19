@@ -638,15 +638,12 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
     public function deleteUser(int $id, int $actorId): void
     {
         $user = $this->requireRow('users', $id, 'User');
-        if ($id === $actorId) {
-            throw new RuntimeException('You cannot delete your own account.');
-        }
         $this->assertAccountManagementPermission((string) ($user['role'] ?? ''), $actorId);
         $this->assertAdminContinuityOnDelete($id, (string) ($user['role'] ?? ''));
 
         $this->db->transStart();
-        $this->db->table('users')->where('id', $id)->delete();
         $this->notify($actorId, 'user_deleted', 'Removed account for ' . ($user['display_name'] ?? '#'.$id));
+        $this->db->table('users')->where('id', $id)->delete();
         $this->finishTransaction();
     }
 

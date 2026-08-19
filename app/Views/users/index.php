@@ -13,6 +13,10 @@ $roleOptions = $roleOptions ?? ($roleType ? [$roleType] : []);
 $hasActiveEvent = ! empty($activeEvent);
 $canCreate = $isAdminManagement || $hasActiveEvent;
 $createAction = $isAdminManagement ? 'users' : 'facilitators';
+$currentUserId = (int) session()->get('user_id');
+$activeAdminCount = $isAdminManagement
+    ? count(array_filter($users, static fn(array $user): bool => ($user['role'] ?? '') === 'admin' && ($user['status'] ?? '') === 'active'))
+    : 0;
 ?>
 
 <div class="page-head">
@@ -49,7 +53,14 @@ $createAction = $isAdminManagement ? 'users' : 'facilitators';
             </thead>
             <tbody>
             <?php foreach ($users as $i => $user): ?>
-                <?php $userRole = (string) ($user['role'] ?? $roleType ?? ''); ?>
+                <?php
+                $userRole = (string) ($user['role'] ?? $roleType ?? '');
+                $isOnlyActiveAdminSelf = $isAdminManagement
+                    && $userRole === 'admin'
+                    && ($user['status'] ?? '') === 'active'
+                    && (int) $user['id'] === $currentUserId
+                    && $activeAdminCount === 1;
+                ?>
                 <tr>
                     <td><?= $i + 1 ?></td>
                     <td><b><?= esc($user['username']) ?></b></td>
@@ -73,7 +84,10 @@ $createAction = $isAdminManagement ? 'users' : 'facilitators';
                                   action="<?= site_url(($isAdminManagement ? 'users/' : 'facilitators/') . $user['id'] . '/delete') ?>"
                                   data-confirm="Delete <?= esc($user['display_name'], 'attr') ?>'s account? This cannot be undone, although supported audit references will remain.">
                                 <?= csrf_field() ?>
-                                <button class="btn tiny danger" type="submit"><?= ui_icon('trash') ?><span>Delete</span></button>
+                                <button class="btn tiny danger" type="submit"
+                                        <?= $isOnlyActiveAdminSelf ? 'disabled aria-disabled="true" title="The only active administrator cannot delete their own account."' : '' ?>>
+                                    <?= ui_icon('trash') ?><span>Delete</span>
+                                </button>
                             </form>
                         </div>
                     </td>
