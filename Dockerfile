@@ -52,4 +52,4 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD php -r '$s = @fsockopen("127.0.0.1", 3000, $errno, $errstr, 2); if (! $s) { exit(1); } fclose($s);'
 
-CMD ["apache2-foreground"]
+CMD ["sh", "-c", "php spark migrate --all && exec apache2-foreground"]
