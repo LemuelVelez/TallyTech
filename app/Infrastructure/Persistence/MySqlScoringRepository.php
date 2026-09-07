@@ -124,7 +124,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         if ($resultType) {
             $builder->where('s.result_type', $resultType);
         }
-        return $builder->orderBy('sc.match_date', 'DESC')->get()->getResultArray();
+        return $builder->orderBy('sc.match_date', 'ASC')->orderBy('sc.bracket_order', 'ASC')->orderBy('sc.id', 'ASC')->get()->getResultArray();
     }
 
     public function usersByRole(string $role): array
@@ -943,9 +943,37 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         if ($teamA && $teamB && $teamA === $teamB) {
             throw new RuntimeException('Team A and Team B must be different.');
         }
-        if (($sport['result_type'] ?? '') === 'match' && (! $teamA || ! $teamB)) {
-            throw new RuntimeException('Match schedules require both Team A and Team B.');
+        $feeds = [
+            ['id'=>'team_a_id','code'=>'feeds_from_a','type'=>'feeds_from_a_type','team'=>$teamA],
+            ['id'=>'team_b_id','code'=>'feeds_from_b','type'=>'feeds_from_b_type','team'=>$teamB],
+        ];
+        foreach ($feeds as $slot) {
+            $hasFeed = ! empty($data[$slot['code']]) && ! empty($data[$slot['type']]);
+            if ($slot['team'] && $hasFeed) {
+                throw new RuntimeException('A team slot cannot have both a team and bracket source.');
+            }
+            if (! $slot['team'] && ! $hasFeed && (($sport['result_type'] ?? '') === 'match')) {
+                throw new RuntimeException('Match schedules require both Team A and Team B.');
+            }
+            if ($hasFeed) {
+                $code = strtoupper((string)$data[$slot['code']]);
+                if (! preg_match('/^M[1-9][0-9]?$/', $code)) {
+                    throw new RuntimeException('Bracket source must be a valid match code.');
+                }
+                if ($code === strtoupper((string)($data['match_code'] ?? ''))) {
+                    throw new RuntimeException('A match cannot feed itself.');
+                }
+            }
         }
+        if (! empty($data['match_code'])) {
+            $code = strtoupper((string)$data['match_code']);
+            if (! preg_match('/^M[1-9][0-9]?$/', $code)) { throw new RuntimeException('Match ID is invalid.'); }
+            $exists = $this->db->table('schedules')->where('event_id',$eventId)->where('sport_id',$sportId)->where('match_code',$code);
+            if ($existingScheduleId !== null) { $exists->where('id !=', $existingScheduleId); }
+            if ($exists->countAllResults() > 0) { throw new RuntimeException('Match ID already exists for this sport.'); }
+        }
+        if (! empty($data['court_label']) && mb_strlen($data['court_label']) > 60) throw new RuntimeException('Court label is too long.');
+        if (! empty($data['scheduling_note']) && mb_strlen($data['scheduling_note']) > 255) throw new RuntimeException('Scheduling note is too long.');
         if ($teamA) {
             $this->requireRow('teams', $teamA, 'Team A');
         }
@@ -954,6 +982,22 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         }
     }
 
+
+
+    public function resolveBracketSlots(array $schedules): array
+    {
+        $byCode = [];
+        foreach ($schedules as $row) { if (! empty($row['match_code'])) $byCode[$row['match_code']] = $row; }
+        foreach ($schedules as &$row) {
+            foreach (['a','b'] as $slot) {
+                $teamKey = 'team_'.$slot.'_name'; $code = 'feeds_from_'.$slot; $type = 'feeds_from_'.$slot.'_type';
+                $label = $row[$teamKey] ?? null;
+                if (! $label && ! empty($row[$code]) && ! empty($row[$type])) { $label = ucfirst($row[$type]).' of '.$row[$code]; }
+                $row['slot_'.$slot.'_label'] = $label ?: 'TBD';
+            }
+        }
+        return $schedules;
+    }
 
     private function assertAccountManagementPermission(string $targetRole, int $actorId): void
     {

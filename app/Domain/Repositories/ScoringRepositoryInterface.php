@@ -14,6 +14,7 @@ interface ScoringRepositoryInterface
     public function sportCategories(bool $includeInactive = false): array;
     public function sportCategory(int $id): ?array;
     public function schedules(?int $eventId = null, ?string $resultType = null): array;
+    public function resolveBracketSlots(array $schedules): array;
     public function usersByRole(string $role): array;
     public function assignedSportIds(int $userId): array;
     public function notifications(int $limit = 30): array;

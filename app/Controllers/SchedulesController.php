@@ -8,7 +8,7 @@ class SchedulesController extends BaseController
     {
         $data = $this->scoringService()->commonData();
         $data['title'] = 'Team Schedules';
-        $data['schedules'] = $this->repository()->schedules((int) ($data['activeEvent']['id'] ?? 0));
+        $data['schedules'] = $this->repository()->resolveBracketSlots($this->repository()->schedules((int) ($data['activeEvent']['id'] ?? 0)));
         $data['allLocations'] = $this->repository()->allLocations();
         return view('schedules/index', $data);
     }
@@ -88,6 +88,17 @@ class SchedulesController extends BaseController
             'team_a_id' => $this->postPositiveInt('team_a_id') ?: null,
             'team_b_id' => $this->postPositiveInt('team_b_id') ?: null,
             'status' => $status,
+            'match_code' => strtoupper(trim($this->postString('match_code'))) ?: null,
+            'phase' => trim($this->postString('phase')) ?: null,
+            'bracket_side' => trim($this->postString('bracket_side')) ?: null,
+            'bracket_order' => $this->postPositiveInt('bracket_order') ?: 0,
+            'feeds_from_a' => strtoupper(trim($this->postString('feeds_from_a'))) ?: null,
+            'feeds_from_a_type' => trim($this->postString('feeds_from_a_type')) ?: null,
+            'feeds_from_b' => strtoupper(trim($this->postString('feeds_from_b'))) ?: null,
+            'feeds_from_b_type' => trim($this->postString('feeds_from_b_type')) ?: null,
+            'court_label' => trim($this->postString('court_label')) ?: null,
+            'is_conditional' => $this->postPositiveInt('is_conditional') ? 1 : 0,
+            'scheduling_note' => trim($this->postString('scheduling_note')) ?: null,
         ];
     }
 

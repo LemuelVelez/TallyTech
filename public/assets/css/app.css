@@ -1068,3 +1068,5 @@ input[type="checkbox"], input[type="radio"] { width: 18px; min-height: 18px; hei
   .action-card:hover, .viewer-rank:hover, .btn:hover:not(:disabled), .nav-item:hover { transform: none; }
   .hero-slide { transform: none; }
 }
+
+.matchup-placeholder{font-style:italic;color:var(--muted)}
