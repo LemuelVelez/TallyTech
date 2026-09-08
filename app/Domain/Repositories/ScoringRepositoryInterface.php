@@ -22,6 +22,7 @@ interface ScoringRepositoryInterface
     public function results(?int $eventId = null, ?string $type = null): array;
     public function resultEntries(int $resultId): array;
     public function ranking(?int $eventId = null): array;
+    public function rankingBySport(int $eventId, int $sportId): array;
     public function reportSummary(?int $eventId = null): array;
 
     public function createTeam(array $data, int $actorId): int;
@@ -50,6 +51,7 @@ interface ScoringRepositoryInterface
     public function createSchedule(array $data, int $actorId): int;
     public function updateSchedule(int $id, array $data, int $actorId): void;
     public function deleteSchedule(int $id, int $actorId): void;
+    public function generateBracket(array $data, array $teamIds, int $actorId): int;
 
     public function createUser(array $data, array $sportIds, int $actorId): int;
     public function updateUser(int $id, array $data, array $sportIds, int $actorId): void;

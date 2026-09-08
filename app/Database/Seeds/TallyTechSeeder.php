@@ -34,7 +34,7 @@ class TallyTechSeeder extends Seeder
             $ids = [
                 'admin' => $this->ensureUser([
                     'username' => 'admin',
-                    'password_hash' => password_hash('Admin@12345', PASSWORD_DEFAULT),
+                    'password_hash' => password_hash('Admin_123', PASSWORD_DEFAULT),
                     'display_name' => 'System Admin',
                     'role' => 'admin',
                     'status' => 'active',
@@ -42,7 +42,7 @@ class TallyTechSeeder extends Seeder
                 ]),
                 'manager' => $this->ensureUser([
                     'username' => 'manager',
-                    'password_hash' => password_hash('Manager@12345', PASSWORD_DEFAULT),
+                    'password_hash' => password_hash('Manager_123', PASSWORD_DEFAULT),
                     'display_name' => 'Joy Tournament Manager',
                     'role' => 'manager',
                     'status' => 'active',
@@ -50,7 +50,7 @@ class TallyTechSeeder extends Seeder
                 ]),
                 'validator' => $this->ensureUser([
                     'username' => 'validator',
-                    'password_hash' => password_hash('Validator@12345', PASSWORD_DEFAULT),
+                    'password_hash' => password_hash('Validator_123', PASSWORD_DEFAULT),
                     'display_name' => 'ISF Validator',
                     'role' => 'validator',
                     'status' => 'active',
@@ -58,7 +58,7 @@ class TallyTechSeeder extends Seeder
                 ]),
                 'facilitator' => $this->ensureUser([
                     'username' => 'facilitator',
-                    'password_hash' => password_hash('Facilitator@12345', PASSWORD_DEFAULT),
+                    'password_hash' => password_hash('Facilitator_123', PASSWORD_DEFAULT),
                     'display_name' => 'Game Facilitator',
                     'role' => 'facilitator',
                     'status' => 'active',
@@ -118,6 +118,12 @@ class TallyTechSeeder extends Seeder
                 'sport_id' => $sports['Basketball'],
                 'location_id' => $locations['Main Gymnasium'],
                 'round' => 'Final',
+                'tournament_format' => 'single_elimination',
+                'match_code' => 'M1',
+                'phase' => 'final',
+                'bracket_side' => 'grand',
+                'bracket_order' => 1,
+                'court_label' => 'Court 1',
                 'match_date' => '2026-08-15 18:00:00',
                 'team_a_id' => $teams['CBA'],
                 'team_b_id' => $teams['CCS-CAF'],
@@ -130,6 +136,12 @@ class TallyTechSeeder extends Seeder
                 'sport_id' => $sports['Volleyball'],
                 'location_id' => $locations['Covered Court'],
                 'round' => 'Final',
+                'tournament_format' => 'single_elimination',
+                'match_code' => 'M1',
+                'phase' => 'final',
+                'bracket_side' => 'grand',
+                'bracket_order' => 1,
+                'court_label' => 'Court 1',
                 'match_date' => '2026-08-16 09:00:00',
                 'team_a_id' => $teams['CIT-COC'],
                 'team_b_id' => $teams['SCA-CLAIM'],
@@ -142,6 +154,12 @@ class TallyTechSeeder extends Seeder
                 'sport_id' => $sports['Cheerdance'],
                 'location_id' => $locations['Auditorium'],
                 'round' => 'Championship',
+                'tournament_format' => 'single_elimination',
+                'match_code' => 'M1',
+                'phase' => 'final',
+                'bracket_side' => 'grand',
+                'bracket_order' => 1,
+                'court_label' => 'Main Stage',
                 'match_date' => '2026-08-16 14:00:00',
                 'team_a_id' => null,
                 'team_b_id' => null,
@@ -202,7 +220,18 @@ class TallyTechSeeder extends Seeder
     private function ensureUser(array $data): int
     {
         $row = $this->db->table('users')->select('id')->where('username', $data['username'])->get()->getRowArray();
-        return $this->existingOrInsert('users', $row, $data);
+        if ($row) {
+            $this->db->table('users')->where('id', (int) $row['id'])->update([
+                'password_hash' => $data['password_hash'],
+                'display_name' => $data['display_name'],
+                'role' => $data['role'],
+                'status' => $data['status'],
+            ]);
+            $this->changes++;
+            return (int) $row['id'];
+        }
+
+        return $this->existingOrInsert('users', null, $data);
     }
 
     private function ensureEvent(array $data): int

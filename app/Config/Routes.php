@@ -16,22 +16,26 @@ $routes->group('', ['filter' => 'auth'], static function (RouteCollection $route
     $routes->get('settings', 'SettingsController::index');
     $routes->post('settings', 'SettingsController::update');
 
-    $routes->group('', ['filter' => 'role:admin'], static function (RouteCollection $routes): void {
+    $routes->group('', ['filter' => 'role:admin,manager'], static function (RouteCollection $routes): void {
         $routes->get('teams', 'TeamsController::index');
         $routes->post('teams', 'TeamsController::store');
         $routes->post('teams/(:num)/update', 'TeamsController::update/$1');
         $routes->post('teams/(:num)/delete', 'TeamsController::delete/$1');
 
+        $routes->get('sports', 'SportsController::index');
+        $routes->post('sports', 'SportsController::store');
+        $routes->post('sports/(:num)/update', 'SportsController::update/$1');
+        $routes->post('sports/(:num)/delete', 'SportsController::delete/$1');
+
+        $routes->get('reports', 'ReportsController::index');
+    });
+
+    $routes->group('', ['filter' => 'role:admin'], static function (RouteCollection $routes): void {
         $routes->get('events', 'EventsController::index');
         $routes->post('events', 'EventsController::store');
         $routes->post('events/(:num)/update', 'EventsController::update/$1');
         $routes->post('events/(:num)/activate', 'EventsController::activate/$1');
         $routes->post('events/(:num)/delete', 'EventsController::delete/$1');
-
-        $routes->get('sports', 'SportsController::index');
-        $routes->post('sports', 'SportsController::store');
-        $routes->post('sports/(:num)/update', 'SportsController::update/$1');
-        $routes->post('sports/(:num)/delete', 'SportsController::delete/$1');
 
         $routes->get('sport-categories', 'SportCategoriesController::index');
         $routes->post('sport-categories', 'SportCategoriesController::store');
@@ -45,30 +49,28 @@ $routes->group('', ['filter' => 'auth'], static function (RouteCollection $route
         $routes->post('locations/(:num)/status', 'LocationsController::setStatus/$1');
         $routes->post('locations/(:num)/delete', 'LocationsController::delete/$1');
 
-        $routes->get('schedules', 'SchedulesController::index');
-        $routes->post('schedules', 'SchedulesController::store');
-        $routes->post('schedules/(:num)/update', 'SchedulesController::update/$1');
-        $routes->post('schedules/(:num)/delete', 'SchedulesController::delete/$1');
-
         $routes->get('users', 'UsersController::index');
         $routes->post('users', 'UsersController::store');
         $routes->post('users/(:num)/update', 'UsersController::update/$1');
         $routes->post('users/(:num)/delete', 'UsersController::delete/$1');
 
-        // Legacy Sports Manager URLs remain available for existing bookmarks/forms.
+        // Legacy Tournament Manager URLs remain available for existing bookmarks/forms.
         $routes->get('sports-managers', 'UsersController::sportsManagers');
         $routes->post('sports-managers', 'UsersController::storeSportsManager');
         $routes->post('sports-managers/(:num)/update', 'UsersController::updateSportsManager/$1');
         $routes->post('sports-managers/(:num)/delete', 'UsersController::deleteSportsManager/$1');
     });
 
-    $routes->group('', ['filter' => 'role:admin,manager'], static function (RouteCollection $routes): void {
-        $routes->get('reports', 'ReportsController::index');
-    });
-
     $routes->get('weighted-points', 'WeightedPointsController::index', ['filter' => 'role:manager,validator']);
 
     $routes->group('', ['filter' => 'role:manager'], static function (RouteCollection $routes): void {
+        $routes->get('schedules', 'SchedulesController::index');
+        $routes->post('schedules', 'SchedulesController::store');
+        $routes->post('schedules/(:num)/update', 'SchedulesController::update/$1');
+        $routes->post('schedules/(:num)/delete', 'SchedulesController::delete/$1');
+        $routes->get('brackets', 'SchedulesController::brackets');
+        $routes->post('brackets/generate', 'SchedulesController::generateBracket');
+
         $routes->post('weighted-points', 'WeightedPointsController::store');
         $routes->post('weighted-points/(:num)/update', 'WeightedPointsController::update/$1');
         $routes->post('weighted-points/(:num)/delete', 'WeightedPointsController::delete/$1');

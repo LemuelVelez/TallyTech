@@ -1,7 +1,7 @@
 <?php
 $role = (string) session()->get('role');
 $roleLabel = ['admin' => 'Admin Panel', 'manager' => 'Tournament Manager', 'validator' => 'Validator', 'facilitator' => 'Facilitator'][$role] ?? 'TallyTech';
-$accountRoleLabel = ['admin' => 'Administrator', 'manager' => 'Sports Manager', 'validator' => 'Validator', 'facilitator' => 'Facilitator'][$role] ?? ucfirst($role);
+$accountRoleLabel = ['admin' => 'Administrator', 'manager' => 'Tournament Manager', 'validator' => 'Validator', 'facilitator' => 'Facilitator'][$role] ?? ucfirst($role);
 $compactSidebar = (bool) session()->get('compact_sidebar');
 $resultDensity = (string) (session()->get('result_density') ?: 'comfortable');
 $displayName = (string) session()->get('display_name');

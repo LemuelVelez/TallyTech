@@ -173,10 +173,21 @@ class UsersController extends BaseController
     {
         return match ($role) {
             'admin' => 'Administrator',
-            'manager' => 'Sports Manager',
+            'manager' => 'Tournament Manager',
             'validator' => 'Validator',
             'facilitator' => 'Facilitator',
             default => 'User',
+        };
+    }
+
+    private function defaultPasswordForRole(string $role): string
+    {
+        return match ($role) {
+            'admin' => 'Admin_123',
+            'manager' => 'Manager_123',
+            'validator' => 'Validator_123',
+            'facilitator' => 'Facilitator_123',
+            default => '',
         };
     }
 
@@ -201,7 +212,7 @@ class UsersController extends BaseController
             return ['error' => 'Select a valid account status.'];
         }
         if ($passwordRequired && $password === '') {
-            return ['error' => 'Password is required.'];
+            $password = $this->defaultPasswordForRole($role);
         }
         if ($password !== '' && ! preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/', $password)) {
             return ['error' => 'Password must be 8+ characters with uppercase, lowercase, number, and special character.'];

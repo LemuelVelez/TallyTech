@@ -5,7 +5,7 @@ $manageMode = (string) ($manageMode ?? $roleType ?? '');
 $isAdminManagement = $manageMode === 'admin';
 $roleLabels = [
     'admin' => 'Administrator',
-    'manager' => 'Sports Manager',
+    'manager' => 'Tournament Manager',
     'validator' => 'Validator',
     'facilitator' => 'Facilitator',
 ];
@@ -22,7 +22,7 @@ $activeAdminCount = $isAdminManagement
 <div class="page-head">
     <div>
         <h1><?= esc($title) ?></h1>
-        <p><?= $isAdminManagement ? 'Create and manage Administrators, Sports Managers, Validators, and Facilitators.' : 'Create, update, deactivate, and remove facilitator accounts.' ?></p>
+        <p><?= $isAdminManagement ? 'Create and manage Administrators, Tournament Managers, Validators, and Facilitators.' : 'Create, update, deactivate, and remove facilitator accounts.' ?></p>
     </div>
     <button class="btn primary" data-modal="user-modal" <?= $canCreate ? '' : 'disabled' ?>>
         <?= ui_icon('plus') ?> <span>Add <?= $isAdminManagement ? 'User' : 'Facilitator' ?></span>
@@ -228,7 +228,7 @@ $activeAdminCount = $isAdminManagement
                 </label>
                 <label>Password
                     <span class="password-field">
-                        <input type="password" name="password" minlength="8" required autocomplete="new-password" data-password-input>
+                        <input type="password" name="password" minlength="8" autocomplete="new-password" placeholder="Leave blank to use the role default" data-password-input>
                         <button class="password-toggle" type="button" data-password-toggle aria-label="Show password" aria-pressed="false">
                             <?= ui_icon('eye', 'password-icon password-icon-show') ?>
                             <?= ui_icon('eye-off', 'password-icon password-icon-hide') ?>
@@ -239,6 +239,7 @@ $activeAdminCount = $isAdminManagement
 
             <div class="password-rules" data-password-rules>
                 <b>Password Requirements</b>
+                <p class="form-note">Blank uses Admin_123, Manager_123, Validator_123, or Facilitator_123 based on role.</p>
                 <span data-password-rule="length">At least 8 characters</span>
                 <span data-password-rule="case">One uppercase and one lowercase letter</span>
                 <span data-password-rule="number">One number</span>

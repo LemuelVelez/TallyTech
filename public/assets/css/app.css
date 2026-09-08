@@ -1070,3 +1070,53 @@ input[type="checkbox"], input[type="radio"] { width: 18px; min-height: 18px; hei
 }
 
 .matchup-placeholder{font-style:italic;color:var(--muted)}
+
+/* Tournament management and live bracket enhancements */
+.page-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.schedule-table { min-width: 1120px !important; }
+.schedule-table td > small { display: block; margin-top: 4px; }
+.inline-filter, .sport-filter-form { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; }
+.inline-filter label, .sport-filter-form label { margin: 0; min-width: min(340px, 100%); }
+.bracket-filter-panel { padding-block: 18px; }
+.bracket-team-checks { margin: 8px 0 16px; }
+
+.management-bracket, .live-bracket { display: grid; gap: 24px; overflow-x: auto; padding: 4px 2px 10px; }
+.bracket-lane { min-width: max-content; padding: 18px; border: 1px solid var(--line); border-radius: 16px; background: #f8fafc; }
+.bracket-lane > h3 { margin: 0 0 16px; color: #334155; font-size: 0.82rem; letter-spacing: 0.06em; text-transform: uppercase; }
+.bracket-rounds { display: flex; align-items: stretch; gap: 32px; min-width: max-content; }
+.bracket-column { width: 250px; display: flex; flex-direction: column; gap: 14px; }
+.bracket-round-title { min-height: 22px; color: var(--muted); font-size: 0.75rem; letter-spacing: 0.045em; text-transform: uppercase; }
+.tournament-match { position: relative; display: grid; gap: 8px; padding: 13px; border: 1px solid #d8e0ea; border-radius: 12px; background: #fff; box-shadow: 0 5px 16px rgba(15, 23, 42, 0.05); }
+.tournament-match::after { content: ""; position: absolute; right: -33px; top: 50%; width: 32px; border-top: 2px solid #c8d2df; }
+.bracket-column:last-child .tournament-match::after { display: none; }
+.tournament-match.conditional { border-style: dashed; }
+.match-meta { display: flex; justify-content: space-between; gap: 10px; color: #667085; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.04em; }
+.bracket-team { min-height: 34px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 9px; border-radius: 8px; background: #f8fafc; font-size: 0.82rem; }
+.bracket-team.winner { background: #ecfdf3; color: #087443; font-weight: 850; }
+.bracket-team b { min-width: 22px; text-align: right; font-size: 0.95rem; }
+.tournament-match > small { color: var(--muted); font-size: 0.72rem; line-height: 1.4; }
+.tournament-match > em { color: var(--accent-dark); font-size: 0.72rem; font-style: normal; font-weight: 800; line-height: 1.4; }
+
+.sport-filter-card { margin-bottom: 22px; }
+.sport-filter-form { align-items: center; }
+.sport-filter-form label { min-width: 160px; color: var(--muted); font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; }
+.sport-filter-form select { min-width: min(420px, 100%); }
+.live-bracket-panel { margin-bottom: 22px; overflow: hidden; }
+.viewer-bracket-lane { background: #f8fbff; }
+.public-tournament-match { width: 250px; }
+.scoreboard-detail-columns { margin-bottom: 22px; }
+.compact-podium { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 0; }
+.compact-podium .viewer-rank { min-height: 145px; padding: 18px; }
+.sport-points-panel { margin-top: 0; }
+.sport-points-panel table { min-width: 520px; }
+
+@media (max-width: 640px) {
+  .page-actions { width: 100%; }
+  .page-actions .btn { flex: 1 1 100%; justify-content: center; }
+  .bracket-lane { padding: 14px; }
+  .bracket-rounds { gap: 24px; }
+  .bracket-column, .public-tournament-match { width: 220px; }
+  .compact-podium { grid-template-columns: 1fr; }
+  .sport-filter-form { align-items: stretch; }
+  .sport-filter-form select { width: 100%; min-width: 0; }
+}
