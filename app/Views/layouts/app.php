@@ -62,16 +62,18 @@ $jsVersion = $assetVersion('assets/js/app.js');
     </main>
 </div>
 
-<dialog class="confirmation-dialog" data-confirm-dialog aria-labelledby="confirmation-title" aria-describedby="confirmation-message">
+<dialog class="confirmation-dialog" data-confirm-dialog data-confirm-tone="default" role="alertdialog" aria-labelledby="confirmation-title" aria-describedby="confirmation-message">
     <div class="confirmation-card">
-        <div class="confirmation-icon" aria-hidden="true"><?= ui_icon('alert-triangle') ?></div>
-        <div>
-            <h2 id="confirmation-title">Confirm action</h2>
-            <p id="confirmation-message" data-confirm-message>Are you sure you want to continue?</p>
+        <div class="confirmation-main">
+            <div class="confirmation-icon" aria-hidden="true"><?= ui_icon('alert-triangle') ?></div>
+            <div class="confirmation-copy">
+                <h2 id="confirmation-title" data-confirm-title>Confirm action</h2>
+                <p id="confirmation-message" data-confirm-message>Are you sure you want to continue?</p>
+            </div>
         </div>
         <div class="confirmation-actions">
-            <button class="btn" type="button" data-confirm-cancel>Cancel</button>
-            <button class="btn danger" type="button" data-confirm-proceed>Confirm</button>
+            <button class="btn confirmation-cancel" type="button" data-confirm-cancel>Cancel</button>
+            <button class="btn confirmation-proceed" type="button" data-confirm-proceed>Confirm</button>
         </div>
     </div>
 </dialog>

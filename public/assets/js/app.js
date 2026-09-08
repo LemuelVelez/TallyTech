@@ -6,9 +6,12 @@
   const accountToggle = accountMenu?.querySelector('[data-account-toggle]');
   const accountDropdown = accountMenu?.querySelector('[data-account-dropdown]');
   const confirmDialog = document.querySelector('[data-confirm-dialog]');
+  const confirmTitle = confirmDialog?.querySelector('[data-confirm-title]');
   const confirmMessage = confirmDialog?.querySelector('[data-confirm-message]');
   const confirmCancel = confirmDialog?.querySelector('[data-confirm-cancel]');
   const confirmProceed = confirmDialog?.querySelector('[data-confirm-proceed]');
+  const confirmIconUse = confirmDialog?.querySelector('.confirmation-icon use');
+  const confirmIconBase = confirmIconUse?.getAttribute('href')?.split('#')[0] || '';
 
   let lastDialogTrigger = null;
   let pendingConfirmForm = null;
@@ -442,10 +445,54 @@
     return true;
   };
 
+  const confirmationPresentation = (message, submitter) => {
+    const actionLabel = submitter?.textContent?.trim() || 'Confirm';
+    const action = actionLabel.toLowerCase();
+    const normalized = `${actionLabel} ${message}`.toLowerCase();
+
+    if (/\b(delete|remove|deactivate|disable)\b/.test(action) || /\b(delete|remove|deactivate|disable)\b/.test(normalized)) {
+      return { title: 'Confirm removal', tone: 'danger', actionLabel, icon: 'trash' };
+    }
+    if (/\b(log out|logout)\b/.test(action) || /\b(log out|logout)\b/.test(normalized)) {
+      return { title: 'Confirm logout', tone: 'danger', actionLabel, icon: 'log-out' };
+    }
+    if (/\bvalidate\b/.test(action)) {
+      return { title: 'Confirm validation', tone: 'success', actionLabel, icon: 'check-circle' };
+    }
+    if (/\b(activate|enable)\b/.test(action)) {
+      return { title: 'Confirm activation', tone: 'success', actionLabel, icon: 'power' };
+    }
+    if (/\bgenerate\b/.test(action)) {
+      return { title: 'Confirm generation', tone: 'warning', actionLabel, icon: 'play-circle' };
+    }
+    if (/\bsubmit\b/.test(action)) {
+      return { title: 'Confirm submission', tone: 'default', actionLabel, icon: 'clipboard-check' };
+    }
+    if (/\b(save|change|update)\b/.test(action)) {
+      return { title: 'Confirm changes', tone: 'default', actionLabel, icon: 'save' };
+    }
+
+    if (/\bvalidate\b/.test(normalized)) {
+      return { title: 'Confirm validation', tone: 'success', actionLabel, icon: 'check-circle' };
+    }
+    if (/\b(activate|enable)\b/.test(normalized)) {
+      return { title: 'Confirm activation', tone: 'success', actionLabel, icon: 'power' };
+    }
+    if (/\bgenerate\b/.test(normalized)) {
+      return { title: 'Confirm generation', tone: 'warning', actionLabel, icon: 'play-circle' };
+    }
+
+    return { title: 'Confirm action', tone: 'default', actionLabel, icon: 'alert-triangle' };
+  };
+
   const clearPendingConfirmation = () => {
     pendingConfirmForm = null;
     pendingConfirmSubmitter = null;
+    if (confirmTitle) confirmTitle.textContent = 'Confirm action';
+    if (confirmMessage) confirmMessage.textContent = 'Are you sure you want to continue?';
     if (confirmProceed) confirmProceed.textContent = 'Confirm';
+    if (confirmIconUse && confirmIconBase) confirmIconUse.setAttribute('href', `${confirmIconBase}#alert-triangle`);
+    if (confirmDialog) confirmDialog.dataset.confirmTone = 'default';
   };
 
   document.addEventListener('click', (event) => {
@@ -874,16 +921,20 @@
     event.preventDefault();
     pendingConfirmForm = form;
     pendingConfirmSubmitter = event.submitter || null;
+    const presentation = confirmationPresentation(message, pendingConfirmSubmitter);
+    if (confirmTitle) confirmTitle.textContent = presentation.title;
     if (confirmMessage) confirmMessage.textContent = message;
-    if (confirmProceed) {
-      const actionLabel = pendingConfirmSubmitter?.textContent?.trim();
-      confirmProceed.textContent = actionLabel || 'Confirm';
-    }
+    if (confirmProceed) confirmProceed.textContent = presentation.actionLabel;
+    if (confirmIconUse && confirmIconBase) confirmIconUse.setAttribute('href', `${confirmIconBase}#${presentation.icon}`);
+    confirmDialog.dataset.confirmTone = presentation.tone;
     confirmDialog.showModal();
     window.setTimeout(() => confirmCancel?.focus(), 0);
   });
 
   confirmCancel?.addEventListener('click', () => confirmDialog?.close());
+  confirmDialog?.addEventListener('click', (event) => {
+    if (event.target === confirmDialog) confirmDialog.close();
+  });
   confirmProceed?.addEventListener('click', () => {
     const form = pendingConfirmForm;
     const submitter = pendingConfirmSubmitter;

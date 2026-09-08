@@ -746,23 +746,113 @@ input[type="checkbox"], input[type="radio"] { width: 18px; min-height: 18px; hei
 .password-rules span.is-met::before { content: "✓ "; color: var(--accent); }
 
 
-.confirmation-dialog { width: min(480px, calc(100vw - 32px)); }
-.confirmation-card { padding: 24px; display: grid; grid-template-columns: auto 1fr; gap: 14px 16px; }
+.confirmation-dialog {
+  width: min(440px, calc(100vw - 28px));
+  overflow: visible;
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 28px 80px rgba(15, 29, 50, 0.22), 0 8px 24px rgba(15, 29, 50, 0.08);
+}
+.confirmation-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.48);
+  backdrop-filter: blur(6px);
+}
+.confirmation-dialog[open] { animation: confirmation-in 150ms ease-out; }
+.confirmation-card { padding: 24px; }
+.confirmation-main { display: flex; align-items: flex-start; gap: 14px; }
+.confirmation-copy { min-width: 0; flex: 1; }
 .confirmation-icon {
   width: 42px;
   height: 42px;
+  flex: 0 0 42px;
   display: grid;
   place-items: center;
-  border-radius: 50%;
-  background: #fff0ef;
-  color: var(--danger-dark);
-  font-size: 1.15rem;
-  font-weight: 900;
+  border: 1px solid #e3e9f0;
+  border-radius: 12px;
+  background: #f6f8fb;
+  color: #526072;
 }
-.confirmation-icon .ui-icon { width: 22px; height: 22px; }
-.confirmation-card h2 { margin: 2px 0 6px; font-size: 1.15rem; }
-.confirmation-card p { margin: 0; color: var(--muted); font-size: 0.9rem; line-height: 1.55; }
-.confirmation-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
+.confirmation-icon .ui-icon { width: 20px; height: 20px; }
+.confirmation-card h2 {
+  margin: 0 0 5px;
+  color: var(--text);
+  font-size: 1.05rem;
+  line-height: 1.35;
+  letter-spacing: -0.015em;
+}
+.confirmation-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+.confirmation-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid #edf1f5;
+}
+.confirmation-actions .btn {
+  min-width: 104px;
+  min-height: 42px;
+  justify-content: center;
+  border-radius: 10px;
+}
+.confirmation-cancel {
+  border-color: #d9e0e8;
+  background: #fff;
+  color: #475467;
+}
+.confirmation-cancel:hover { background: #f7f9fb; color: #263247; }
+.confirmation-proceed {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--accent), transparent 78%);
+}
+.confirmation-proceed:hover {
+  border-color: var(--accent-dark);
+  background: var(--accent-dark);
+}
+.confirmation-dialog[data-confirm-tone="danger"] .confirmation-icon {
+  border-color: #f3d5d5;
+  background: #fff5f5;
+  color: var(--danger-dark);
+}
+.confirmation-dialog[data-confirm-tone="danger"] .confirmation-proceed {
+  border-color: var(--danger);
+  background: var(--danger);
+  box-shadow: 0 5px 14px rgba(220, 70, 70, 0.18);
+}
+.confirmation-dialog[data-confirm-tone="danger"] .confirmation-proceed:hover {
+  border-color: var(--danger-dark);
+  background: var(--danger-dark);
+}
+.confirmation-dialog[data-confirm-tone="success"] .confirmation-icon {
+  border-color: color-mix(in srgb, var(--accent), white 76%);
+  background: color-mix(in srgb, var(--accent), white 93%);
+  color: var(--accent-dark);
+}
+.confirmation-dialog[data-confirm-tone="warning"] .confirmation-icon {
+  border-color: #f1dfad;
+  background: #fff9e8;
+  color: #8a6811;
+}
+@keyframes confirmation-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@media (max-width: 520px) {
+  .confirmation-card { padding: 20px; }
+  .confirmation-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .confirmation-actions .btn { min-width: 0; width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .confirmation-dialog[open] { animation: none; }
+}
 [data-sport-assignment][hidden] { display: none !important; }
 
 /* Results and brackets */
