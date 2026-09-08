@@ -5,6 +5,12 @@ $accountRoleLabel = ['admin' => 'Administrator', 'manager' => 'Tournament Manage
 $compactSidebar = (bool) session()->get('compact_sidebar');
 $resultDensity = (string) (session()->get('result_density') ?: 'comfortable');
 $displayName = (string) session()->get('display_name');
+$assetVersion = static function (string $relativePath): string {
+    $path = defined('FCPATH') ? FCPATH . ltrim($relativePath, '/\\') : '';
+    return $path !== '' && is_file($path) ? (string) filemtime($path) : '20260908-2';
+};
+$cssVersion = $assetVersion('assets/css/app.css');
+$jsVersion = $assetVersion('assets/js/app.js');
 ?>
 <!doctype html>
 <html lang="en">
@@ -14,7 +20,7 @@ $displayName = (string) session()->get('display_name');
     <meta name="theme-color" content="#0c7e43">
     <title><?= esc($title ?? 'TallyTech') ?> · TallyTech</title>
     <link rel="icon" type="image/png" href="<?= base_url('logo.png') ?>">
-    <link rel="stylesheet" href="<?= base_url('assets/css/app.css') ?>">
+    <link rel="stylesheet" href="<?= esc(base_url('assets/css/app.css') . '?v=' . rawurlencode($cssVersion), 'attr') ?>">
 </head>
 <body class="app role-<?= esc($role) ?> <?= $compactSidebar ? 'sidebar-compact' : '' ?> density-<?= esc($resultDensity) ?>">
 <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -70,6 +76,6 @@ $displayName = (string) session()->get('display_name');
     </div>
 </dialog>
 
-<script src="<?= base_url('assets/js/app.js') ?>"></script>
+<script src="<?= esc(base_url('assets/js/app.js') . '?v=' . rawurlencode($jsVersion), 'attr') ?>"></script>
 </body>
 </html>

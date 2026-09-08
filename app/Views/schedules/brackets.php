@@ -1,12 +1,7 @@
 <?= $this->extend('layouts/app') ?><?= $this->section('content') ?>
 <?php
 $formatLabel = static fn(string $format): string => $format === 'double_elimination' ? 'Double Elimination' : 'Single Elimination';
-$grouped = ['upper' => [], 'lower' => [], 'grand' => []];
-foreach ($schedules as $schedule) {
-    $side = (string) ($schedule['bracket_side'] ?? 'upper');
-    if (! isset($grouped[$side])) $side = 'upper';
-    $grouped[$side][$schedule['round']][] = $schedule;
-}
+$bracketFormat = (string) ($schedules[0]['tournament_format'] ?? 'single_elimination');
 ?>
 <div class="page-head">
     <div><h1>Bracket Management</h1><p>Generate elimination structures and manage the progression path from the same schedule data used by scoring.</p></div>
@@ -20,38 +15,15 @@ foreach ($schedules as $schedule) {
     </form>
 </section>
 
-<section class="panel">
-    <div class="panel-head"><div><h2><?= esc($selectedSport['name'] ?? 'Tournament') ?> Bracket</h2><p><?= $schedules ? esc($formatLabel((string) ($schedules[0]['tournament_format'] ?? 'single_elimination'))) : 'Generate a bracket to begin.' ?></p></div><a href="<?= site_url('schedules') ?>">Open Master Schedule</a></div>
+<section class="panel bracket-management-panel">
+    <div class="panel-head"><div><h2><?= esc($selectedSport['name'] ?? 'Tournament') ?> Bracket</h2><p><?= $schedules ? esc($formatLabel($bracketFormat)) : 'Generate a bracket to begin.' ?></p></div><a href="<?= site_url('schedules') ?>">Open Master Schedule</a></div>
     <?php if ($schedules): ?>
-        <div class="management-bracket">
-            <?php foreach (['upper' => 'Winner Bracket', 'lower' => 'Loser Bracket', 'grand' => 'Championship'] as $side => $label): ?>
-                <?php if (!empty($grouped[$side])): ?>
-                    <div class="bracket-lane">
-                        <h3><?= esc($label) ?></h3>
-                        <div class="bracket-rounds">
-                            <?php foreach ($grouped[$side] as $round => $matches): ?>
-                                <div class="bracket-column">
-                                    <b class="bracket-round-title"><?= esc($round) ?></b>
-                                    <?php foreach ($matches as $match): ?>
-                                        <article class="tournament-match <?= !empty($match['is_conditional']) ? 'conditional' : '' ?>">
-                                            <div class="match-meta"><span><?= esc($match['match_code'] ?? '—') ?></span><span><?= strtoupper(esc($match['status'])) ?></span></div>
-                                            <?php if (($match['result_type'] ?? '') === 'judged'): ?>
-                                                <strong>All participating teams</strong>
-                                            <?php else: ?>
-                                                <div class="bracket-team"><span><?= esc($match['slot_a_label'] ?? 'TBD') ?></span></div>
-                                                <div class="bracket-team"><span><?= esc($match['slot_b_label'] ?? 'TBD') ?></span></div>
-                                            <?php endif; ?>
-                                            <small><?= esc(date('M j · g:i A', strtotime($match['match_date']))) ?> · <?= esc($match['court_label'] ?: ($match['location_name'] ?? '—')) ?></small>
-                                            <?php if (!empty($match['scheduling_note'])): ?><em><?= esc($match['scheduling_note']) ?></em><?php endif; ?>
-                                        </article>
-                                    <?php endforeach; ?>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                    </div>
-                <?php endif; ?>
-            <?php endforeach; ?>
-        </div>
+        <?= view('partials/bracket_tree', [
+            'bracketSchedules' => $schedules,
+            'bracketFormat' => $bracketFormat,
+            'bracketVariant' => 'management',
+            'bracketAriaLabel' => ($selectedSport['name'] ?? 'Tournament') . ' ' . ($selectedSport['category'] ?? '') . ' bracket',
+        ]) ?>
     <?php else: ?><div class="empty">No bracket has been generated for this sport.</div><?php endif; ?>
 </section>
 

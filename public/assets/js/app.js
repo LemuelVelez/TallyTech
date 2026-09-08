@@ -541,14 +541,30 @@
     if (window.innerWidth > 860 && body.classList.contains('nav-open')) setNavigation(false);
   });
 
-  const publicBracketBoards = Array.from(document.querySelectorAll('[data-public-bracket]'));
+  const bracketBoards = Array.from(document.querySelectorAll('[data-bracket-board]'));
   const svgNamespace = 'http://www.w3.org/2000/svg';
 
-  const drawBracketConnectors = (board) => {
+  const bracketPoint = (element, boardRect, edge) => {
+    const rect = element.getBoundingClientRect();
+    return {
+      x: (edge === 'right' ? rect.right : rect.left) - boardRect.left,
+      y: rect.top - boardRect.top + (rect.height / 2),
+    };
+  };
+
+  const appendBracketPath = (svg, d, classes = []) => {
+    if (!d) return;
+    const path = document.createElementNS(svgNamespace, 'path');
+    path.setAttribute('d', d);
+    classes.filter(Boolean).forEach((className) => path.classList.add(className));
+    svg.appendChild(path);
+  };
+
+  const drawBracketBoard = (board) => {
     const svg = board.querySelector('[data-bracket-connectors]');
     if (!svg) return;
 
-    const matches = Array.from(board.querySelectorAll('.public-tournament-match[data-match-code]'));
+    const matches = Array.from(board.querySelectorAll('[data-bracket-match][data-match-code]'));
     const matchByCode = new Map();
     matches.forEach((match) => {
       const code = (match.dataset.matchCode || '').trim().toUpperCase();
@@ -564,151 +580,89 @@
     svg.replaceChildren();
 
     matches.forEach((target) => {
-      const feedCodes = [...new Set([target.dataset.feedA, target.dataset.feedB]
-        .map((code) => (code || '').trim().toUpperCase())
-        .filter(Boolean))];
-      const sources = feedCodes.map((code) => matchByCode.get(code)).filter(Boolean);
-      if (!sources.length) return;
-
-      const targetRect = target.getBoundingClientRect();
-      const targetPoint = {
-        x: targetRect.left - boardRect.left,
-        y: targetRect.top - boardRect.top + (targetRect.height / 2),
-      };
-      const sourcePoints = sources.map((source) => {
-        const rect = source.getBoundingClientRect();
-        return {
-          x: rect.right - boardRect.left,
-          y: rect.top - boardRect.top + (rect.height / 2),
-        };
+      const rawFeeds = [
+        { code: target.dataset.feedA, type: target.dataset.feedAType },
+        { code: target.dataset.feedB, type: target.dataset.feedBType },
+      ];
+      const feedMap = new Map();
+      rawFeeds.forEach((feed) => {
+        const code = (feed.code || '').trim().toUpperCase();
+        if (!code || !matchByCode.has(code)) return;
+        const existing = feedMap.get(code) || { code, types: new Set() };
+        if (feed.type) existing.types.add(String(feed.type).toLowerCase());
+        feedMap.set(code, existing);
       });
-      const maxSourceX = Math.max(...sourcePoints.map((point) => point.x));
-      const horizontalGap = targetPoint.x - maxSourceX;
-      let joinX = maxSourceX + Math.max(18, horizontalGap * 0.52);
-      if (joinX >= targetPoint.x - 12) joinX = targetPoint.x - 18;
-      if (joinX <= maxSourceX) joinX = maxSourceX + 14;
 
-      let pathData = '';
+      const feeds = Array.from(feedMap.values()).map((feed) => ({
+        ...feed,
+        source: matchByCode.get(feed.code),
+      }));
+      if (!feeds.length) return;
+
+      const targetPoint = bracketPoint(target, boardRect, 'left');
+      const sourcePoints = feeds.map((feed) => ({
+        ...bracketPoint(feed.source, boardRect, 'right'),
+        types: feed.types,
+      }));
+      const maxSourceX = Math.max(...sourcePoints.map((point) => point.x));
+      const availableGap = targetPoint.x - maxSourceX;
+      const joinX = availableGap >= 44
+        ? maxSourceX + Math.max(22, Math.min(availableGap * 0.55, availableGap - 18))
+        : maxSourceX + 22;
+      const conditionalClass = target.classList.contains('conditional') ? 'is-conditional' : '';
+
       if (sourcePoints.length === 1) {
         const source = sourcePoints[0];
-        pathData = `M ${source.x} ${source.y} H ${joinX} V ${targetPoint.y} H ${targetPoint.x}`;
-      } else {
-        pathData = sourcePoints.map((source) => `M ${source.x} ${source.y} H ${joinX}`).join(' ');
-        const ys = [...sourcePoints.map((point) => point.y), targetPoint.y];
-        pathData += ` M ${joinX} ${Math.min(...ys)} V ${Math.max(...ys)} M ${joinX} ${targetPoint.y} H ${targetPoint.x}`;
+        const loserClass = source.types.has('loser') ? 'is-loser-feed' : '';
+        appendBracketPath(
+          svg,
+          `M ${source.x} ${source.y} H ${joinX} V ${targetPoint.y} H ${targetPoint.x}`,
+          [loserClass, conditionalClass]
+        );
+        return;
       }
 
-      const path = document.createElementNS(svgNamespace, 'path');
-      path.setAttribute('d', pathData);
-      if (target.classList.contains('conditional')) path.classList.add('is-conditional');
-      svg.appendChild(path);
+      sourcePoints.forEach((source) => {
+        appendBracketPath(
+          svg,
+          `M ${source.x} ${source.y} H ${joinX}`,
+          [source.types.has('loser') ? 'is-loser-feed' : '', conditionalClass]
+        );
+      });
+
+      const ys = sourcePoints.map((point) => point.y);
+      ys.push(targetPoint.y);
+      appendBracketPath(
+        svg,
+        `M ${joinX} ${Math.min(...ys)} V ${Math.max(...ys)} M ${joinX} ${targetPoint.y} H ${targetPoint.x}`,
+        [conditionalClass]
+      );
     });
+
+    board.dataset.bracketReady = 'true';
   };
 
-  const drawAllBracketConnectors = () => publicBracketBoards.forEach(drawBracketConnectors);
-  if (publicBracketBoards.length) {
-    const redraw = () => window.requestAnimationFrame(drawAllBracketConnectors);
-    window.requestAnimationFrame(() => window.requestAnimationFrame(drawAllBracketConnectors));
-    window.addEventListener('load', redraw, { once: true });
-    window.addEventListener('resize', redraw);
+  if (bracketBoards.length) {
+    let bracketFrame = 0;
+    const redrawBrackets = () => {
+      if (bracketFrame) window.cancelAnimationFrame(bracketFrame);
+      bracketFrame = window.requestAnimationFrame(() => {
+        bracketFrame = 0;
+        bracketBoards.forEach(drawBracketBoard);
+      });
+    };
+
+    redrawBrackets();
+    window.addEventListener('load', redrawBrackets, { once: true });
+    window.addEventListener('resize', redrawBrackets, { passive: true });
+
+    if (document.fonts?.ready) {
+      document.fonts.ready.then(redrawBrackets).catch(() => {});
+    }
 
     if ('ResizeObserver' in window) {
-      const bracketResizeObserver = new ResizeObserver(redraw);
-      publicBracketBoards.forEach((board) => bracketResizeObserver.observe(board));
+      const bracketResizeObserver = new ResizeObserver(redrawBrackets);
+      bracketBoards.forEach((board) => bracketResizeObserver.observe(board));
     }
   }
-
-  const carousel = document.querySelector('[data-hero-carousel]');
-  if (!carousel) return;
-
-  const slides = Array.from(carousel.querySelectorAll('[data-carousel-slide]'));
-  const dots = Array.from(carousel.querySelectorAll('[data-carousel-dot]'));
-  const previous = carousel.querySelector('[data-carousel-prev]');
-  const next = carousel.querySelector('[data-carousel-next]');
-  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-  const interval = Number(carousel.dataset.interval) || 6000;
-  let activeIndex = Math.max(0, slides.findIndex((slide) => slide.classList.contains('is-active')));
-  let timer = null;
-  let touchStartX = 0;
-
-  const render = (index) => {
-    if (!slides.length) return;
-    activeIndex = (index + slides.length) % slides.length;
-
-    slides.forEach((slide, slideIndex) => {
-      const isActive = slideIndex === activeIndex;
-      slide.classList.toggle('is-active', isActive);
-      slide.setAttribute('aria-hidden', isActive ? 'false' : 'true');
-    });
-
-    dots.forEach((dot, dotIndex) => {
-      const isActive = dotIndex === activeIndex;
-      dot.classList.toggle('is-active', isActive);
-      dot.setAttribute('aria-current', isActive ? 'true' : 'false');
-    });
-  };
-
-  const stop = () => {
-    if (timer) window.clearInterval(timer);
-    timer = null;
-  };
-
-  const start = () => {
-    stop();
-    if (slides.length < 2 || reduceMotion.matches || document.hidden) return;
-    timer = window.setInterval(() => render(activeIndex + 1), interval);
-  };
-
-  const move = (offset) => {
-    render(activeIndex + offset);
-    start();
-  };
-
-  previous?.addEventListener('click', () => move(-1));
-  next?.addEventListener('click', () => move(1));
-
-  dots.forEach((dot, index) => {
-    dot.addEventListener('click', () => {
-      render(index);
-      start();
-    });
-  });
-
-  carousel.addEventListener('mouseenter', stop);
-  carousel.addEventListener('mouseleave', start);
-  carousel.addEventListener('focusin', stop);
-  carousel.addEventListener('focusout', (event) => {
-    if (!carousel.contains(event.relatedTarget)) start();
-  });
-
-  carousel.addEventListener('touchstart', (event) => {
-    touchStartX = event.changedTouches[0]?.clientX || 0;
-    stop();
-  }, { passive: true });
-
-  carousel.addEventListener('touchend', (event) => {
-    const touchEndX = event.changedTouches[0]?.clientX || 0;
-    const distance = touchEndX - touchStartX;
-    if (Math.abs(distance) > 45) render(activeIndex + (distance < 0 ? 1 : -1));
-    start();
-  }, { passive: true });
-
-  carousel.addEventListener('keydown', (event) => {
-    if (event.key === 'ArrowLeft') {
-      event.preventDefault();
-      move(-1);
-    }
-    if (event.key === 'ArrowRight') {
-      event.preventDefault();
-      move(1);
-    }
-  });
-
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) stop(); else start();
-  });
-
-  reduceMotion.addEventListener?.('change', start);
-  render(activeIndex);
-  start();
 })();

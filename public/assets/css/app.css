@@ -1186,3 +1186,303 @@ input[type="checkbox"], input[type="radio"] { width: 18px; min-height: 18px; hei
   .sport-score-table { min-width: 680px !important; }
   .judged-championship-card { min-width: 230px; }
 }
+
+/* Reusable bracket tree component */
+.bracket-management-panel { overflow: hidden; }
+.tt-bracket-scroll {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 6px 2px 14px;
+  overscroll-behavior-inline: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+.tt-bracket-board {
+  --tt-bracket-card-width: 252px;
+  --tt-bracket-column-gap: 66px;
+  position: relative;
+  display: grid;
+  grid-template-columns: max-content max-content;
+  grid-template-areas: "upper grand";
+  column-gap: 70px;
+  row-gap: 28px;
+  width: max-content;
+  min-width: max-content;
+  padding: 4px 8px 8px;
+  isolation: isolate;
+}
+.tt-bracket-board--double { grid-template-areas: "upper grand" "lower grand"; }
+.tt-bracket-board--grand-only { grid-template-columns: max-content; grid-template-areas: "grand"; }
+.tt-bracket-lane {
+  position: relative;
+  z-index: 0;
+  min-width: max-content;
+  min-height: 420px;
+  padding: 16px 18px 18px;
+  border: 1px solid #dbe4ee;
+  border-radius: 16px;
+  background: #f8fafc;
+  scroll-snap-align: start;
+}
+.tt-bracket-lane--upper { grid-area: upper; }
+.tt-bracket-lane--lower { grid-area: lower; min-height: 320px; }
+.tt-bracket-lane--grand { grid-area: grand; align-self: stretch; display: flex; flex-direction: column; justify-content: center; }
+.tt-bracket-lane-heading,
+.tt-bracket-rounds { position: relative; z-index: 2; }
+.tt-bracket-lane-heading {
+  display: flex;
+  align-items: center;
+  min-height: 30px;
+  margin-bottom: 12px;
+  color: #102a43;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.065em;
+  text-transform: uppercase;
+}
+.tt-bracket-rounds {
+  min-height: calc(100% - 42px);
+  display: flex;
+  align-items: stretch;
+  gap: var(--tt-bracket-column-gap);
+}
+.tt-bracket-board--double .tt-bracket-lane--lower .tt-bracket-rounds {
+  padding-left: calc(var(--tt-bracket-card-width) + var(--tt-bracket-column-gap));
+}
+.tt-bracket-round {
+  width: var(--tt-bracket-card-width);
+  flex: 0 0 var(--tt-bracket-card-width);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.tt-bracket-round > h4 {
+  min-height: 28px;
+  margin: 0 0 10px;
+  color: #6b7789;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+.tt-bracket-match-stack {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  gap: 28px;
+}
+.tt-bracket-lane--lower .tt-bracket-match-stack,
+.tt-bracket-lane--grand .tt-bracket-match-stack { justify-content: center; }
+.tt-bracket-match {
+  position: relative;
+  z-index: 3;
+  width: 100%;
+  box-sizing: border-box;
+  display: grid;
+  gap: 7px;
+  padding: 10px;
+  border: 1px solid #cfd9e5;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 5px 15px rgba(15, 35, 58, 0.07);
+}
+.tt-bracket-match::after { display: none !important; }
+.tt-bracket-match.conditional {
+  border: 2px dashed #d39d25;
+  background: #fffaf0;
+}
+.tt-bracket-match-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #66758a;
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.045em;
+}
+.tt-bracket-match-head b { color: #1f344d; }
+.tt-bracket-match-head span { text-align: right; }
+.tt-bracket-slot.bracket-team {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid #e5eaf0;
+  border-radius: 7px;
+  background: #f8fafc;
+  color: #26384c;
+  font-size: 0.8rem;
+}
+.tt-bracket-slot.bracket-team > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tt-bracket-slot.bracket-team > b {
+  flex: 0 0 auto;
+  min-width: 24px;
+  text-align: right;
+  color: #0f2239;
+  font-size: 0.95rem;
+}
+.tt-bracket-slot.bracket-team.winner {
+  border-color: #8bd4ac;
+  background: #e9f9f0;
+  color: #087443;
+  font-weight: 900;
+}
+.tt-bracket-slot.bracket-team.winner > b { color: #087443; }
+.tt-bracket-match-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #7a8798;
+  font-size: 0.67rem;
+}
+.tt-bracket-match-foot small:last-child { text-align: right; }
+.tt-bracket-note {
+  color: var(--accent-dark);
+  font-size: 0.69rem;
+  font-weight: 800;
+  font-style: italic;
+  line-height: 1.35;
+}
+.tt-bracket-note--conditional { color: #946b0d; font-style: normal; text-transform: uppercase; letter-spacing: 0.035em; }
+.tt-bracket-judged { padding: 14px 10px; border-radius: 7px; background: #f8fafc; color: #34465c; font-weight: 800; text-align: center; }
+.tt-bracket-connectors {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.tt-bracket-connectors path {
+  fill: none;
+  stroke: #91a4b8;
+  stroke-width: 2;
+  stroke-linecap: square;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.tt-bracket-connectors path.is-loser-feed { stroke-dasharray: 5 4; }
+.tt-bracket-connectors path.is-conditional { stroke: #c5952c; stroke-dasharray: 6 5; }
+
+/* The live scoreboard bracket replaces the old logo/image carousel hero. */
+.score-hero.score-hero--bracket {
+  min-height: 0;
+  display: block;
+  overflow: hidden;
+  padding: clamp(30px, 4vw, 58px) 0 clamp(34px, 5vw, 68px);
+  background:
+    radial-gradient(circle at 12% 0%, rgba(21, 111, 154, 0.2), transparent 33%),
+    linear-gradient(150deg, #061b3a 0%, #092850 52%, #061b3a 100%);
+  color: #fff;
+}
+.score-hero-inner {
+  width: min(1520px, 100%);
+  margin: 0 auto;
+  padding: 0 clamp(14px, 3vw, 42px);
+}
+.score-hero-copy {
+  max-width: 920px;
+  margin: 0 auto 22px;
+  text-align: center;
+}
+.score-hero.score-hero--bracket h1 {
+  margin: 16px 0 8px;
+  font-size: clamp(2.4rem, 5vw, 5rem);
+  line-height: 0.98;
+  letter-spacing: -0.045em;
+}
+.score-hero.score-hero--bracket p { margin: 0 auto 8px; font-size: clamp(1rem, 1.4vw, 1.2rem); color: #f4f8ff; }
+.score-hero.score-hero--bracket small { color: #bfd0e4; }
+.score-hero-sports {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto 22px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 14px;
+  background: rgba(5, 20, 43, 0.48);
+  backdrop-filter: blur(10px);
+}
+.score-hero-sports .sport-chip {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.08);
+  color: #e8f0fa;
+}
+.score-hero-sports .sport-chip:hover { background: rgba(255, 255, 255, 0.14); }
+.score-hero-sports .sport-chip.active {
+  border-color: #ffce25;
+  background: #ffce25;
+  color: #4c3a00;
+  box-shadow: none;
+}
+.score-hero-brackets { display: grid; gap: 22px; }
+.score-hero-bracket-category {
+  overflow: hidden;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.97);
+  color: #10233c;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.16);
+}
+.score-hero-bracket-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 2px 4px 10px;
+}
+.score-hero-bracket-heading > div { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.score-hero-bracket-heading b { font-size: 1rem; }
+.score-hero-bracket-heading span { color: #6d7b8d; font-size: 0.76rem; }
+.score-hero-bracket-heading > span { flex: 0 0 auto; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 800; }
+.score-hero-empty { color: #c8d5e8; font-size: 0.86rem; }
+.score-hero-empty--panel {
+  max-width: 760px;
+  margin: 20px auto 0;
+  padding: 24px;
+  border: 1px dashed rgba(255, 255, 255, 0.26);
+  border-radius: 14px;
+  text-align: center;
+}
+.scoreboard-below-bracket { padding-top: clamp(28px, 3vw, 42px); }
+
+@media (max-width: 900px) {
+  .tt-bracket-board { --tt-bracket-card-width: 232px; --tt-bracket-column-gap: 50px; column-gap: 52px; }
+  .tt-bracket-lane { min-height: 390px; padding: 14px; }
+  .tt-bracket-lane--lower { min-height: 300px; }
+}
+
+@media (max-width: 640px) {
+  .score-hero.score-hero--bracket { padding-top: 24px; padding-bottom: 34px; }
+  .score-hero-inner { padding-inline: 12px; }
+  .score-hero-copy { margin-bottom: 18px; }
+  .score-hero.score-hero--bracket h1 { font-size: clamp(2.35rem, 13vw, 3.7rem); }
+  .score-hero-sports { width: 100%; border-radius: 12px; }
+  .score-hero-bracket-category { padding: 10px; border-radius: 14px; }
+  .score-hero-bracket-heading { align-items: flex-start; flex-direction: column; gap: 4px; padding: 4px 4px 8px; }
+  .score-hero-bracket-heading > div { flex-wrap: wrap; gap: 4px 8px; }
+  .tt-bracket-scroll { padding-bottom: 10px; }
+  .tt-bracket-board { --tt-bracket-card-width: 210px; --tt-bracket-column-gap: 40px; column-gap: 42px; row-gap: 20px; padding-inline: 2px; }
+  .tt-bracket-lane { min-height: 360px; padding: 12px; border-radius: 13px; }
+  .tt-bracket-lane--lower { min-height: 280px; }
+  .tt-bracket-round > h4 { font-size: 0.68rem; }
+  .tt-bracket-match { padding: 9px; }
+  .tt-bracket-slot.bracket-team { min-height: 36px; padding: 7px 8px; font-size: 0.76rem; }
+  .tt-bracket-match-foot { align-items: flex-start; flex-direction: column; gap: 2px; }
+  .tt-bracket-match-foot small:last-child { text-align: left; }
+}

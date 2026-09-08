@@ -33,6 +33,27 @@ class SchedulesController extends BaseController
 
         $schedules = $this->repository()->resolveBracketSlots($this->repository()->schedules($eventId));
         $data['schedules'] = array_values(array_filter($schedules, static fn(array $row): bool => (int) $row['sport_id'] === $selectedSportId));
+
+        $resultBySchedule = [];
+        foreach ($this->repository()->results($eventId) as $result) {
+            $resultBySchedule[(int) $result['schedule_id']] = $result;
+        }
+        foreach ($data['schedules'] as &$schedule) {
+            $result = $resultBySchedule[(int) $schedule['id']] ?? null;
+            $schedule['result_status'] = $result['status'] ?? null;
+            $schedule['result_entries'] = $result['entries'] ?? [];
+            $schedule['score_by_team'] = [];
+            $schedule['winner_name'] = null;
+
+            foreach ($schedule['result_entries'] as $entry) {
+                $schedule['score_by_team'][(int) $entry['team_id']] = $entry['raw_score'];
+                if (($result['status'] ?? '') === 'validated' && (int) ($entry['placement'] ?? 0) === 1) {
+                    $schedule['winner_name'] = $entry['team_name'] ?? null;
+                }
+            }
+        }
+        unset($schedule);
+
         $data['selectedSportId'] = $selectedSportId;
         $data['selectedSport'] = null;
         foreach ($data['sports'] as $sport) {
