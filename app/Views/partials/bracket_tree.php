@@ -110,14 +110,14 @@ $teamMarkStyle = static function (string $name): string {
             <span class="tt-bracket-zoom-hint" data-bracket-zoom-hint>Ctrl + scroll to zoom</span>
             <div class="tt-bracket-zoom-controls" role="group" aria-label="Bracket zoom">
                 <button type="button" class="tt-bracket-zoom-button" data-bracket-zoom-out aria-label="Zoom bracket out">−</button>
-                <button type="button" class="tt-bracket-zoom-reset" data-bracket-zoom-reset aria-label="Reset bracket zoom"><span data-bracket-zoom-value>100%</span></button>
+                <button type="button" class="tt-bracket-zoom-reset" data-bracket-zoom-reset aria-label="Reset bracket zoom"><span data-bracket-zoom-value>50%</span></button>
                 <button type="button" class="tt-bracket-zoom-button" data-bracket-zoom-in aria-label="Zoom bracket in">+</button>
             </div>
         </div>
     </div>
     <div class="tt-bracket-scroll tt-bracket-scroll--<?= esc($bracketVariant, 'attr') ?>" data-bracket-scroll role="region" aria-label="<?= esc($bracketAriaLabel, 'attr') ?>" tabindex="0">
         <div class="tt-bracket-zoom-shell" data-bracket-zoom-shell>
-            <div class="tt-bracket-board tt-bracket-board--<?= esc($formatClass, 'attr') ?> tt-bracket-board--<?= esc($bracketVariant, 'attr') ?> <?= ! $hasUpper && ! $hasLower && $hasGrand ? 'tt-bracket-board--grand-only' : '' ?>" data-bracket-board data-bracket-zoom="1">
+            <div class="tt-bracket-board tt-bracket-board--<?= esc($formatClass, 'attr') ?> tt-bracket-board--<?= esc($bracketVariant, 'attr') ?> <?= ! $hasUpper && ! $hasLower && $hasGrand ? 'tt-bracket-board--grand-only' : '' ?>" data-bracket-board data-bracket-zoom="0.5">
         <span class="sr-only" data-bracket-selection-status aria-live="polite"></span>
         <svg class="tt-bracket-connectors" data-bracket-connectors aria-hidden="true"></svg>
 

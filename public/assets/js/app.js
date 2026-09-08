@@ -1023,19 +1023,20 @@
   if (bracketBoards.length) {
     const bracketZoomMin = 0.35;
     const bracketZoomMax = 2.5;
+    const bracketZoomDefault = 0.5;
     const bracketZoomStep = 0.1;
     const bracketFrames = new Map();
     const bracketTrailingTimers = new WeakMap();
     const clampBracketZoom = (value) => {
       const parsed = Number.parseFloat(value);
-      const safeValue = Number.isFinite(parsed) ? parsed : 1;
+      const safeValue = Number.isFinite(parsed) ? parsed : bracketZoomDefault;
       return Math.min(bracketZoomMax, Math.max(bracketZoomMin, safeValue));
     };
 
     const syncBracketShell = (board) => {
       const shell = board.closest('[data-bracket-zoom-shell]');
       if (!shell) return;
-      const zoom = clampBracketZoom(board.dataset.bracketZoom || 1);
+      const zoom = clampBracketZoom(board.dataset.bracketZoom || bracketZoomDefault);
       shell.style.width = `${Math.ceil(board.scrollWidth * zoom)}px`;
       shell.style.height = `${Math.ceil(board.scrollHeight * zoom)}px`;
     };
@@ -1061,7 +1062,7 @@
       bracketTrailingTimers.set(board, timer);
     };
 
-    const currentBracketZoom = (board) => clampBracketZoom(board?.dataset.bracketZoom || 1);
+    const currentBracketZoom = (board) => clampBracketZoom(board?.dataset.bracketZoom || bracketZoomDefault);
     const centerBracketAnchor = (scroll) => ({
       scroll,
       offsetX: scroll.clientWidth / 2,
@@ -1120,7 +1121,7 @@
         trailingBracketRedraw(board);
       });
       component.querySelector('[data-bracket-zoom-reset]')?.addEventListener('click', () => {
-        setBracketZoom(component, 1, centeredAnchor());
+        setBracketZoom(component, bracketZoomDefault, centeredAnchor());
         trailingBracketRedraw(board);
       });
 
@@ -1246,7 +1247,7 @@
       scroll.addEventListener('gesturestart', preventSafariGestureZoom, { passive: false });
       scroll.addEventListener('gesturechange', preventSafariGestureZoom, { passive: false });
 
-      setBracketZoom(component, 1);
+      setBracketZoom(component, bracketZoomDefault);
     });
 
     bracketBoards.forEach((board) => {
