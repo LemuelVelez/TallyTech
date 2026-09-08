@@ -541,15 +541,255 @@
     if (window.innerWidth > 860 && body.classList.contains('nav-open')) setNavigation(false);
   });
 
+  const draftRoot = document.querySelector('[data-draft-generator]');
+  if (draftRoot) {
+    const form = draftRoot.querySelector('[data-draft-form]');
+    const banCount = draftRoot.querySelector('[data-draft-ban-count]');
+    const sportSelect = draftRoot.querySelector('[data-draft-sport]');
+    const categorySelect = draftRoot.querySelector('[data-draft-category]');
+    const message = draftRoot.querySelector('[data-draft-message]');
+    const previewPanel = document.querySelector('[data-draft-preview]');
+    const previewEmpty = previewPanel?.querySelector('[data-draft-preview-empty]');
+    const draftSheet = previewPanel?.querySelector('[data-draft-sheet]');
+    const copyButton = previewPanel?.querySelector('[data-draft-copy]');
+    let lastDraftSummary = '';
+
+    const valueFor = (selector) => String(draftRoot.querySelector(selector)?.value || '').trim();
+    const setPreviewText = (selector, value, fallback = '—') => {
+      const element = previewPanel?.querySelector(selector);
+      if (element) element.textContent = value || fallback;
+    };
+    const teamNameFor = (side) => {
+      const select = draftRoot.querySelector(`[data-draft-team="${side}"]`);
+      return String(select?.selectedOptions?.[0]?.dataset.teamName || select?.selectedOptions?.[0]?.textContent || '').trim();
+    };
+
+    const updateDraftCategories = () => {
+      if (!sportSelect || !categorySelect) return;
+      const selected = sportSelect.selectedOptions?.[0];
+      const categories = String(selected?.dataset.categories || '')
+        .split('|')
+        .map((value) => value.trim())
+        .filter(Boolean);
+      const previous = categorySelect.value;
+      categorySelect.replaceChildren();
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = categories.length ? 'Select category' : 'No category';
+      categorySelect.appendChild(placeholder);
+      categories.forEach((category) => {
+        const option = document.createElement('option');
+        option.value = category;
+        option.textContent = category;
+        categorySelect.appendChild(option);
+      });
+      categorySelect.disabled = categories.length === 0;
+      if (categories.includes(previous)) categorySelect.value = previous;
+      else if (categories.length === 1) categorySelect.value = categories[0];
+    };
+
+    const updateDraftBanRows = () => {
+      const count = Math.max(0, Math.min(5, Number.parseInt(banCount?.value || '0', 10) || 0));
+      draftRoot.querySelectorAll('[data-draft-ban-row]').forEach((row) => {
+        const parts = String(row.dataset.draftBanRow || '').split(':');
+        const index = Number.parseInt(parts[1] || '0', 10) || 0;
+        row.hidden = index > count;
+        const input = row.querySelector('input');
+        if (input) input.disabled = index > count;
+      });
+    };
+
+    const draftBansFor = (side) => {
+      const count = Math.max(0, Math.min(5, Number.parseInt(banCount?.value || '0', 10) || 0));
+      const bans = [];
+      for (let index = 1; index <= count; index += 1) {
+        const value = valueFor(`[data-draft-ban="${side}:${index}"]`);
+        if (value) bans.push(value);
+      }
+      return bans;
+    };
+
+    const renderDraftBans = (side, bans) => {
+      const container = previewPanel?.querySelector(`[data-preview-bans="${side}"]`);
+      if (!container) return;
+      container.replaceChildren();
+      if (!bans.length) {
+        const empty = document.createElement('span');
+        empty.className = 'draft-empty-ban';
+        empty.textContent = 'None';
+        container.appendChild(empty);
+        return;
+      }
+      bans.forEach((ban) => {
+        const chip = document.createElement('span');
+        chip.textContent = ban;
+        container.appendChild(chip);
+      });
+    };
+
+    const validateDraft = () => {
+      if (!form) return 'Draft form is unavailable.';
+      if (!form.checkValidity()) {
+        form.reportValidity();
+        return 'Complete all mandatory draft fields.';
+      }
+      const duration = valueFor('[data-draft-duration]');
+      if (duration && !/^\d{1,3}:[0-5]\d$/.test(duration)) {
+        draftRoot.querySelector('[data-draft-duration]')?.focus();
+        return 'Duration must use M:SS format, for example 18:42.';
+      }
+      const team1 = valueFor('[data-draft-team="1"]');
+      const team2 = valueFor('[data-draft-team="2"]');
+      if (team1 && team2 && team1 === team2) {
+        draftRoot.querySelector('[data-draft-team="2"]')?.focus();
+        return 'Team 1 and Team 2 must be different teams.';
+      }
+      return '';
+    };
+
+    const buildDraftSummary = (data) => {
+      const line = (label, value) => `${label}: ${value || '—'}`;
+      const roleLines = (side) => data.roles[side]
+        .map((role, index) => `${data.roleLabels[index]}: ${role || '—'}`)
+        .join(', ');
+      return [
+        `${data.sport || 'Match Draft'}${data.category ? ` · ${data.category}` : ''} · Game ${data.game}`,
+        line('Duration', data.duration),
+        line('Map / Court', data.map),
+        line('VOD', data.vod),
+        '',
+        `${data.teamNames[1]}${data.winner === 'team1' ? ' — WINNER' : ''}`,
+        line('Side', data.sides[1]),
+        roleLines(1),
+        line('Bans', data.bans[1].join(', ') || 'None'),
+        '',
+        `${data.teamNames[2]}${data.winner === 'team2' ? ' — WINNER' : ''}`,
+        line('Side', data.sides[2]),
+        roleLines(2),
+        line('Bans', data.bans[2].join(', ') || 'None'),
+      ].join('\n');
+    };
+
+    const renderDraft = () => {
+      const error = validateDraft();
+      if (message) {
+        message.classList.remove('is-success');
+        message.textContent = error;
+      }
+      if (error) return;
+
+      const roleLabels = ['EXP Lane', 'Jungler', 'Mid Lane', 'Gold Lane', 'Roamer'];
+      const data = {
+        game: valueFor('[data-draft-game]') || '1',
+        duration: valueFor('[data-draft-duration]'),
+        sport: valueFor('[data-draft-sport]'),
+        category: valueFor('[data-draft-category]'),
+        vod: valueFor('[data-draft-vod]'),
+        map: valueFor('[data-draft-map]'),
+        winner: valueFor('[data-draft-winner]'),
+        teamNames: { 1: teamNameFor(1) || 'Team 1', 2: teamNameFor(2) || 'Team 2' },
+        sides: { 1: valueFor('[data-draft-side="1"]'), 2: valueFor('[data-draft-side="2"]') },
+        roleLabels,
+        roles: { 1: [], 2: [] },
+        bans: { 1: draftBansFor(1), 2: draftBansFor(2) },
+      };
+
+      [1, 2].forEach((side) => {
+        roleLabels.forEach((_, index) => {
+          data.roles[side].push(valueFor(`[data-draft-role="${side}:${index}"]`));
+        });
+      });
+
+      setPreviewText('[data-preview-game]', data.game, '1');
+      setPreviewText('[data-preview-sport]', data.sport, 'Match Draft');
+      setPreviewText('[data-preview-category]', data.category, '');
+      setPreviewText('[data-preview-duration]', data.duration);
+      setPreviewText('[data-preview-map]', data.map);
+      setPreviewText('[data-preview-vod]', data.vod);
+
+      [1, 2].forEach((side) => {
+        setPreviewText(`[data-preview-team-name="${side}"]`, data.teamNames[side], `Team ${side}`);
+        setPreviewText(`[data-preview-side="${side}"]`, data.sides[side]);
+        data.roles[side].forEach((role, index) => setPreviewText(`[data-preview-role="${side}:${index}"]`, role));
+        renderDraftBans(side, data.bans[side]);
+        const teamCard = previewPanel?.querySelector(`[data-preview-team-card="${side}"]`);
+        const winnerBadge = previewPanel?.querySelector(`[data-preview-winner="${side}"]`);
+        const isWinner = data.winner === `team${side}`;
+        teamCard?.classList.toggle('is-winner', isWinner);
+        if (winnerBadge) winnerBadge.hidden = !isWinner;
+      });
+
+      lastDraftSummary = buildDraftSummary(data);
+      if (previewEmpty) previewEmpty.hidden = true;
+      if (draftSheet) draftSheet.hidden = false;
+      if (copyButton) copyButton.disabled = false;
+      if (message) {
+        message.classList.add('is-success');
+        message.textContent = 'Draft preview generated.';
+      }
+      previewPanel?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+    };
+
+    form?.addEventListener('submit', (event) => {
+      event.preventDefault();
+      renderDraft();
+    });
+    banCount?.addEventListener('change', updateDraftBanRows);
+    sportSelect?.addEventListener('change', updateDraftCategories);
+    form?.addEventListener('reset', () => {
+      window.setTimeout(() => {
+        updateDraftBanRows();
+        updateDraftCategories();
+        lastDraftSummary = '';
+        if (previewEmpty) previewEmpty.hidden = false;
+        if (draftSheet) draftSheet.hidden = true;
+        if (copyButton) copyButton.disabled = true;
+        if (message) {
+          message.classList.remove('is-success');
+          message.textContent = '';
+        }
+      }, 0);
+    });
+    copyButton?.addEventListener('click', async () => {
+      if (!lastDraftSummary) return;
+      try {
+        if (!navigator.clipboard?.writeText) throw new Error('Clipboard API unavailable');
+        await navigator.clipboard.writeText(lastDraftSummary);
+        if (message) {
+          message.classList.add('is-success');
+          message.textContent = 'Draft summary copied.';
+        }
+      } catch (_) {
+        const textarea = document.createElement('textarea');
+        textarea.value = lastDraftSummary;
+        textarea.setAttribute('readonly', '');
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        const copied = document.execCommand('copy');
+        textarea.remove();
+        if (message) {
+          message.classList.toggle('is-success', copied);
+          message.textContent = copied ? 'Draft summary copied.' : 'Copy is unavailable in this browser.';
+        }
+      }
+    });
+
+    updateDraftBanRows();
+    updateDraftCategories();
+  }
+
   const bracketBoards = Array.from(document.querySelectorAll('[data-bracket-board]'));
   const svgNamespace = 'http://www.w3.org/2000/svg';
   const normalizeMatchCode = (value) => String(value || '').trim().toUpperCase();
 
-  const bracketPoint = (element, boardRect, edge) => {
+  const bracketPoint = (element, boardRect, edge, scale = 1) => {
     const rect = element.getBoundingClientRect();
+    const safeScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
     return {
-      x: (edge === 'right' ? rect.right : rect.left) - boardRect.left,
-      y: rect.top - boardRect.top + (rect.height / 2),
+      x: ((edge === 'right' ? rect.right : rect.left) - boardRect.left) / safeScale,
+      y: (rect.top - boardRect.top + (rect.height / 2)) / safeScale,
     };
   };
 
@@ -671,8 +911,9 @@
 
     const graph = buildBracketGraph(board);
     const boardRect = board.getBoundingClientRect();
-    const width = Math.max(board.scrollWidth, Math.ceil(boardRect.width));
-    const height = Math.max(board.scrollHeight, Math.ceil(boardRect.height));
+    const bracketScale = Math.max(0.01, Number.parseFloat(board.dataset.bracketZoom || '1') || 1);
+    const width = Math.max(board.scrollWidth, Math.ceil(boardRect.width / bracketScale));
+    const height = Math.max(board.scrollHeight, Math.ceil(boardRect.height / bracketScale));
     svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
     svg.setAttribute('width', String(width));
     svg.setAttribute('height', String(height));
@@ -700,9 +941,9 @@
       }));
       if (!feeds.length) return;
 
-      const targetPoint = bracketPoint(target, boardRect, 'left');
+      const targetPoint = bracketPoint(target, boardRect, 'left', bracketScale);
       const sourcePoints = feeds.map((feed) => ({
-        ...bracketPoint(feed.source, boardRect, 'right'),
+        ...bracketPoint(feed.source, boardRect, 'right', bracketScale),
         code: feed.code,
         types: feed.types,
       }));
@@ -739,6 +980,50 @@
         bracketBoards.forEach(drawBracketBoard);
       });
     };
+
+    const bracketZoomMin = 0.7;
+    const bracketZoomMax = 1.4;
+    const bracketZoomStep = 0.1;
+    const cssZoomSupported = typeof CSS !== 'undefined' && CSS.supports?.('zoom', '1');
+    const clampBracketZoom = (value) => Math.min(bracketZoomMax, Math.max(bracketZoomMin, Math.round(value * 10) / 10));
+
+    const setBracketZoom = (component, requestedZoom) => {
+      const board = component.querySelector('[data-bracket-board]');
+      const shell = component.querySelector('[data-bracket-zoom-shell]');
+      if (!board || !shell) return;
+
+      const zoom = clampBracketZoom(requestedZoom);
+      board.dataset.bracketZoom = String(zoom);
+      if (cssZoomSupported) {
+        board.style.zoom = String(zoom);
+        board.style.transform = '';
+        shell.style.width = '';
+        shell.style.height = '';
+      } else {
+        board.style.zoom = '';
+        board.style.transform = `scale(${zoom})`;
+        shell.style.width = `${Math.ceil(board.scrollWidth * zoom)}px`;
+        shell.style.height = `${Math.ceil(board.scrollHeight * zoom)}px`;
+      }
+
+      const value = component.querySelector('[data-bracket-zoom-value]');
+      const zoomOut = component.querySelector('[data-bracket-zoom-out]');
+      const zoomIn = component.querySelector('[data-bracket-zoom-in]');
+      if (value) value.textContent = `${Math.round(zoom * 100)}%`;
+      if (zoomOut) zoomOut.disabled = zoom <= bracketZoomMin;
+      if (zoomIn) zoomIn.disabled = zoom >= bracketZoomMax;
+      redrawBrackets();
+    };
+
+    document.querySelectorAll('[data-bracket-component]').forEach((component) => {
+      const board = component.querySelector('[data-bracket-board]');
+      if (!board) return;
+      const currentZoom = () => Number.parseFloat(board.dataset.bracketZoom || '1') || 1;
+      component.querySelector('[data-bracket-zoom-out]')?.addEventListener('click', () => setBracketZoom(component, currentZoom() - bracketZoomStep));
+      component.querySelector('[data-bracket-zoom-in]')?.addEventListener('click', () => setBracketZoom(component, currentZoom() + bracketZoomStep));
+      component.querySelector('[data-bracket-zoom-reset]')?.addEventListener('click', () => setBracketZoom(component, 1));
+      setBracketZoom(component, 1);
+    });
 
     bracketBoards.forEach((board) => {
       board.addEventListener('click', (event) => {

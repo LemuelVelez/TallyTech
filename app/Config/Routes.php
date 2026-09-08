@@ -71,6 +71,7 @@ $routes->group('', ['filter' => 'auth'], static function (RouteCollection $route
         $routes->post('schedules/(:num)/delete', 'SchedulesController::delete/$1');
         $routes->get('brackets', 'SchedulesController::brackets');
         $routes->post('brackets/generate', 'SchedulesController::generateBracket');
+        $routes->get('draft-generator', 'DraftGeneratorController::index');
 
         $routes->post('weighted-points', 'WeightedPointsController::store');
         $routes->post('weighted-points/(:num)/update', 'WeightedPointsController::update/$1');
