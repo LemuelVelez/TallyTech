@@ -24,7 +24,6 @@
   const scoreboardPresentationStage = document.querySelector('[data-scoreboard-presentation-stage]');
   const scoreboardPresentButton = document.querySelector('[data-scoreboard-present]');
   const scoreboardExitPresentationButton = document.querySelector('[data-scoreboard-exit-presentation]');
-  const scoreboardResumeFullscreenButton = document.querySelector('[data-scoreboard-resume-fullscreen]');
   const scoreboardPresentationIframe = document.querySelector('[data-scoreboard-presentation-iframe]');
   const SCOREBOARD_PRESENTATION_KEY = 'tallytech.scoreboardPresentation.v1';
   let scoreboardPresentationActive = false;
@@ -53,17 +52,14 @@
     const root = document.documentElement;
     const request = root.requestFullscreen || root.webkitRequestFullscreen;
     if (typeof request !== 'function') {
-      if (scoreboardResumeFullscreenButton) scoreboardResumeFullscreenButton.hidden = true;
       return false;
     }
 
     try {
       await request.call(root);
       scoreboardHadNativeFullscreen = true;
-      if (scoreboardResumeFullscreenButton) scoreboardResumeFullscreenButton.hidden = true;
       return true;
     } catch (_) {
-      if (scoreboardResumeFullscreenButton) scoreboardResumeFullscreenButton.hidden = false;
       return false;
     }
   };
@@ -99,7 +95,6 @@
     scoreboardPresentationStage.hidden = false;
     if (!scoreboardPresentationIframe.src) scoreboardPresentationIframe.src = buildScoreboardPresentationUrl();
     if (persist) persistScoreboardPresentationPreference(true);
-    if (scoreboardResumeFullscreenButton) scoreboardResumeFullscreenButton.hidden = Boolean(scoreboardFullscreenElement());
     announceScoreboardPresentationChange();
 
     if (requestFullscreen) requestScoreboardFullscreen();
@@ -113,7 +108,6 @@
     body.classList.remove('is-scoreboard-presentation');
     scoreboardPresentationStage.hidden = true;
     if (scoreboardPresentationIframe) scoreboardPresentationIframe.removeAttribute('src');
-    if (scoreboardResumeFullscreenButton) scoreboardResumeFullscreenButton.hidden = true;
     if (persist) persistScoreboardPresentationPreference(false);
     announceScoreboardPresentationChange();
 
@@ -130,23 +124,17 @@
   if (!scoreboardPresentationFrame && scoreboardPresentationStage) {
     scoreboardPresentButton?.addEventListener('click', () => showScoreboardPresentation({ requestFullscreen: true }));
     scoreboardExitPresentationButton?.addEventListener('click', () => hideScoreboardPresentation());
-    scoreboardResumeFullscreenButton?.addEventListener('click', requestScoreboardFullscreen);
 
     const syncScoreboardFullscreenState = () => {
       const isFullscreen = Boolean(scoreboardFullscreenElement());
       if (isFullscreen) {
         scoreboardHadNativeFullscreen = true;
-        if (scoreboardResumeFullscreenButton) scoreboardResumeFullscreenButton.hidden = true;
         return;
       }
 
       if (scoreboardPresentationActive && scoreboardHadNativeFullscreen && !scoreboardClosingPresentation) {
         hideScoreboardPresentation({ exitFullscreen: false });
         return;
-      }
-
-      if (scoreboardPresentationActive && scoreboardResumeFullscreenButton) {
-        scoreboardResumeFullscreenButton.hidden = false;
       }
     };
 

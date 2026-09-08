@@ -37,7 +37,7 @@ $cssVersion = $assetVersion('assets/css/app.css');
 $jsVersion = $assetVersion('assets/js/app.js');
 ?>
 <!doctype html>
-<html lang="en">
+<html lang="en"<?= $presentationFrame ? ' class="scoreboard-presentation-html"' : '' ?>>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -168,10 +168,6 @@ $jsVersion = $assetVersion('assets/js/app.js');
 <div class="scoreboard-presentation-stage" data-scoreboard-presentation-stage hidden aria-label="Live scoreboard presentation">
     <iframe data-scoreboard-presentation-iframe title="Live scoreboard presentation" allow="fullscreen" allowfullscreen></iframe>
     <div class="scoreboard-presentation-stage-controls" aria-label="Presentation controls">
-        <button type="button" class="scoreboard-presentation-control" data-scoreboard-resume-fullscreen hidden>
-            <?= ui_icon('play-circle') ?>
-            <span>Fullscreen</span>
-        </button>
         <button type="button" class="scoreboard-presentation-control scoreboard-presentation-control--exit" data-scoreboard-exit-presentation>
             <?= ui_icon('x') ?>
             <span>Exit presentation</span>

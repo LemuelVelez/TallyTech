@@ -1970,6 +1970,21 @@ input[type="checkbox"], input[type="radio"] { width: 18px; min-height: 18px; hei
 }
 
 /* Live scoreboard presentation mode */
+.scoreboard-presentation-html {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  scrollbar-gutter: auto;
+  background: #061b3a;
+  scrollbar-color: var(--accent) #061b3a;
+}
+.scoreboard-presentation-html::-webkit-scrollbar-track,
+.scoreboard-presentation-html body::-webkit-scrollbar-track {
+  background: #061b3a;
+  border-radius: 0;
+}
+.scoreboard-presentation-html::-webkit-scrollbar-corner,
+.scoreboard-presentation-html body::-webkit-scrollbar-corner { background: #061b3a; }
 .scoreboard-presentation-launch {
   display: flex;
   justify-content: center;
@@ -2040,10 +2055,18 @@ body.is-scoreboard-presentation { overflow: hidden; }
 }
 .scoreboard-presentation-control--exit { border-color: rgba(255, 255, 255, 0.34); }
 .viewer-page--presentation-frame {
+  width: 100%;
   min-height: 100%;
+  margin: 0;
   background: #061b3a;
   overflow-x: hidden;
+  scrollbar-color: var(--accent) #061b3a;
 }
+.viewer-page--presentation-frame::-webkit-scrollbar-track {
+  background: #061b3a;
+  border-radius: 0;
+}
+.viewer-page--presentation-frame::-webkit-scrollbar-corner { background: #061b3a; }
 .viewer-page--presentation-frame #scoreboard-content { min-height: 100svh; }
 .viewer-page--presentation-frame .score-hero.score-hero--bracket {
   min-height: 100svh;
