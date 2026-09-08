@@ -23,28 +23,99 @@
   const scoreboardSportNav = document.querySelector('[data-scoreboard-sport-nav]');
   if (scoreboardSportNav) {
     const sportLinks = Array.from(scoreboardSportNav.querySelectorAll('[data-scoreboard-sport-link]'));
+    const rotationUi = document.querySelector('[data-scoreboard-rotation-ui]');
+    const rotationToggle = rotationUi?.querySelector('[data-scoreboard-auto-rotate-toggle]');
+    const rotationLabel = rotationUi?.querySelector('[data-scoreboard-rotation-label]');
+    const rotationCountdown = rotationUi?.querySelector('[data-scoreboard-rotation-countdown]');
+    const rotationUnit = rotationUi?.querySelector('[data-scoreboard-rotation-unit]');
     const configuredDelay = Number.parseInt(scoreboardSportNav.dataset.autoRotateMs || '15000', 10);
     const rotateDelay = Number.isFinite(configuredDelay) && configuredDelay >= 3000 ? configuredDelay : 15000;
+    const SCOREBOARD_AUTO_ROTATE_KEY = 'tallytech.scoreboardAutoRotate.v1';
     let sportRotateTimer = null;
+    let sportCountdownTimer = null;
+    let rotationDeadline = 0;
+    let autoRotateEnabled = true;
+
+    try {
+      const storedAutoRotate = window.localStorage.getItem(SCOREBOARD_AUTO_ROTATE_KEY);
+      if (storedAutoRotate !== null) autoRotateEnabled = storedAutoRotate !== '0';
+    } catch (_) {
+      // Auto rotation still works when browser storage is unavailable.
+    }
+
+    const persistAutoRotation = () => {
+      try {
+        window.localStorage.setItem(SCOREBOARD_AUTO_ROTATE_KEY, autoRotateEnabled ? '1' : '0');
+      } catch (_) {
+        // Keep the current-page setting even when browser storage is unavailable.
+      }
+    };
 
     const stopSportRotation = () => {
       if (sportRotateTimer !== null) {
         window.clearTimeout(sportRotateTimer);
         sportRotateTimer = null;
       }
+      if (sportCountdownTimer !== null) {
+        window.clearInterval(sportCountdownTimer);
+        sportCountdownTimer = null;
+      }
+      rotationDeadline = 0;
+    };
+
+    const updateRotationUi = () => {
+      if (!rotationUi) return;
+      const canRotate = sportLinks.length >= 2;
+      rotationUi.hidden = !canRotate;
+      if (!canRotate) return;
+
+      if (rotationToggle) rotationToggle.checked = autoRotateEnabled;
+      rotationUi.classList.toggle('is-disabled', !autoRotateEnabled);
+
+      if (!autoRotateEnabled) {
+        if (rotationLabel) rotationLabel.textContent = 'Auto rotation is off';
+        if (rotationCountdown) rotationCountdown.hidden = true;
+        if (rotationUnit) rotationUnit.hidden = true;
+        return;
+      }
+
+      if (rotationLabel) rotationLabel.textContent = 'Next sport in';
+      if (rotationUnit) rotationUnit.hidden = false;
+      if (rotationCountdown) {
+        const remainingMs = Math.max(0, rotationDeadline - Date.now());
+        rotationCountdown.hidden = false;
+        rotationCountdown.textContent = String(Math.max(0, Math.ceil(remainingMs / 1000)));
+      }
+    };
+
+    const goToNextSport = () => {
+      const currentIndex = sportLinks.findIndex((link) => link.matches('[aria-current="page"], .active'));
+      const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % sportLinks.length : 0;
+      const nextLink = sportLinks[nextIndex];
+      if (nextLink?.href) window.location.assign(nextLink.href);
     };
 
     const scheduleSportRotation = () => {
       stopSportRotation();
-      if (sportLinks.length < 2 || document.visibilityState === 'hidden') return;
+      if (!autoRotateEnabled || sportLinks.length < 2 || document.visibilityState === 'hidden') {
+        updateRotationUi();
+        return;
+      }
 
-      sportRotateTimer = window.setTimeout(() => {
-        const currentIndex = sportLinks.findIndex((link) => link.matches('[aria-current=\"page\"], .active'));
-        const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % sportLinks.length : 0;
-        const nextLink = sportLinks[nextIndex];
-        if (nextLink?.href) window.location.assign(nextLink.href);
-      }, rotateDelay);
+      rotationDeadline = Date.now() + rotateDelay;
+      updateRotationUi();
+      sportCountdownTimer = window.setInterval(updateRotationUi, 250);
+      sportRotateTimer = window.setTimeout(goToNextSport, rotateDelay);
     };
+
+    if (rotationToggle) {
+      rotationToggle.checked = autoRotateEnabled;
+      rotationToggle.addEventListener('change', () => {
+        autoRotateEnabled = rotationToggle.checked;
+        persistAutoRotation();
+        scheduleSportRotation();
+      });
+    }
 
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') stopSportRotation();

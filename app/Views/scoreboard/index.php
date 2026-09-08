@@ -63,6 +63,18 @@ $jsVersion = $assetVersion('assets/js/app.js');
                 <small><?= $hasActiveEvent ? 'Validated results automatically update bracket progression, standings, and overall sport points.' : 'Brackets will appear when an event is activated.' ?></small>
             </div>
 
+            <div class="score-hero-rotation" data-scoreboard-rotation-ui hidden>
+                <div class="score-hero-rotation-countdown" data-scoreboard-rotation-status>
+                    <span data-scoreboard-rotation-label>Next sport in</span>
+                    <strong data-scoreboard-rotation-countdown>15</strong><span data-scoreboard-rotation-unit aria-hidden="true">s</span>
+                </div>
+                <label class="scoreboard-rotation-switch">
+                    <input type="checkbox" role="switch" data-scoreboard-auto-rotate-toggle aria-label="Automatically rotate scoreboard sports" checked>
+                    <span class="scoreboard-rotation-switch-track" aria-hidden="true"><span></span></span>
+                    <span class="scoreboard-rotation-switch-label">Auto rotate</span>
+                </label>
+            </div>
+
             <nav class="score-hero-sports sport-chip-row" aria-label="Choose sport" data-scoreboard-sport-nav data-auto-rotate-ms="15000">
                 <?php foreach ($sportGroups as $sportGroup): ?>
                     <?php $active = in_array((int) $sportGroup['id'], $selectedSportIds, true); ?>
