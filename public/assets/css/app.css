@@ -1103,7 +1103,41 @@ input[type="checkbox"], input[type="radio"] { width: 18px; min-height: 18px; hei
 .sport-filter-form select { min-width: min(420px, 100%); }
 .live-bracket-panel { margin-bottom: 22px; overflow: hidden; }
 .viewer-bracket-lane { background: #f8fbff; }
-.public-tournament-match { width: 250px; }
+.public-bracket-scroll { display: block; overflow-x: auto; padding: 4px 2px 14px; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; }
+.public-bracket-canvas {
+  --public-bracket-card-width: 240px;
+  --public-bracket-column-gap: 54px;
+  position: relative;
+  display: grid;
+  grid-template-columns: max-content max-content;
+  grid-template-areas: "upper grand";
+  column-gap: 62px;
+  row-gap: 26px;
+  width: max-content;
+  min-width: max-content;
+  padding: 2px 4px 6px;
+}
+.public-bracket-canvas--double-elimination { grid-template-areas: "upper grand" "lower grand"; }
+.public-bracket-canvas--grand-only { grid-template-columns: max-content; grid-template-areas: "grand"; }
+.public-bracket-lane { position: relative; min-height: 390px; display: flex; flex-direction: column; padding: 16px; scroll-snap-align: start; }
+.public-bracket-lane--upper { grid-area: upper; }
+.public-bracket-lane--lower { grid-area: lower; min-height: 280px; }
+.public-bracket-lane--grand { grid-area: grand; align-self: stretch; }
+.public-bracket-lane > h3, .public-bracket-lane > .bracket-rounds { position: relative; z-index: 3; }
+.public-bracket-lane .bracket-rounds { flex: 1; align-items: stretch; gap: var(--public-bracket-column-gap); }
+.public-bracket-canvas--double-elimination .public-bracket-lane--lower .bracket-rounds { padding-left: calc(var(--public-bracket-card-width) + var(--public-bracket-column-gap)); }
+.public-bracket-round { width: var(--public-bracket-card-width); flex: 0 0 var(--public-bracket-card-width); gap: 10px; }
+.public-bracket-match-stack { flex: 1; display: flex; flex-direction: column; justify-content: space-around; gap: 24px; min-height: 0; }
+.public-bracket-lane--lower .public-bracket-match-stack, .public-bracket-lane--grand .public-bracket-match-stack { justify-content: center; }
+.public-tournament-match { z-index: 4; width: 100%; box-sizing: border-box; padding: 11px; border-radius: 10px; }
+.public-tournament-match::after { display: none; }
+.public-tournament-match.conditional { border: 2px dashed #d6a541; background: #fffbeb; }
+.public-tournament-match.conditional .match-meta span:last-child { color: #9a6700; }
+.public-tournament-match .bracket-team { min-height: 32px; padding: 7px 8px; }
+.public-tournament-match > em { display: block; }
+.public-bracket-connectors { position: absolute; inset: 0; z-index: 2; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.public-bracket-connectors path { fill: none; stroke: #aebdcd; stroke-width: 2; stroke-linecap: square; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.public-bracket-connectors path.is-conditional { stroke-dasharray: 5 5; stroke: #c69a38; }
 .scoreboard-detail-columns { margin-bottom: 22px; }
 .compact-podium { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 0; }
 .compact-podium .viewer-rank { min-height: 145px; padding: 18px; }
@@ -1116,6 +1150,9 @@ input[type="checkbox"], input[type="radio"] { width: 18px; min-height: 18px; hei
   .bracket-lane { padding: 14px; }
   .bracket-rounds { gap: 24px; }
   .bracket-column, .public-tournament-match { width: 220px; }
+  .public-bracket-canvas { --public-bracket-card-width: 220px; --public-bracket-column-gap: 38px; column-gap: 44px; }
+  .public-bracket-lane { min-height: 360px; }
+  .public-bracket-lane--lower { min-height: 250px; }
   .compact-podium { grid-template-columns: 1fr; }
   .sport-filter-form { align-items: stretch; }
   .sport-filter-form select { width: 100%; min-width: 0; }

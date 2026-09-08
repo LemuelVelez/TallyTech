@@ -103,16 +103,17 @@ class TallyTechSeeder extends Seeder
 
             $sports = [
                 'Basketball' => $this->ensureSport($eventId, 'Basketball', 'Men', 'match', 1, null, $now),
-                'Volleyball' => $this->ensureSport($eventId, 'Volleyball', 'Women', 'match', 5, 25, $now),
+                'Volleyball Men' => $this->ensureSport($eventId, 'Volleyball', 'Men', 'match', 5, 25, $now),
+                'Volleyball Women' => $this->ensureSport($eventId, 'Volleyball', 'Women', 'match', 5, 25, $now),
                 'Badminton' => $this->ensureSport($eventId, 'Badminton', 'Men', 'match', 3, 21, $now),
                 'Cheerdance' => $this->ensureSport($eventId, 'Cheerdance', 'Mixed', 'judged', 1, null, $now),
             ];
 
-            foreach ([$sports['Basketball'], $sports['Volleyball'], $sports['Badminton'], $sports['Cheerdance']] as $sportId) {
+            foreach ($sports as $sportId) {
                 $this->ensureUserSport($ids['manager'], $sportId);
             }
 
-            foreach ([$sports['Basketball'], $sports['Volleyball'], $sports['Cheerdance']] as $sportId) {
+            foreach ([$sports['Basketball'], $sports['Volleyball Men'], $sports['Volleyball Women'], $sports['Cheerdance']] as $sportId) {
                 $this->ensureUserSport($ids['facilitator'], $sportId);
             }
 
@@ -120,92 +121,10 @@ class TallyTechSeeder extends Seeder
                 $this->ensureWeightedPoints($eventId, $sportId, $ids['manager'], $ids['validator'], $now);
             }
 
-            $basketballSchedule = $this->ensureSchedule([
-                'event_id' => $eventId,
-                'sport_id' => $sports['Basketball'],
-                'location_id' => $locations['Main Gymnasium'],
-                'round' => 'Final',
-                'tournament_format' => 'single_elimination',
-                'match_code' => 'M1',
-                'phase' => 'final',
-                'bracket_side' => 'grand',
-                'bracket_order' => 1,
-                'court_label' => 'Court 1',
-                'match_date' => '2026-08-15 18:00:00',
-                'team_a_id' => $teams['CBA'],
-                'team_b_id' => $teams['CCS-CAF'],
-                'status' => 'played',
-                'created_at' => $now,
-            ]);
-
-            $this->ensureSchedule([
-                'event_id' => $eventId,
-                'sport_id' => $sports['Volleyball'],
-                'location_id' => $locations['Covered Court'],
-                'round' => 'Final',
-                'tournament_format' => 'single_elimination',
-                'match_code' => 'M1',
-                'phase' => 'final',
-                'bracket_side' => 'grand',
-                'bracket_order' => 1,
-                'court_label' => 'Court 1',
-                'match_date' => '2026-08-16 09:00:00',
-                'team_a_id' => $teams['CIT-COC'],
-                'team_b_id' => $teams['SCA-CLAIM'],
-                'status' => 'scheduled',
-                'created_at' => $now,
-            ]);
-
-            $cheerdanceSchedule = $this->ensureSchedule([
-                'event_id' => $eventId,
-                'sport_id' => $sports['Cheerdance'],
-                'location_id' => $locations['Auditorium'],
-                'round' => 'Championship',
-                'tournament_format' => 'single_elimination',
-                'match_code' => 'M1',
-                'phase' => 'final',
-                'bracket_side' => 'grand',
-                'bracket_order' => 1,
-                'court_label' => 'Main Stage',
-                'match_date' => '2026-08-16 14:00:00',
-                'team_a_id' => null,
-                'team_b_id' => null,
-                'status' => 'played',
-                'created_at' => $now,
-            ]);
-
-            $basketballResult = $this->ensureResult([
-                'event_id' => $eventId,
-                'schedule_id' => $basketballSchedule,
-                'type' => 'match',
-                'status' => 'validated',
-                'submitted_by' => $ids['facilitator'],
-                'validated_by' => $ids['validator'],
-                'submitted_at' => $now,
-                'validated_at' => $now,
-            ]);
-
-            $this->ensureResultEntry($basketballResult, $teams['CBA'], 88, 1, 10);
-            $this->ensureResultEntry($basketballResult, $teams['CCS-CAF'], 81, 2, 7);
-
-            $cheerdanceResult = $this->ensureResult([
-                'event_id' => $eventId,
-                'schedule_id' => $cheerdanceSchedule,
-                'type' => 'judged',
-                'status' => 'pending',
-                'submitted_by' => $ids['facilitator'],
-                'validated_by' => null,
-                'submitted_at' => $now,
-                'validated_at' => null,
-            ]);
-
-            $this->ensureResultEntry($cheerdanceResult, $teams['SCA-CLAIM'], 94.5, 1, 0);
-            $this->ensureResultEntry($cheerdanceResult, $teams['CIT-COC'], 92, 2, 0);
-            $this->ensureResultEntry($cheerdanceResult, $teams['CBA'], 89.5, 3, 0);
-            $this->ensureResultEntry($cheerdanceResult, $teams['CCS-CAF'], 87, 4, 0);
+            $this->call(BracketSeeder::class);
 
             $this->ensureNotification($ids['facilitator'], 'result_submitted', 'Submitted unofficial Cheerdance judged result', $now);
-            $this->ensureNotification($ids['validator'], 'result_validated', 'Validated Basketball final as official', $now);
+            $this->ensureNotification($ids['validator'], 'result_validated', 'Validated Basketball bracket results as official', $now);
             $this->ensureNotification($ids['manager'], 'weighted_points_validated', 'Weighted points are ready for scoring', $now);
 
             if (! $this->db->transComplete()) {

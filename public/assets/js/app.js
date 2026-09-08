@@ -541,6 +541,83 @@
     if (window.innerWidth > 860 && body.classList.contains('nav-open')) setNavigation(false);
   });
 
+  const publicBracketBoards = Array.from(document.querySelectorAll('[data-public-bracket]'));
+  const svgNamespace = 'http://www.w3.org/2000/svg';
+
+  const drawBracketConnectors = (board) => {
+    const svg = board.querySelector('[data-bracket-connectors]');
+    if (!svg) return;
+
+    const matches = Array.from(board.querySelectorAll('.public-tournament-match[data-match-code]'));
+    const matchByCode = new Map();
+    matches.forEach((match) => {
+      const code = (match.dataset.matchCode || '').trim().toUpperCase();
+      if (code) matchByCode.set(code, match);
+    });
+
+    const boardRect = board.getBoundingClientRect();
+    const width = Math.max(board.scrollWidth, Math.ceil(boardRect.width));
+    const height = Math.max(board.scrollHeight, Math.ceil(boardRect.height));
+    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    svg.setAttribute('width', String(width));
+    svg.setAttribute('height', String(height));
+    svg.replaceChildren();
+
+    matches.forEach((target) => {
+      const feedCodes = [...new Set([target.dataset.feedA, target.dataset.feedB]
+        .map((code) => (code || '').trim().toUpperCase())
+        .filter(Boolean))];
+      const sources = feedCodes.map((code) => matchByCode.get(code)).filter(Boolean);
+      if (!sources.length) return;
+
+      const targetRect = target.getBoundingClientRect();
+      const targetPoint = {
+        x: targetRect.left - boardRect.left,
+        y: targetRect.top - boardRect.top + (targetRect.height / 2),
+      };
+      const sourcePoints = sources.map((source) => {
+        const rect = source.getBoundingClientRect();
+        return {
+          x: rect.right - boardRect.left,
+          y: rect.top - boardRect.top + (rect.height / 2),
+        };
+      });
+      const maxSourceX = Math.max(...sourcePoints.map((point) => point.x));
+      const horizontalGap = targetPoint.x - maxSourceX;
+      let joinX = maxSourceX + Math.max(18, horizontalGap * 0.52);
+      if (joinX >= targetPoint.x - 12) joinX = targetPoint.x - 18;
+      if (joinX <= maxSourceX) joinX = maxSourceX + 14;
+
+      let pathData = '';
+      if (sourcePoints.length === 1) {
+        const source = sourcePoints[0];
+        pathData = `M ${source.x} ${source.y} H ${joinX} V ${targetPoint.y} H ${targetPoint.x}`;
+      } else {
+        pathData = sourcePoints.map((source) => `M ${source.x} ${source.y} H ${joinX}`).join(' ');
+        const ys = [...sourcePoints.map((point) => point.y), targetPoint.y];
+        pathData += ` M ${joinX} ${Math.min(...ys)} V ${Math.max(...ys)} M ${joinX} ${targetPoint.y} H ${targetPoint.x}`;
+      }
+
+      const path = document.createElementNS(svgNamespace, 'path');
+      path.setAttribute('d', pathData);
+      if (target.classList.contains('conditional')) path.classList.add('is-conditional');
+      svg.appendChild(path);
+    });
+  };
+
+  const drawAllBracketConnectors = () => publicBracketBoards.forEach(drawBracketConnectors);
+  if (publicBracketBoards.length) {
+    const redraw = () => window.requestAnimationFrame(drawAllBracketConnectors);
+    window.requestAnimationFrame(() => window.requestAnimationFrame(drawAllBracketConnectors));
+    window.addEventListener('load', redraw, { once: true });
+    window.addEventListener('resize', redraw);
+
+    if ('ResizeObserver' in window) {
+      const bracketResizeObserver = new ResizeObserver(redraw);
+      publicBracketBoards.forEach((board) => bracketResizeObserver.observe(board));
+    }
+  }
+
   const carousel = document.querySelector('[data-hero-carousel]');
   if (!carousel) return;
 

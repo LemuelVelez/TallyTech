@@ -34,6 +34,8 @@ $scoreFor = static function (array $match, ?int $teamId): string {
     $score = (float) $match['score_by_team'][$teamId];
     return rtrim(rtrim(number_format($score, 2, '.', ''), '0'), '.');
 };
+$sportGroups = $sportScoreTable['sportGroups'] ?? [];
+$selectedSportIds = array_map('intval', $sportScoreTable['selectedSportIds'] ?? []);
 ?>
 <!doctype html>
 <html lang="en">
@@ -77,46 +79,80 @@ $scoreFor = static function (array $match, ?int $teamId): string {
 </section>
 
 <main class="viewer-content" id="scoreboard-content">
-    <?php $sportScorePanelClass = 'viewer-panel'; $sportScoreAction = 'scoreboard'; ?>
-    <?= view('partials/sport_score_table', get_defined_vars()) ?>
+    <section class="viewer-panel sport-filter-card">
+        <div class="section-title"><h2>Select Sport</h2><span>Choose a sport to view its live bracket</span></div>
+        <nav class="sport-chip-row" aria-label="Choose sport">
+            <?php foreach ($sportGroups as $sportGroup): ?>
+                <?php $active = in_array((int) $sportGroup['id'], $selectedSportIds, true); ?>
+                <a class="chip sport-chip <?= $active ? 'active' : '' ?>" href="<?= esc(site_url('scoreboard') . '?sport=' . (int) $sportGroup['id'], 'attr') ?>" <?= $active ? 'aria-current="page"' : '' ?>><?= esc($sportGroup['name']) ?></a>
+            <?php endforeach; ?>
+            <?php if (empty($sportGroups)): ?><span class="muted">No sports are configured for the active event.</span><?php endif; ?>
+        </nav>
+    </section>
 
     <?php if ($selectedSport): ?>
     <section class="viewer-panel live-bracket-panel">
         <div class="section-title"><h2 class="title-with-icon"><?= ui_icon('trophy') ?><span><?= esc($selectedSport['name']) ?> Bracket</span></h2><span>Live tournament paths</span></div>
         <?php if ($schedules): ?>
             <?php foreach ($bracketsByCategory as $category => $bracketData): ?>
+                <?php
+                $formatClass = $bracketData['format'] === 'double_elimination' ? 'double-elimination' : 'single-elimination';
+                $hasUpper = ! empty($bracketData['grouped']['upper']);
+                $hasLower = ! empty($bracketData['grouped']['lower']);
+                $hasGrand = ! empty($bracketData['grouped']['grand']);
+                ?>
                 <div class="bracket-category-block">
                     <div class="section-title bracket-category-title"><h3><?= esc($category) ?></h3><span><?= esc($bracketData['format_label']) ?></span></div>
-                    <div class="live-bracket bracket-board">
-                        <?php foreach (['upper' => $bracketData['format'] === 'double_elimination' ? 'Winner Bracket' : 'Championship Path', 'lower' => 'Loser Bracket', 'grand' => 'Championship'] as $side => $laneLabel): ?>
-                            <?php if (!empty($bracketData['grouped'][$side])): ?>
-                                <div class="bracket-lane viewer-bracket-lane">
+                    <div class="live-bracket public-bracket-scroll" role="region" aria-label="<?= esc($category . ' ' . $bracketData['format_label'] . ' bracket', 'attr') ?>" tabindex="0">
+                        <div class="public-bracket-canvas public-bracket-canvas--<?= esc($formatClass, 'attr') ?> <?= ! $hasUpper && ! $hasLower && $hasGrand ? 'public-bracket-canvas--grand-only' : '' ?>" data-public-bracket>
+                            <svg class="public-bracket-connectors" data-bracket-connectors aria-hidden="true"></svg>
+                            <?php foreach (['upper', 'lower', 'grand'] as $side): ?>
+                                <?php if (empty($bracketData['grouped'][$side])) continue; ?>
+                                <?php
+                                $laneLabel = match ($side) {
+                                    'upper' => 'Winner Bracket',
+                                    'lower' => 'Loser Bracket',
+                                    'grand' => $bracketData['format'] === 'double_elimination' ? 'Championship / Grand Final' : 'Championship',
+                                    default => 'Bracket',
+                                };
+                                ?>
+                                <section class="bracket-lane viewer-bracket-lane public-bracket-lane public-bracket-lane--<?= esc($side, 'attr') ?>">
                                     <h3><?= esc($laneLabel) ?></h3>
                                     <div class="bracket-rounds">
                                         <?php foreach ($bracketData['grouped'][$side] as $round => $matches): ?>
-                                            <div class="bracket-column">
+                                            <div class="bracket-column public-bracket-round">
                                                 <b class="bracket-round-title"><?= esc($round) ?></b>
-                                                <?php foreach ($matches as $match): ?>
-                                                    <?php $winner = (string) ($match['winner_name'] ?? ''); ?>
-                                                    <article class="tournament-match public-tournament-match <?= !empty($match['is_conditional']) ? 'conditional' : '' ?>">
-                                                        <div class="match-meta"><span><?= esc($match['match_code'] ?? '—') ?></span><span><?= esc($statusLabel($match)) ?></span></div>
-                                                        <?php if (($match['result_type'] ?? '') === 'judged'): ?>
-                                                            <strong>Judged Championship</strong>
-                                                            <small>All participating teams</small>
-                                                        <?php else: ?>
-                                                            <div class="bracket-team <?= $winner !== '' && $winner === ($match['slot_a_label'] ?? '') ? 'winner' : '' ?>"><span><?= esc($match['slot_a_label'] ?? 'TBD') ?></span><b><?= esc($scoreFor($match, !empty($match['team_a_id']) ? (int) $match['team_a_id'] : null)) ?></b></div>
-                                                            <div class="bracket-team <?= $winner !== '' && $winner === ($match['slot_b_label'] ?? '') ? 'winner' : '' ?>"><span><?= esc($match['slot_b_label'] ?? 'TBD') ?></span><b><?= esc($scoreFor($match, !empty($match['team_b_id']) ? (int) $match['team_b_id'] : null)) ?></b></div>
-                                                        <?php endif; ?>
-                                                        <small><?= esc(date('M j · g:i A', strtotime($match['match_date']))) ?> · <?= esc($match['court_label'] ?: ($match['location_name'] ?? '—')) ?></small>
-                                                        <?php if ($winner !== ''): ?><em><?= esc($winner) ?> advances</em><?php elseif (!empty($match['scheduling_note'])): ?><em><?= esc($match['scheduling_note']) ?></em><?php endif; ?>
-                                                    </article>
-                                                <?php endforeach; ?>
+                                                <div class="public-bracket-match-stack">
+                                                    <?php foreach ($matches as $match): ?>
+                                                        <?php
+                                                        $winner = (string) ($match['winner_name'] ?? '');
+                                                        $matchCode = strtoupper((string) ($match['match_code'] ?? ''));
+                                                        $feedA = strtoupper((string) ($match['feeds_from_a'] ?? ''));
+                                                        $feedB = strtoupper((string) ($match['feeds_from_b'] ?? ''));
+                                                        ?>
+                                                        <article class="tournament-match public-tournament-match <?= !empty($match['is_conditional']) ? 'conditional' : '' ?>"
+                                                            data-match-code="<?= esc($matchCode, 'attr') ?>"
+                                                            <?= $feedA !== '' ? 'data-feed-a="' . esc($feedA, 'attr') . '"' : '' ?>
+                                                            <?= $feedB !== '' ? 'data-feed-b="' . esc($feedB, 'attr') . '"' : '' ?>>
+                                                            <div class="match-meta"><span><?= esc($matchCode !== '' ? $matchCode : '—') ?></span><span><?= esc($statusLabel($match)) ?></span></div>
+                                                            <?php if (($match['result_type'] ?? '') === 'judged'): ?>
+                                                                <strong>Judged Championship</strong>
+                                                                <small>All participating teams</small>
+                                                            <?php else: ?>
+                                                                <div class="bracket-team <?= $winner !== '' && $winner === ($match['slot_a_label'] ?? '') ? 'winner' : '' ?>"><span><?= esc($match['slot_a_label'] ?? 'TBD') ?></span><b><?= esc($scoreFor($match, !empty($match['team_a_id']) ? (int) $match['team_a_id'] : null)) ?></b></div>
+                                                                <div class="bracket-team <?= $winner !== '' && $winner === ($match['slot_b_label'] ?? '') ? 'winner' : '' ?>"><span><?= esc($match['slot_b_label'] ?? 'TBD') ?></span><b><?= esc($scoreFor($match, !empty($match['team_b_id']) ? (int) $match['team_b_id'] : null)) ?></b></div>
+                                                            <?php endif; ?>
+                                                            <small><?= esc(date('M j · g:i A', strtotime($match['match_date']))) ?> · <?= esc($match['court_label'] ?: ($match['location_name'] ?? '—')) ?></small>
+                                                            <?php if ($winner !== ''): ?><em><?= esc($winner) ?> advances</em><?php elseif (!empty($match['scheduling_note'])): ?><em><?= esc($match['scheduling_note']) ?></em><?php endif; ?>
+                                                        </article>
+                                                    <?php endforeach; ?>
+                                                </div>
                                             </div>
                                         <?php endforeach; ?>
                                     </div>
-                                </div>
-                            <?php endif; ?>
-                        <?php endforeach; ?>
+                                </section>
+                            <?php endforeach; ?>
+                        </div>
                     </div>
                 </div>
             <?php endforeach; ?>
