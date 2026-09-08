@@ -1,6 +1,7 @@
 (() => {
   const body = document.body;
   const navToggle = document.querySelector('[data-nav-toggle]');
+  const sidebarCompactToggle = document.querySelector('[data-sidebar-compact-toggle]');
   const accountMenu = document.querySelector('[data-account-menu]');
   const accountToggle = accountMenu?.querySelector('[data-account-toggle]');
   const accountDropdown = accountMenu?.querySelector('[data-account-dropdown]');
@@ -18,6 +19,39 @@
     navToggle?.setAttribute('aria-expanded', open ? 'true' : 'false');
     navToggle?.setAttribute('aria-label', open ? 'Close navigation' : 'Open navigation');
   };
+
+  const SIDEBAR_COMPACT_KEY = 'tallytech.sidebarCompact';
+
+  const setSidebarCompact = (compact, persist = true) => {
+    if (window.matchMedia('(max-width: 860px)').matches) return;
+
+    body.classList.toggle('sidebar-compact', compact);
+    sidebarCompactToggle?.setAttribute('aria-expanded', compact ? 'false' : 'true');
+    sidebarCompactToggle?.setAttribute('aria-label', compact ? 'Expand navigation' : 'Collapse navigation');
+    sidebarCompactToggle?.setAttribute('title', compact ? 'Expand navigation' : 'Collapse navigation');
+
+    if (persist) {
+      try {
+        window.localStorage.setItem(SIDEBAR_COMPACT_KEY, compact ? '1' : '0');
+      } catch (_) {
+        // The compact state still works when browser storage is unavailable.
+      }
+    }
+  };
+
+  if (sidebarCompactToggle) {
+    let storedCompact = null;
+    try {
+      storedCompact = window.localStorage.getItem(SIDEBAR_COMPACT_KEY);
+    } catch (_) {
+      storedCompact = null;
+    }
+
+    const initialCompact = storedCompact === null
+      ? body.classList.contains('sidebar-compact')
+      : storedCompact === '1';
+    setSidebarCompact(initialCompact, false);
+  }
 
   const accountItems = () => accountDropdown
     ? Array.from(accountDropdown.querySelectorAll('a[href], button:not([disabled])'))
@@ -105,6 +139,10 @@
     }
     if (event.target.closest('[data-nav-close]')) setNavigation(false);
 
+    if (event.target.closest('[data-sidebar-compact-toggle]')) {
+      setSidebarCompact(!body.classList.contains('sidebar-compact'));
+    }
+
     if (event.target.closest('[data-account-toggle]')) {
       setNavigation(false);
       setAccountMenu(accountDropdown?.hidden ?? true);
@@ -154,6 +192,17 @@
     window.setTimeout(() => {
       if (accountMenu && !accountMenu.contains(document.activeElement)) setAccountMenu(false);
     }, 0);
+  });
+
+  window.addEventListener('resize', () => {
+    if (window.matchMedia('(max-width: 860px)').matches) {
+      sidebarCompactToggle?.setAttribute('aria-expanded', 'true');
+      sidebarCompactToggle?.setAttribute('aria-label', 'Collapse navigation');
+      sidebarCompactToggle?.setAttribute('title', 'Collapse navigation');
+    } else if (sidebarCompactToggle) {
+      setSidebarCompact(body.classList.contains('sidebar-compact'), false);
+      setNavigation(false);
+    }
   });
 
   document.querySelectorAll('dialog').forEach((dialog, index) => {
