@@ -543,6 +543,7 @@
 
   const bracketBoards = Array.from(document.querySelectorAll('[data-bracket-board]'));
   const svgNamespace = 'http://www.w3.org/2000/svg';
+  const normalizeMatchCode = (value) => String(value || '').trim().toUpperCase();
 
   const bracketPoint = (element, boardRect, edge) => {
     const rect = element.getBoundingClientRect();
@@ -552,25 +553,123 @@
     };
   };
 
-  const appendBracketPath = (svg, d, classes = []) => {
+  const appendBracketPath = (svg, d, classes = [], meta = {}) => {
     if (!d) return;
     const path = document.createElementNS(svgNamespace, 'path');
     path.setAttribute('d', d);
     classes.filter(Boolean).forEach((className) => path.classList.add(className));
+    if (meta.from) path.dataset.from = normalizeMatchCode(meta.from);
+    if (meta.to) path.dataset.to = normalizeMatchCode(meta.to);
     svg.appendChild(path);
+  };
+
+  const buildBracketGraph = (board) => {
+    const matches = Array.from(board.querySelectorAll('[data-bracket-match][data-match-code]'));
+    const matchByCode = new Map();
+    const feedsByCode = new Map();
+    const nextByCode = new Map();
+
+    matches.forEach((match) => {
+      const code = normalizeMatchCode(match.dataset.matchCode);
+      if (!code) return;
+      matchByCode.set(code, match);
+    });
+
+    matches.forEach((match) => {
+      const targetCode = normalizeMatchCode(match.dataset.matchCode);
+      if (!targetCode) return;
+
+      const feeds = [match.dataset.feedA, match.dataset.feedB]
+        .map(normalizeMatchCode)
+        .filter((code, index, list) => code && matchByCode.has(code) && list.indexOf(code) === index);
+
+      feedsByCode.set(targetCode, feeds);
+      feeds.forEach((sourceCode) => {
+        const next = nextByCode.get(sourceCode) || [];
+        if (!next.includes(targetCode)) next.push(targetCode);
+        nextByCode.set(sourceCode, next);
+      });
+    });
+
+    return { matches, matchByCode, feedsByCode, nextByCode };
+  };
+
+  const collectBracketPath = (graph, startCode) => {
+    const selected = new Set();
+    const visit = (code, relationMap) => {
+      if (!code || selected.has(code)) return;
+      selected.add(code);
+      (relationMap.get(code) || []).forEach((relatedCode) => visit(relatedCode, relationMap));
+    };
+
+    const upstream = new Set();
+    const downstream = new Set();
+    const walk = (code, relationMap, targetSet) => {
+      if (!code || targetSet.has(code)) return;
+      targetSet.add(code);
+      (relationMap.get(code) || []).forEach((relatedCode) => walk(relatedCode, relationMap, targetSet));
+    };
+
+    walk(startCode, graph.feedsByCode, upstream);
+    walk(startCode, graph.nextByCode, downstream);
+    upstream.forEach((code) => selected.add(code));
+    downstream.forEach((code) => selected.add(code));
+    return selected;
+  };
+
+  const clearBracketSelection = (board, announce = true) => {
+    board.classList.remove('has-bracket-selection');
+    board.dataset.selectedMatch = '';
+    board.querySelectorAll('[data-bracket-match]').forEach((match) => {
+      match.classList.remove('is-selected', 'is-path-match');
+      match.setAttribute('aria-pressed', 'false');
+    });
+    board.querySelectorAll('[data-bracket-connectors] path').forEach((path) => path.classList.remove('is-active'));
+
+    const status = board.querySelector('[data-bracket-selection-status]');
+    if (status && announce) status.textContent = 'Bracket path highlight cleared.';
+  };
+
+  const applyBracketSelection = (board, match, announce = true) => {
+    if (!match) {
+      clearBracketSelection(board, announce);
+      return;
+    }
+
+    const graph = buildBracketGraph(board);
+    const code = normalizeMatchCode(match.dataset.matchCode);
+    if (!code || !graph.matchByCode.has(code)) return;
+
+    const pathCodes = collectBracketPath(graph, code);
+    board.classList.add('has-bracket-selection');
+    board.dataset.selectedMatch = code;
+
+    graph.matches.forEach((candidate) => {
+      const candidateCode = normalizeMatchCode(candidate.dataset.matchCode);
+      const isSelected = candidateCode === code;
+      candidate.classList.toggle('is-selected', isSelected);
+      candidate.classList.toggle('is-path-match', pathCodes.has(candidateCode));
+      candidate.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+    });
+
+    board.querySelectorAll('[data-bracket-connectors] path').forEach((path) => {
+      const from = normalizeMatchCode(path.dataset.from);
+      const to = normalizeMatchCode(path.dataset.to);
+      path.classList.toggle('is-active', pathCodes.has(from) && pathCodes.has(to));
+    });
+
+    const status = board.querySelector('[data-bracket-selection-status]');
+    if (status && announce) {
+      const round = match.dataset.matchRound ? `, ${match.dataset.matchRound}` : '';
+      status.textContent = `${code}${round} selected. Connected tournament path highlighted.`;
+    }
   };
 
   const drawBracketBoard = (board) => {
     const svg = board.querySelector('[data-bracket-connectors]');
     if (!svg) return;
 
-    const matches = Array.from(board.querySelectorAll('[data-bracket-match][data-match-code]'));
-    const matchByCode = new Map();
-    matches.forEach((match) => {
-      const code = (match.dataset.matchCode || '').trim().toUpperCase();
-      if (code) matchByCode.set(code, match);
-    });
-
+    const graph = buildBracketGraph(board);
     const boardRect = board.getBoundingClientRect();
     const width = Math.max(board.scrollWidth, Math.ceil(boardRect.width));
     const height = Math.max(board.scrollHeight, Math.ceil(boardRect.height));
@@ -579,15 +678,17 @@
     svg.setAttribute('height', String(height));
     svg.replaceChildren();
 
-    matches.forEach((target) => {
+    graph.matches.forEach((target) => {
+      const targetCode = normalizeMatchCode(target.dataset.matchCode);
       const rawFeeds = [
         { code: target.dataset.feedA, type: target.dataset.feedAType },
         { code: target.dataset.feedB, type: target.dataset.feedBType },
       ];
       const feedMap = new Map();
+
       rawFeeds.forEach((feed) => {
-        const code = (feed.code || '').trim().toUpperCase();
-        if (!code || !matchByCode.has(code)) return;
+        const code = normalizeMatchCode(feed.code);
+        if (!code || !graph.matchByCode.has(code)) return;
         const existing = feedMap.get(code) || { code, types: new Set() };
         if (feed.type) existing.types.add(String(feed.type).toLowerCase());
         feedMap.set(code, existing);
@@ -595,13 +696,14 @@
 
       const feeds = Array.from(feedMap.values()).map((feed) => ({
         ...feed,
-        source: matchByCode.get(feed.code),
+        source: graph.matchByCode.get(feed.code),
       }));
       if (!feeds.length) return;
 
       const targetPoint = bracketPoint(target, boardRect, 'left');
       const sourcePoints = feeds.map((feed) => ({
         ...bracketPoint(feed.source, boardRect, 'right'),
+        code: feed.code,
         types: feed.types,
       }));
       const maxSourceX = Math.max(...sourcePoints.map((point) => point.x));
@@ -611,35 +713,21 @@
         : maxSourceX + 22;
       const conditionalClass = target.classList.contains('conditional') ? 'is-conditional' : '';
 
-      if (sourcePoints.length === 1) {
-        const source = sourcePoints[0];
-        const loserClass = source.types.has('loser') ? 'is-loser-feed' : '';
-        appendBracketPath(
-          svg,
-          `M ${source.x} ${source.y} H ${joinX} V ${targetPoint.y} H ${targetPoint.x}`,
-          [loserClass, conditionalClass]
-        );
-        return;
-      }
-
       sourcePoints.forEach((source) => {
         appendBracketPath(
           svg,
-          `M ${source.x} ${source.y} H ${joinX}`,
-          [source.types.has('loser') ? 'is-loser-feed' : '', conditionalClass]
+          `M ${source.x} ${source.y} H ${joinX} V ${targetPoint.y} H ${targetPoint.x}`,
+          [source.types.has('loser') ? 'is-loser-feed' : '', conditionalClass],
+          { from: source.code, to: targetCode }
         );
       });
-
-      const ys = sourcePoints.map((point) => point.y);
-      ys.push(targetPoint.y);
-      appendBracketPath(
-        svg,
-        `M ${joinX} ${Math.min(...ys)} V ${Math.max(...ys)} M ${joinX} ${targetPoint.y} H ${targetPoint.x}`,
-        [conditionalClass]
-      );
     });
 
     board.dataset.bracketReady = 'true';
+    const selectedCode = normalizeMatchCode(board.dataset.selectedMatch);
+    if (selectedCode && graph.matchByCode.has(selectedCode)) {
+      applyBracketSelection(board, graph.matchByCode.get(selectedCode), false);
+    }
   };
 
   if (bracketBoards.length) {
@@ -651,6 +739,38 @@
         bracketBoards.forEach(drawBracketBoard);
       });
     };
+
+    bracketBoards.forEach((board) => {
+      board.addEventListener('click', (event) => {
+        const match = event.target.closest('[data-bracket-match]');
+        if (match && board.contains(match)) {
+          const selectedCode = normalizeMatchCode(board.dataset.selectedMatch);
+          const matchCode = normalizeMatchCode(match.dataset.matchCode);
+          if (selectedCode && selectedCode === matchCode) clearBracketSelection(board);
+          else applyBracketSelection(board, match);
+          return;
+        }
+
+        if (!event.target.closest('.tt-bracket-round')) clearBracketSelection(board, false);
+      });
+
+      board.addEventListener('keydown', (event) => {
+        const match = event.target.closest('[data-bracket-match]');
+        if (match && ['Enter', ' '].includes(event.key)) {
+          event.preventDefault();
+          const selectedCode = normalizeMatchCode(board.dataset.selectedMatch);
+          const matchCode = normalizeMatchCode(match.dataset.matchCode);
+          if (selectedCode && selectedCode === matchCode) clearBracketSelection(board);
+          else applyBracketSelection(board, match);
+          return;
+        }
+
+        if (event.key === 'Escape' && board.classList.contains('has-bracket-selection')) {
+          event.preventDefault();
+          clearBracketSelection(board);
+        }
+      });
+    });
 
     redrawBrackets();
     window.addEventListener('load', redrawBrackets, { once: true });

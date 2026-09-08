@@ -67,9 +67,25 @@ $winnerName = static function (array $match): string {
     }
     return '';
 };
+
+$laneIcon = static fn(string $side): string => match ($side) {
+    'upper' => 'trophy',
+    'lower' => 'target',
+    'grand' => 'award',
+    default => 'circle',
+};
+
+$matchIcon = static function (array $match, string $side): string {
+    if (! empty($match['is_conditional'])) return 'alert-triangle';
+    if ($side === 'grand') return 'trophy';
+    if (($match['result_status'] ?? '') === 'validated') return 'check-circle';
+    if ($side === 'lower') return 'target';
+    return 'play-circle';
+};
 ?>
 <div class="tt-bracket-scroll tt-bracket-scroll--<?= esc($bracketVariant, 'attr') ?>" role="region" aria-label="<?= esc($bracketAriaLabel, 'attr') ?>" tabindex="0">
-    <div class="tt-bracket-board tt-bracket-board--<?= esc($formatClass, 'attr') ?> <?= ! $hasUpper && ! $hasLower && $hasGrand ? 'tt-bracket-board--grand-only' : '' ?>" data-bracket-board>
+    <div class="tt-bracket-board tt-bracket-board--<?= esc($formatClass, 'attr') ?> tt-bracket-board--<?= esc($bracketVariant, 'attr') ?> <?= ! $hasUpper && ! $hasLower && $hasGrand ? 'tt-bracket-board--grand-only' : '' ?>" data-bracket-board>
+        <span class="sr-only" data-bracket-selection-status aria-live="polite"></span>
         <svg class="tt-bracket-connectors" data-bracket-connectors aria-hidden="true"></svg>
 
         <?php foreach (['upper', 'lower', 'grand'] as $side): ?>
@@ -84,7 +100,9 @@ $winnerName = static function (array $match): string {
             ?>
             <section class="tt-bracket-lane tt-bracket-lane--<?= esc($side, 'attr') ?>" data-bracket-lane="<?= esc($side, 'attr') ?>">
                 <div class="tt-bracket-lane-heading">
+                    <span class="tt-bracket-lane-icon" aria-hidden="true"><?= ui_icon($laneIcon($side)) ?></span>
                     <span><?= esc($laneLabel) ?></span>
+                    <small>Select a match to trace its path</small>
                 </div>
                 <div class="tt-bracket-rounds">
                     <?php foreach ($grouped[$side] as $round => $matches): ?>
@@ -106,31 +124,41 @@ $winnerName = static function (array $match): string {
                                     $scoreA = $scoreFor($match, $teamAId);
                                     $scoreB = $scoreFor($match, $teamBId);
                                     $isConditional = ! empty($match['is_conditional']);
+                                    $status = $statusLabel($match);
+                                    $matchAria = trim(($matchCode !== '' ? $matchCode . ', ' : '') . $round . ': ' . $teamALabel . ' versus ' . $teamBLabel . '. ' . $status);
                                     ?>
                                     <article
-                                        class="tournament-match tt-bracket-match <?= $isConditional ? 'conditional' : '' ?>"
+                                        class="tournament-match tt-bracket-match <?= $isConditional ? 'conditional' : '' ?> <?= $side === 'grand' ? 'tt-bracket-match--championship' : '' ?>"
                                         data-bracket-match
                                         data-match-code="<?= esc($matchCode, 'attr') ?>"
                                         data-bracket-side="<?= esc($side, 'attr') ?>"
+                                        data-match-round="<?= esc($round, 'attr') ?>"
+                                        tabindex="0"
+                                        role="button"
+                                        aria-pressed="false"
+                                        aria-label="<?= esc($matchAria, 'attr') ?>"
                                         <?= $feedA !== '' ? 'data-feed-a="' . esc($feedA, 'attr') . '"' : '' ?>
                                         <?= $feedB !== '' ? 'data-feed-b="' . esc($feedB, 'attr') . '"' : '' ?>
                                         <?= $feedAType !== '' ? 'data-feed-a-type="' . esc($feedAType, 'attr') . '"' : '' ?>
                                         <?= $feedBType !== '' ? 'data-feed-b-type="' . esc($feedBType, 'attr') . '"' : '' ?>
                                     >
                                         <div class="tt-bracket-match-head">
-                                            <b><?= esc($matchCode !== '' ? $matchCode : '—') ?></b>
-                                            <span><?= esc($statusLabel($match)) ?></span>
+                                            <div class="tt-bracket-match-title">
+                                                <span class="tt-bracket-match-icon" aria-hidden="true"><?= ui_icon($matchIcon($match, $side)) ?></span>
+                                                <b><?= esc($matchCode !== '' ? $matchCode : '—') ?></b>
+                                            </div>
+                                            <span class="tt-bracket-status"><?= esc($status) ?></span>
                                         </div>
 
                                         <?php if (($match['result_type'] ?? '') === 'judged'): ?>
                                             <div class="tt-bracket-judged">All participating teams</div>
                                         <?php else: ?>
                                             <div class="bracket-team tt-bracket-slot <?= $winner !== '' && $winner === $teamALabel ? 'winner' : '' ?>">
-                                                <span><?= esc($teamALabel) ?></span>
+                                                <span class="tt-bracket-team-name"><?= $winner !== '' && $winner === $teamALabel ? ui_icon('check-circle', 'tt-bracket-slot-icon') : '' ?><span><?= esc($teamALabel) ?></span></span>
                                                 <b><?= $scoreA !== '' ? esc($scoreA) : '<span aria-hidden="true">—</span>' ?></b>
                                             </div>
                                             <div class="bracket-team tt-bracket-slot <?= $winner !== '' && $winner === $teamBLabel ? 'winner' : '' ?>">
-                                                <span><?= esc($teamBLabel) ?></span>
+                                                <span class="tt-bracket-team-name"><?= $winner !== '' && $winner === $teamBLabel ? ui_icon('check-circle', 'tt-bracket-slot-icon') : '' ?><span><?= esc($teamBLabel) ?></span></span>
                                                 <b><?= $scoreB !== '' ? esc($scoreB) : '<span aria-hidden="true">—</span>' ?></b>
                                             </div>
                                         <?php endif; ?>
@@ -141,11 +169,18 @@ $winnerName = static function (array $match): string {
                                         </div>
 
                                         <?php if ($isConditional): ?>
-                                            <div class="tt-bracket-note tt-bracket-note--conditional">If necessary</div>
+                                            <div class="tt-bracket-note tt-bracket-note--conditional"><?= ui_icon('alert-triangle') ?><span>If necessary</span></div>
                                         <?php elseif ($winner !== ''): ?>
-                                            <div class="tt-bracket-note"><?= esc($winner) ?> advances</div>
+                                            <div class="tt-bracket-note"><?= ui_icon('chevron-right') ?><span><?= esc($winner) ?> advances</span></div>
                                         <?php elseif (! empty($match['scheduling_note'])): ?>
-                                            <div class="tt-bracket-note"><?= esc($match['scheduling_note']) ?></div>
+                                            <div class="tt-bracket-note"><?= ui_icon('calendar-clock') ?><span><?= esc($match['scheduling_note']) ?></span></div>
+                                        <?php endif; ?>
+
+                                        <?php if ($side === 'grand' && $winner !== '' && ($match['result_status'] ?? '') === 'validated'): ?>
+                                            <div class="tt-bracket-champion">
+                                                <span aria-hidden="true"><?= ui_icon('trophy') ?></span>
+                                                <div><small>Champion</small><strong><?= esc($winner) ?></strong></div>
+                                            </div>
                                         <?php endif; ?>
                                     </article>
                                 <?php endforeach; ?>
