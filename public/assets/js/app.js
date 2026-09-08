@@ -48,18 +48,84 @@
 
   const scoreboardFullscreenElement = () => document.fullscreenElement || document.webkitFullscreenElement || null;
 
+  const isScoreboardMobileScreen = () => {
+    const coarsePointer = typeof window.matchMedia === 'function'
+      && window.matchMedia('(pointer: coarse)').matches;
+    const narrowScreen = Math.min(window.screen?.width || window.innerWidth, window.screen?.height || window.innerHeight) <= 900;
+    return coarsePointer || narrowScreen;
+  };
+
+  const lockScoreboardLandscape = async () => {
+    if (!isScoreboardMobileScreen()) return false;
+
+    const orientation = window.screen?.orientation;
+    if (orientation && typeof orientation.lock === 'function') {
+      try {
+        await orientation.lock('landscape');
+        return true;
+      } catch (_) {
+        // Some mobile browsers only allow orientation lock while native fullscreen is active.
+      }
+    }
+
+    const legacyLock = window.screen?.lockOrientation
+      || window.screen?.mozLockOrientation
+      || window.screen?.msLockOrientation;
+    if (typeof legacyLock === 'function') {
+      try {
+        return legacyLock.call(window.screen, 'landscape') !== false;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    return false;
+  };
+
+  const unlockScoreboardOrientation = () => {
+    const orientation = window.screen?.orientation;
+    if (orientation && typeof orientation.unlock === 'function') {
+      try {
+        orientation.unlock();
+        return;
+      } catch (_) {
+        // Fall through to legacy orientation APIs when available.
+      }
+    }
+
+    const legacyUnlock = window.screen?.unlockOrientation
+      || window.screen?.mozUnlockOrientation
+      || window.screen?.msUnlockOrientation;
+    if (typeof legacyUnlock === 'function') {
+      try {
+        legacyUnlock.call(window.screen);
+      } catch (_) {
+        // Exiting presentation still succeeds if the browser owns orientation.
+      }
+    }
+  };
+
   const requestScoreboardFullscreen = async () => {
+    if (scoreboardFullscreenElement()) {
+      scoreboardHadNativeFullscreen = true;
+      await lockScoreboardLandscape();
+      return true;
+    }
+
     const root = document.documentElement;
     const request = root.requestFullscreen || root.webkitRequestFullscreen;
     if (typeof request !== 'function') {
+      await lockScoreboardLandscape();
       return false;
     }
 
     try {
       await request.call(root);
       scoreboardHadNativeFullscreen = true;
+      await lockScoreboardLandscape();
       return true;
     } catch (_) {
+      await lockScoreboardLandscape();
       return false;
     }
   };
@@ -97,7 +163,11 @@
     if (persist) persistScoreboardPresentationPreference(true);
     announceScoreboardPresentationChange();
 
-    if (requestFullscreen) requestScoreboardFullscreen();
+    if (requestFullscreen) {
+      requestScoreboardFullscreen();
+    } else {
+      lockScoreboardLandscape();
+    }
   };
 
   const hideScoreboardPresentation = ({ persist = true, exitFullscreen = true } = {}) => {
@@ -110,6 +180,7 @@
     if (scoreboardPresentationIframe) scoreboardPresentationIframe.removeAttribute('src');
     if (persist) persistScoreboardPresentationPreference(false);
     announceScoreboardPresentationChange();
+    unlockScoreboardOrientation();
 
     if (exitFullscreen) exitScoreboardFullscreen().finally(() => {
       scoreboardClosingPresentation = false;
@@ -129,6 +200,7 @@
       const isFullscreen = Boolean(scoreboardFullscreenElement());
       if (isFullscreen) {
         scoreboardHadNativeFullscreen = true;
+        if (scoreboardPresentationActive) lockScoreboardLandscape();
         return;
       }
 
@@ -140,6 +212,9 @@
 
     document.addEventListener('fullscreenchange', syncScoreboardFullscreenState);
     document.addEventListener('webkitfullscreenchange', syncScoreboardFullscreenState);
+    scoreboardPresentationIframe?.addEventListener('load', () => {
+      if (scoreboardPresentationActive) lockScoreboardLandscape();
+    });
 
     if (readScoreboardPresentationPreference()) {
       showScoreboardPresentation({ requestFullscreen: true, persist: false });
