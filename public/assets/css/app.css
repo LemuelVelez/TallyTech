@@ -1968,3 +1968,134 @@ input[type="checkbox"], input[type="radio"] { width: 18px; min-height: 18px; hei
     transition: none;
   }
 }
+
+/* Live scoreboard presentation mode */
+.scoreboard-presentation-launch {
+  display: flex;
+  justify-content: center;
+  margin: -4px auto 14px;
+}
+.scoreboard-present-button,
+.scoreboard-presentation-control {
+  min-height: 42px;
+  padding: 0 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+  background: rgba(5, 20, 43, 0.62);
+  color: #fff;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 850;
+  line-height: 1;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease, opacity 160ms ease;
+}
+.scoreboard-present-button .ui-icon,
+.scoreboard-presentation-control .ui-icon { width: 18px; height: 18px; }
+.scoreboard-present-button:hover,
+.scoreboard-presentation-control:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(5, 20, 43, 0.86);
+  transform: translateY(-1px);
+}
+.scoreboard-present-button:focus-visible,
+.scoreboard-presentation-control:focus-visible {
+  outline: 3px solid #ffce25;
+  outline-offset: 3px;
+}
+body.is-scoreboard-presentation { overflow: hidden; }
+.scoreboard-presentation-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #061b3a;
+}
+.scoreboard-presentation-stage[hidden] { display: none; }
+.scoreboard-presentation-stage iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #061b3a;
+}
+.scoreboard-presentation-stage-controls {
+  position: absolute;
+  top: max(12px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.scoreboard-presentation-control {
+  min-height: 40px;
+  padding-inline: 13px;
+  background: rgba(6, 27, 58, 0.78);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
+}
+.scoreboard-presentation-control--exit { border-color: rgba(255, 255, 255, 0.34); }
+.viewer-page--presentation-frame {
+  min-height: 100%;
+  background: #061b3a;
+  overflow-x: hidden;
+}
+.viewer-page--presentation-frame #scoreboard-content { min-height: 100svh; }
+.viewer-page--presentation-frame .score-hero.score-hero--bracket {
+  min-height: 100svh;
+  padding: clamp(18px, 2.2vw, 34px) 0 clamp(20px, 2.5vw, 38px);
+}
+.viewer-page--presentation-frame .score-hero-inner {
+  width: min(1920px, 100%);
+  padding-inline: clamp(18px, 2.5vw, 48px);
+}
+.viewer-page--presentation-frame .score-hero-copy {
+  max-width: 1100px;
+  margin-bottom: 14px;
+}
+.viewer-page--presentation-frame .score-hero.score-hero--bracket h1 {
+  margin: 10px 0 4px;
+  font-size: clamp(2.1rem, 3.6vw, 4.2rem);
+}
+.viewer-page--presentation-frame .score-hero.score-hero--bracket p {
+  margin-bottom: 0;
+  font-size: clamp(1rem, 1.25vw, 1.35rem);
+}
+.viewer-page--presentation-frame .score-hero.score-hero--bracket small { display: none; }
+.viewer-page--presentation-frame .score-hero-rotation { margin-bottom: 8px; }
+.viewer-page--presentation-frame .score-hero-sports { margin-bottom: 14px; }
+.viewer-page--presentation-frame .score-hero-brackets { gap: 14px; }
+.viewer-page--presentation-frame .score-hero-bracket-category {
+  padding: clamp(10px, 1vw, 16px);
+  border-radius: 14px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  body.is-scoreboard-presentation .scoreboard-presentation-stage-controls:not(:focus-within) {
+    opacity: 0.4;
+  }
+  body.is-scoreboard-presentation .scoreboard-presentation-stage-controls:hover { opacity: 1; }
+}
+
+@media (max-width: 640px) {
+  .scoreboard-presentation-launch { margin-bottom: 12px; }
+  .scoreboard-presentation-stage-controls {
+    top: max(8px, env(safe-area-inset-top));
+    right: max(8px, env(safe-area-inset-right));
+  }
+  .scoreboard-presentation-control span { display: none; }
+  .scoreboard-presentation-control { width: 42px; padding: 0; }
+  .viewer-page--presentation-frame .score-hero.score-hero--bracket { padding-top: 16px; }
+  .viewer-page--presentation-frame .score-hero-inner { padding-inline: 10px; }
+  .viewer-page--presentation-frame .score-hero-copy { margin-bottom: 10px; }
+  .viewer-page--presentation-frame .score-hero.score-hero--bracket h1 { font-size: clamp(2rem, 10vw, 3rem); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scoreboard-present-button,
+  .scoreboard-presentation-control { transition: none; }
+}

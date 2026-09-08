@@ -20,6 +20,160 @@
     window.setTimeout(() => alert.remove(), Number.isFinite(delay) && delay >= 0 ? delay : 5000);
   });
 
+  const scoreboardPresentationFrame = body.matches('[data-scoreboard-presentation-frame]');
+  const scoreboardPresentationStage = document.querySelector('[data-scoreboard-presentation-stage]');
+  const scoreboardPresentButton = document.querySelector('[data-scoreboard-present]');
+  const scoreboardExitPresentationButton = document.querySelector('[data-scoreboard-exit-presentation]');
+  const scoreboardResumeFullscreenButton = document.querySelector('[data-scoreboard-resume-fullscreen]');
+  const scoreboardPresentationIframe = document.querySelector('[data-scoreboard-presentation-iframe]');
+  const SCOREBOARD_PRESENTATION_KEY = 'tallytech.scoreboardPresentation.v1';
+  let scoreboardPresentationActive = false;
+  let scoreboardHadNativeFullscreen = false;
+  let scoreboardClosingPresentation = false;
+
+  const readScoreboardPresentationPreference = () => {
+    try {
+      return window.localStorage.getItem(SCOREBOARD_PRESENTATION_KEY) === '1';
+    } catch (_) {
+      return false;
+    }
+  };
+
+  const persistScoreboardPresentationPreference = (enabled) => {
+    try {
+      window.localStorage.setItem(SCOREBOARD_PRESENTATION_KEY, enabled ? '1' : '0');
+    } catch (_) {
+      // Presentation mode remains available for the current page without storage.
+    }
+  };
+
+  const scoreboardFullscreenElement = () => document.fullscreenElement || document.webkitFullscreenElement || null;
+
+  const requestScoreboardFullscreen = async () => {
+    const root = document.documentElement;
+    const request = root.requestFullscreen || root.webkitRequestFullscreen;
+    if (typeof request !== 'function') {
+      if (scoreboardResumeFullscreenButton) scoreboardResumeFullscreenButton.hidden = true;
+      return false;
+    }
+
+    try {
+      await request.call(root);
+      scoreboardHadNativeFullscreen = true;
+      if (scoreboardResumeFullscreenButton) scoreboardResumeFullscreenButton.hidden = true;
+      return true;
+    } catch (_) {
+      if (scoreboardResumeFullscreenButton) scoreboardResumeFullscreenButton.hidden = false;
+      return false;
+    }
+  };
+
+  const exitScoreboardFullscreen = async () => {
+    const exit = document.exitFullscreen || document.webkitExitFullscreen;
+    if (!scoreboardFullscreenElement() || typeof exit !== 'function') return;
+    try {
+      await exit.call(document);
+    } catch (_) {
+      // The presentation shell is still closed even if the browser rejects exitFullscreen().
+    }
+  };
+
+  const buildScoreboardPresentationUrl = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('presentation', '1');
+    url.hash = '';
+    return url.toString();
+  };
+
+  const announceScoreboardPresentationChange = () => {
+    document.dispatchEvent(new CustomEvent('scoreboard:presentationchange', {
+      detail: { active: scoreboardPresentationActive },
+    }));
+  };
+
+  const showScoreboardPresentation = ({ requestFullscreen = false, persist = true } = {}) => {
+    if (scoreboardPresentationFrame || !scoreboardPresentationStage || !scoreboardPresentationIframe) return;
+
+    scoreboardPresentationActive = true;
+    body.classList.add('is-scoreboard-presentation');
+    scoreboardPresentationStage.hidden = false;
+    if (!scoreboardPresentationIframe.src) scoreboardPresentationIframe.src = buildScoreboardPresentationUrl();
+    if (persist) persistScoreboardPresentationPreference(true);
+    if (scoreboardResumeFullscreenButton) scoreboardResumeFullscreenButton.hidden = Boolean(scoreboardFullscreenElement());
+    announceScoreboardPresentationChange();
+
+    if (requestFullscreen) requestScoreboardFullscreen();
+  };
+
+  const hideScoreboardPresentation = ({ persist = true, exitFullscreen = true } = {}) => {
+    if (scoreboardPresentationFrame || !scoreboardPresentationStage) return;
+
+    scoreboardClosingPresentation = true;
+    scoreboardPresentationActive = false;
+    body.classList.remove('is-scoreboard-presentation');
+    scoreboardPresentationStage.hidden = true;
+    if (scoreboardPresentationIframe) scoreboardPresentationIframe.removeAttribute('src');
+    if (scoreboardResumeFullscreenButton) scoreboardResumeFullscreenButton.hidden = true;
+    if (persist) persistScoreboardPresentationPreference(false);
+    announceScoreboardPresentationChange();
+
+    if (exitFullscreen) exitScoreboardFullscreen().finally(() => {
+      scoreboardClosingPresentation = false;
+      scoreboardHadNativeFullscreen = false;
+    });
+    else {
+      scoreboardClosingPresentation = false;
+      scoreboardHadNativeFullscreen = false;
+    }
+  };
+
+  if (!scoreboardPresentationFrame && scoreboardPresentationStage) {
+    scoreboardPresentButton?.addEventListener('click', () => showScoreboardPresentation({ requestFullscreen: true }));
+    scoreboardExitPresentationButton?.addEventListener('click', () => hideScoreboardPresentation());
+    scoreboardResumeFullscreenButton?.addEventListener('click', requestScoreboardFullscreen);
+
+    const syncScoreboardFullscreenState = () => {
+      const isFullscreen = Boolean(scoreboardFullscreenElement());
+      if (isFullscreen) {
+        scoreboardHadNativeFullscreen = true;
+        if (scoreboardResumeFullscreenButton) scoreboardResumeFullscreenButton.hidden = true;
+        return;
+      }
+
+      if (scoreboardPresentationActive && scoreboardHadNativeFullscreen && !scoreboardClosingPresentation) {
+        hideScoreboardPresentation({ exitFullscreen: false });
+        return;
+      }
+
+      if (scoreboardPresentationActive && scoreboardResumeFullscreenButton) {
+        scoreboardResumeFullscreenButton.hidden = false;
+      }
+    };
+
+    document.addEventListener('fullscreenchange', syncScoreboardFullscreenState);
+    document.addEventListener('webkitfullscreenchange', syncScoreboardFullscreenState);
+
+    if (readScoreboardPresentationPreference()) {
+      showScoreboardPresentation({ requestFullscreen: true, persist: false });
+    }
+  }
+
+  const scoreboardRefreshMeta = document.querySelector('[data-scoreboard-refresh]');
+  if (scoreboardRefreshMeta) {
+    const configuredSeconds = Number.parseInt(scoreboardRefreshMeta.getAttribute('content') || '30', 10);
+    const refreshMs = (Number.isFinite(configuredSeconds) && configuredSeconds >= 5 ? configuredSeconds : 30) * 1000;
+    const scheduleScoreboardRefresh = () => {
+      window.setTimeout(() => {
+        if (document.visibilityState === 'visible' && !scoreboardPresentationActive) {
+          window.location.reload();
+          return;
+        }
+        scheduleScoreboardRefresh();
+      }, refreshMs);
+    };
+    scheduleScoreboardRefresh();
+  }
+
   const scoreboardSportNav = document.querySelector('[data-scoreboard-sport-nav]');
   if (scoreboardSportNav) {
     const sportLinks = Array.from(scoreboardSportNav.querySelectorAll('[data-scoreboard-sport-link]'));
@@ -97,7 +251,7 @@
 
     const scheduleSportRotation = () => {
       stopSportRotation();
-      if (!autoRotateEnabled || sportLinks.length < 2 || document.visibilityState === 'hidden') {
+      if (!autoRotateEnabled || sportLinks.length < 2 || document.visibilityState === 'hidden' || scoreboardPresentationActive) {
         updateRotationUi();
         return;
       }
@@ -121,6 +275,7 @@
       if (document.visibilityState === 'hidden') stopSportRotation();
       else scheduleSportRotation();
     });
+    document.addEventListener('scoreboard:presentationchange', scheduleSportRotation);
     sportLinks.forEach((link) => link.addEventListener('click', stopSportRotation));
     scheduleSportRotation();
   }

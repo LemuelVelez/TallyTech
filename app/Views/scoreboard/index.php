@@ -2,6 +2,7 @@
 $hasActiveEvent = ! empty($activeEvent);
 $sportGroups = $sportScoreTable['sportGroups'] ?? [];
 $selectedSportIds = array_map('intval', $sportScoreTable['selectedSportIds'] ?? []);
+$presentationFrame = (string) service('request')->getGet('presentation') === '1';
 
 $bracketsByCategory = [];
 foreach ($schedules as $schedule) {
@@ -40,18 +41,20 @@ $jsVersion = $assetVersion('assets/js/app.js');
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-    <meta http-equiv="refresh" content="30">
+    <meta name="tallytech-scoreboard-refresh" content="30" data-scoreboard-refresh>
     <meta name="theme-color" content="#061b3a">
     <title>Live Scoreboard · TallyTech</title>
     <link rel="icon" type="image/png" href="<?= base_url('logo.png') ?>">
     <link rel="stylesheet" href="<?= esc(base_url('assets/css/app.css') . '?v=' . rawurlencode($cssVersion), 'attr') ?>">
 </head>
-<body class="viewer-page">
+<body class="viewer-page<?= $presentationFrame ? ' viewer-page--presentation-frame' : '' ?>"<?= $presentationFrame ? ' data-scoreboard-presentation-frame="true"' : '' ?>>
+<?php if (! $presentationFrame): ?>
 <a class="skip-link" href="#scoreboard-content">Skip to scoreboard content</a>
 <header class="viewer-nav">
     <a class="viewer-brand" href="<?= site_url('scoreboard') ?>"><img src="<?= base_url('assets/img/logo.png') ?>" alt="TallyTech"><b>TallyTech</b></a>
     <div><span><?= $hasActiveEvent ? 'LIVE' : 'IDLE' ?></span><a href="<?= site_url('login') ?>" class="btn viewer-login"><?= ui_icon('log-in') ?><span>Login</span></a></div>
 </header>
+<?php endif; ?>
 
 <main id="scoreboard-content">
     <section class="score-hero score-hero--bracket" aria-labelledby="live-scoreboard-title">
@@ -62,6 +65,15 @@ $jsVersion = $assetVersion('assets/js/app.js');
                 <p><?= $selectedSport ? esc($selectedSport['name']) : 'Select a sport to view its live tournament bracket.' ?></p>
                 <small><?= $hasActiveEvent ? 'Validated results automatically update bracket progression, standings, and overall sport points.' : 'Brackets will appear when an event is activated.' ?></small>
             </div>
+
+            <?php if (! $presentationFrame): ?>
+                <div class="scoreboard-presentation-launch">
+                    <button type="button" class="scoreboard-present-button" data-scoreboard-present aria-label="Present the live scoreboard in fullscreen">
+                        <?= ui_icon('play-circle') ?>
+                        <span>Present</span>
+                    </button>
+                </div>
+            <?php endif; ?>
 
             <div class="score-hero-rotation" data-scoreboard-rotation-ui hidden>
                 <div class="score-hero-rotation-countdown" data-scoreboard-rotation-status>
@@ -78,7 +90,8 @@ $jsVersion = $assetVersion('assets/js/app.js');
             <nav class="score-hero-sports sport-chip-row" aria-label="Choose sport" data-scoreboard-sport-nav data-auto-rotate-ms="15000">
                 <?php foreach ($sportGroups as $sportGroup): ?>
                     <?php $active = in_array((int) $sportGroup['id'], $selectedSportIds, true); ?>
-                    <a class="chip sport-chip <?= $active ? 'active' : '' ?>" data-scoreboard-sport-link href="<?= esc(site_url('scoreboard') . '?sport=' . (int) $sportGroup['id'], 'attr') ?>" <?= $active ? 'aria-current="page"' : '' ?>><?= esc($sportGroup['name']) ?></a>
+                    <?php $sportHref = site_url('scoreboard') . '?sport=' . (int) $sportGroup['id'] . ($presentationFrame ? '&presentation=1' : ''); ?>
+                    <a class="chip sport-chip <?= $active ? 'active' : '' ?>" data-scoreboard-sport-link href="<?= esc($sportHref, 'attr') ?>" <?= $active ? 'aria-current="page"' : '' ?>><?= esc($sportGroup['name']) ?></a>
                 <?php endforeach; ?>
                 <?php if (empty($sportGroups)): ?><span class="score-hero-empty">No sports are configured for the active event.</span><?php endif; ?>
             </nav>
@@ -108,6 +121,7 @@ $jsVersion = $assetVersion('assets/js/app.js');
         </div>
     </section>
 
+    <?php if (! $presentationFrame): ?>
     <div class="viewer-content scoreboard-below-bracket">
         <?php if ($selectedSport): ?>
             <div class="viewer-columns scoreboard-detail-columns">
@@ -147,8 +161,24 @@ $jsVersion = $assetVersion('assets/js/app.js');
             <section class="viewer-panel"><div class="empty">No sports are configured for the active event.</div></section>
         <?php endif; ?>
     </div>
+    <?php endif; ?>
 </main>
+<?php if (! $presentationFrame): ?>
 <footer class="viewer-footer">© 2026 TallyTech · Intramural Sports Festival Management System</footer>
+<div class="scoreboard-presentation-stage" data-scoreboard-presentation-stage hidden aria-label="Live scoreboard presentation">
+    <iframe data-scoreboard-presentation-iframe title="Live scoreboard presentation" allow="fullscreen" allowfullscreen></iframe>
+    <div class="scoreboard-presentation-stage-controls" aria-label="Presentation controls">
+        <button type="button" class="scoreboard-presentation-control" data-scoreboard-resume-fullscreen hidden>
+            <?= ui_icon('play-circle') ?>
+            <span>Fullscreen</span>
+        </button>
+        <button type="button" class="scoreboard-presentation-control scoreboard-presentation-control--exit" data-scoreboard-exit-presentation>
+            <?= ui_icon('x') ?>
+            <span>Exit presentation</span>
+        </button>
+    </div>
+</div>
+<?php endif; ?>
 <script src="<?= esc(base_url('assets/js/app.js') . '?v=' . rawurlencode($jsVersion), 'attr') ?>"></script>
 </body>
 </html>
