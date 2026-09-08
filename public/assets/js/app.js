@@ -20,6 +20,40 @@
     window.setTimeout(() => alert.remove(), Number.isFinite(delay) && delay >= 0 ? delay : 5000);
   });
 
+  const scoreboardSportNav = document.querySelector('[data-scoreboard-sport-nav]');
+  if (scoreboardSportNav) {
+    const sportLinks = Array.from(scoreboardSportNav.querySelectorAll('[data-scoreboard-sport-link]'));
+    const configuredDelay = Number.parseInt(scoreboardSportNav.dataset.autoRotateMs || '15000', 10);
+    const rotateDelay = Number.isFinite(configuredDelay) && configuredDelay >= 3000 ? configuredDelay : 15000;
+    let sportRotateTimer = null;
+
+    const stopSportRotation = () => {
+      if (sportRotateTimer !== null) {
+        window.clearTimeout(sportRotateTimer);
+        sportRotateTimer = null;
+      }
+    };
+
+    const scheduleSportRotation = () => {
+      stopSportRotation();
+      if (sportLinks.length < 2 || document.visibilityState === 'hidden') return;
+
+      sportRotateTimer = window.setTimeout(() => {
+        const currentIndex = sportLinks.findIndex((link) => link.matches('[aria-current=\"page\"], .active'));
+        const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % sportLinks.length : 0;
+        const nextLink = sportLinks[nextIndex];
+        if (nextLink?.href) window.location.assign(nextLink.href);
+      }, rotateDelay);
+    };
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') stopSportRotation();
+      else scheduleSportRotation();
+    });
+    sportLinks.forEach((link) => link.addEventListener('click', stopSportRotation));
+    scheduleSportRotation();
+  }
+
   const setNavigation = (open) => {
     body.classList.toggle('nav-open', open);
     navToggle?.setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -792,12 +826,53 @@
     const bracketZoomMax = 2.5;
     const bracketZoomDefault = 0.5;
     const bracketZoomStep = 0.1;
+    const bracketZoomStoragePrefix = 'tallytech.bracketZoom.v1';
+    const bracketComponents = Array.from(document.querySelectorAll('[data-bracket-component]'));
     const bracketFrames = new Map();
     const bracketTrailingTimers = new WeakMap();
+    const bracketZoomStorageKeys = new WeakMap();
+    const bracketZoomPersistTimers = new WeakMap();
     const clampBracketZoom = (value) => {
       const parsed = Number.parseFloat(value);
       const safeValue = Number.isFinite(parsed) ? parsed : bracketZoomDefault;
       return Math.min(bracketZoomMax, Math.max(bracketZoomMin, safeValue));
+    };
+
+    const bracketZoomStorageKey = (component, scroll, index) => {
+      const variant = component.classList.contains('tt-bracket-component--management') ? 'management' : 'public';
+      const label = (scroll.getAttribute('aria-label') || `bracket-${index + 1}`).trim();
+      return `${bracketZoomStoragePrefix}:${variant}:${label}`;
+    };
+
+    const storedBracketZoom = (key) => {
+      try {
+        const stored = window.localStorage.getItem(key);
+        if (stored === null) return null;
+        const parsed = Number.parseFloat(stored);
+        return Number.isFinite(parsed) ? clampBracketZoom(parsed) : null;
+      } catch (_) {
+        return null;
+      }
+    };
+
+    const persistBracketZoom = (component, zoom, immediate = false) => {
+      const key = bracketZoomStorageKeys.get(component);
+      if (!key) return;
+
+      const currentTimer = bracketZoomPersistTimers.get(component);
+      if (currentTimer) window.clearTimeout(currentTimer);
+
+      const write = () => {
+        bracketZoomPersistTimers.delete(component);
+        try {
+          window.localStorage.setItem(key, String(clampBracketZoom(zoom)));
+        } catch (_) {
+          // Zoom remains usable when browser storage is unavailable.
+        }
+      };
+
+      if (immediate) write();
+      else bracketZoomPersistTimers.set(component, window.setTimeout(write, 150));
     };
 
     const syncBracketShell = (board) => {
@@ -836,7 +911,7 @@
       offsetY: scroll.clientHeight / 2,
     });
 
-    const setBracketZoom = (component, requestedZoom, anchor = null) => {
+    const setBracketZoom = (component, requestedZoom, anchor = null, persist = true) => {
       const board = component.querySelector('[data-bracket-board]');
       const scroll = component.querySelector('[data-bracket-scroll]');
       if (!board || !scroll) return 1;
@@ -862,15 +937,19 @@
       if (value) value.textContent = `${Math.round(zoom * 100)}%`;
       if (zoomOut) zoomOut.disabled = zoom <= bracketZoomMin + 0.0001;
       if (zoomIn) zoomIn.disabled = zoom >= bracketZoomMax - 0.0001;
+      if (persist) persistBracketZoom(component, zoom);
       redrawBracket(board);
       return zoom;
     };
 
-    document.querySelectorAll('[data-bracket-component]').forEach((component) => {
+    bracketComponents.forEach((component, componentIndex) => {
       const board = component.querySelector('[data-bracket-board]');
       const scroll = component.querySelector('[data-bracket-scroll]');
       if (!board || !scroll) return;
 
+      const storageKey = bracketZoomStorageKey(component, scroll, componentIndex);
+      bracketZoomStorageKeys.set(component, storageKey);
+      const initialZoom = storedBracketZoom(storageKey) ?? bracketZoomDefault;
       const currentZoom = () => currentBracketZoom(board);
       const steppedZoom = (direction) => Math.round((currentZoom() + (direction * bracketZoomStep)) * 10) / 10;
       const centeredAnchor = () => centerBracketAnchor(scroll);
@@ -1014,7 +1093,14 @@
       scroll.addEventListener('gesturestart', preventSafariGestureZoom, { passive: false });
       scroll.addEventListener('gesturechange', preventSafariGestureZoom, { passive: false });
 
-      setBracketZoom(component, bracketZoomDefault);
+      setBracketZoom(component, initialZoom, null, false);
+    });
+
+    window.addEventListener('pagehide', () => {
+      bracketComponents.forEach((component) => {
+        const board = component.querySelector('[data-bracket-board]');
+        if (board) persistBracketZoom(component, currentBracketZoom(board), true);
+      });
     });
 
     bracketBoards.forEach((board) => {

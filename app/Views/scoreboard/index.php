@@ -63,10 +63,10 @@ $jsVersion = $assetVersion('assets/js/app.js');
                 <small><?= $hasActiveEvent ? 'Validated results automatically update bracket progression, standings, and overall sport points.' : 'Brackets will appear when an event is activated.' ?></small>
             </div>
 
-            <nav class="score-hero-sports sport-chip-row" aria-label="Choose sport">
+            <nav class="score-hero-sports sport-chip-row" aria-label="Choose sport" data-scoreboard-sport-nav data-auto-rotate-ms="15000">
                 <?php foreach ($sportGroups as $sportGroup): ?>
                     <?php $active = in_array((int) $sportGroup['id'], $selectedSportIds, true); ?>
-                    <a class="chip sport-chip <?= $active ? 'active' : '' ?>" href="<?= esc(site_url('scoreboard') . '?sport=' . (int) $sportGroup['id'], 'attr') ?>" <?= $active ? 'aria-current="page"' : '' ?>><?= esc($sportGroup['name']) ?></a>
+                    <a class="chip sport-chip <?= $active ? 'active' : '' ?>" data-scoreboard-sport-link href="<?= esc(site_url('scoreboard') . '?sport=' . (int) $sportGroup['id'], 'attr') ?>" <?= $active ? 'aria-current="page"' : '' ?>><?= esc($sportGroup['name']) ?></a>
                 <?php endforeach; ?>
                 <?php if (empty($sportGroups)): ?><span class="score-hero-empty">No sports are configured for the active event.</span><?php endif; ?>
             </nav>
