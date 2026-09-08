@@ -4,5 +4,5 @@ use CodeIgniter\Model;
 class TeamModel extends Model
 {
     protected $table='teams'; protected $primaryKey='id'; protected $returnType='array';
-    protected $allowedFields=['name','code','created_at'];
+    protected $allowedFields=['name','code','avatar_path','created_at'];
 }

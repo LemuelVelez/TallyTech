@@ -41,9 +41,9 @@ WORKDIR /var/www/html
 COPY . .
 COPY --from=vendor /app/vendor ./vendor
 
-RUN mkdir -p writable/cache writable/debugbar writable/logs writable/session writable/uploads \
-    && chown -R www-data:www-data writable \
-    && chmod -R 775 writable
+RUN mkdir -p writable/cache writable/debugbar writable/logs writable/session writable/uploads public/uploads/team-avatars \
+    && chown -R www-data:www-data writable public/uploads/team-avatars \
+    && chmod -R 775 writable public/uploads/team-avatars
 
 ENV CI_ENVIRONMENT=production
 

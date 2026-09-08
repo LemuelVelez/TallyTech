@@ -26,8 +26,8 @@ interface ScoringRepositoryInterface
     public function reportSummary(?int $eventId = null): array;
 
     public function createTeam(array $data, int $actorId): int;
-    public function updateTeam(int $id, array $data, int $actorId): void;
-    public function deleteTeam(int $id, int $actorId): void;
+    public function updateTeam(int $id, array $data, int $actorId): ?string;
+    public function deleteTeam(int $id, int $actorId): ?string;
 
     public function createEvent(array $data, int $actorId): int;
     public function updateEvent(int $id, array $data, int $actorId): void;

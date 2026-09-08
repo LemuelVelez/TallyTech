@@ -83,7 +83,6 @@ $matchIcon = static function (array $match, string $side): string {
     return 'play-circle';
 };
 
-// Follow-up: add a team-logo upload migration/field before replacing these deterministic initials marks.
 $teamInitials = static function (string $name): string {
     $name = trim($name);
     if ($name === '') return '—';
@@ -154,6 +153,8 @@ $teamMarkStyle = static function (string $name): string {
                                     $teamBId = ! empty($match['team_b_id']) ? (int) $match['team_b_id'] : null;
                                     $teamALabel = (string) ($match['slot_a_label'] ?? 'TBD');
                                     $teamBLabel = (string) ($match['slot_b_label'] ?? 'TBD');
+                                    $teamAAvatar = trim((string) ($match['slot_a_avatar'] ?? ''));
+                                    $teamBAvatar = trim((string) ($match['slot_b_avatar'] ?? ''));
                                     $scoreA = $scoreFor($match, $teamAId);
                                     $scoreB = $scoreFor($match, $teamBId);
                                     $isConditional = ! empty($match['is_conditional']);
@@ -188,14 +189,14 @@ $teamMarkStyle = static function (string $name): string {
                                         <?php else: ?>
                                             <div class="bracket-team tt-bracket-slot <?= $winner !== '' && $winner === $teamALabel ? 'winner' : '' ?>">
                                                 <span class="tt-bracket-team-main">
-                                                    <span class="tt-bracket-team-mark" style="<?= esc($teamMarkStyle($teamALabel), 'attr') ?>" aria-hidden="true"><?= esc($teamInitials($teamALabel)) ?></span>
+                                                    <span class="tt-bracket-team-mark" style="<?= esc($teamMarkStyle($teamALabel), 'attr') ?>" aria-hidden="true"><?php if ($teamAAvatar !== ''): ?><img src="<?= esc(base_url($teamAAvatar), 'attr') ?>" loading="lazy" decoding="async" width="24" height="24" alt=""><?php else: ?><?= esc($teamInitials($teamALabel)) ?><?php endif; ?></span>
                                                     <span class="tt-bracket-team-name"><span><?= esc($teamALabel) ?></span></span>
                                                 </span>
                                                 <b class="tt-bracket-score"><?= $scoreA !== '' ? esc($scoreA) : '<span aria-hidden="true">—</span>' ?></b>
                                             </div>
                                             <div class="bracket-team tt-bracket-slot <?= $winner !== '' && $winner === $teamBLabel ? 'winner' : '' ?>">
                                                 <span class="tt-bracket-team-main">
-                                                    <span class="tt-bracket-team-mark" style="<?= esc($teamMarkStyle($teamBLabel), 'attr') ?>" aria-hidden="true"><?= esc($teamInitials($teamBLabel)) ?></span>
+                                                    <span class="tt-bracket-team-mark" style="<?= esc($teamMarkStyle($teamBLabel), 'attr') ?>" aria-hidden="true"><?php if ($teamBAvatar !== ''): ?><img src="<?= esc(base_url($teamBAvatar), 'attr') ?>" loading="lazy" decoding="async" width="24" height="24" alt=""><?php else: ?><?= esc($teamInitials($teamBLabel)) ?><?php endif; ?></span>
                                                     <span class="tt-bracket-team-name"><span><?= esc($teamBLabel) ?></span></span>
                                                 </span>
                                                 <b class="tt-bracket-score"><?= $scoreB !== '' ? esc($scoreB) : '<span aria-hidden="true">—</span>' ?></b>

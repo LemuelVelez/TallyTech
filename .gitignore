@@ -124,3 +124,8 @@ _modules/*
 
 /results/
 /phpunit.xml
+# Team avatar uploads
+/public/uploads/team-avatars/*
+!/public/uploads/team-avatars/.gitkeep
+!/public/uploads/team-avatars/.htaccess
+

@@ -113,7 +113,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
     public function schedules(?int $eventId = null, ?string $resultType = null): array
     {
         $builder = $this->db->table('schedules sc')
-            ->select('sc.*, s.name sport_name, s.category, s.result_type, s.set_count, s.winning_points, l.name location_name, ta.name team_a_name, tb.name team_b_name')
+            ->select('sc.*, s.name sport_name, s.category, s.result_type, s.set_count, s.winning_points, l.name location_name, ta.name team_a_name, ta.avatar_path team_a_avatar, tb.name team_b_name, tb.avatar_path team_b_avatar')
             ->join('sports s', 's.id=sc.sport_id')
             ->join('locations l', 'l.id=sc.location_id', 'left')
             ->join('teams ta', 'ta.id=sc.team_a_id', 'left')
@@ -275,16 +275,18 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         return $id;
     }
 
-    public function updateTeam(int $id, array $data, int $actorId): void
+    public function updateTeam(int $id, array $data, int $actorId): ?string
     {
         $team = $this->requireRow('teams', $id, 'Team');
         $this->db->transStart();
         $this->teamsModel->update($id, $data);
         $this->notify($actorId, 'team_updated', 'Updated team ' . ($team['name'] ?? '#'.$id) . ' to ' . $data['name']);
         $this->finishTransaction();
+        $avatarPath = trim((string) ($team['avatar_path'] ?? ''));
+        return $avatarPath !== '' ? $avatarPath : null;
     }
 
-    public function deleteTeam(int $id, int $actorId): void
+    public function deleteTeam(int $id, int $actorId): ?string
     {
         $team = $this->requireRow('teams', $id, 'Team');
         $inUse = $this->db->table('schedules')->groupStart()->where('team_a_id', $id)->orWhere('team_b_id', $id)->groupEnd()->countAllResults();
@@ -296,6 +298,8 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         $this->teamsModel->delete($id);
         $this->notify($actorId, 'team_deleted', 'Removed team ' . ($team['name'] ?? '#'.$id));
         $this->finishTransaction();
+        $avatarPath = trim((string) ($team['avatar_path'] ?? ''));
+        return $avatarPath !== '' ? $avatarPath : null;
     }
 
     public function createEvent(array $data, int $actorId): int
@@ -1124,8 +1128,12 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             }
             foreach (['a', 'b'] as $slot) {
                 $teamKey = 'team_' . $slot . '_name';
+                $avatarKey = 'team_' . $slot . '_avatar';
+                $row['slot_' . $slot . '_avatar'] = null;
                 if (! empty($row[$teamKey])) {
                     $row['slot_' . $slot . '_label'] = (string) $row[$teamKey];
+                    $avatarPath = trim((string) ($row[$avatarKey] ?? ''));
+                    $row['slot_' . $slot . '_avatar'] = $avatarPath !== '' ? $avatarPath : null;
                     continue;
                 }
 

@@ -1468,6 +1468,7 @@ input[type="checkbox"], input[type="radio"] { width: 18px; min-height: 18px; hei
   font-weight: 900;
   letter-spacing: .02em;
 }
+.tt-bracket-team-mark img { width: 100%; height: 100%; object-fit: cover; border-radius: 3px; display: block; }
 .tt-bracket-team-name {
   min-width: 0;
   overflow-wrap: anywhere;
