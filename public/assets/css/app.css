@@ -1978,6 +1978,15 @@ input[type="checkbox"], input[type="radio"] { width: 18px; min-height: 18px; hei
   background: #061b3a;
   scrollbar-color: var(--accent) #061b3a;
 }
+.scoreboard-presentation-html body {
+  width: 100%;
+  min-width: 100%;
+  max-width: none;
+  margin: 0;
+  background: #061b3a;
+  overflow-x: hidden;
+  scrollbar-gutter: auto;
+}
 .scoreboard-presentation-html::-webkit-scrollbar-track,
 .scoreboard-presentation-html body::-webkit-scrollbar-track {
   background: #061b3a;
@@ -2023,11 +2032,27 @@ input[type="checkbox"], input[type="radio"] { width: 18px; min-height: 18px; hei
   outline: 3px solid #ffce25;
   outline-offset: 3px;
 }
-body.is-scoreboard-presentation { overflow: hidden; }
+/* Remove the reserved browser scrollbar gutter while the presentation shell is open. */
+html:has(body.is-scoreboard-presentation) {
+  overflow: hidden;
+  scrollbar-gutter: auto;
+  background: #061b3a;
+}
+body.is-scoreboard-presentation {
+  width: 100vw;
+  min-width: 100vw;
+  max-width: 100vw;
+  overflow: hidden;
+  background: #061b3a;
+}
 .scoreboard-presentation-stage {
   position: fixed;
-  inset: 0;
+  inset: 0 auto auto 0;
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
   z-index: 1000;
+  overflow: hidden;
   background: #061b3a;
 }
 .scoreboard-presentation-stage[hidden] { display: none; }
