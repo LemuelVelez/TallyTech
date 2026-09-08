@@ -1120,3 +1120,32 @@ input[type="checkbox"], input[type="radio"] { width: 18px; min-height: 18px; hei
   .sport-filter-form { align-items: stretch; }
   .sport-filter-form select { width: 100%; min-width: 0; }
 }
+
+/* Shared sport score table */
+.sport-chip-row { display: flex; align-items: center; gap: 8px; overflow-x: auto; padding: 2px 1px 7px; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+.sport-chip { flex: 0 0 auto; min-height: 38px; padding: 0.55rem 0.9rem; border: 1px solid #d7e1ec; background: #f8fafc; color: #445164; font-weight: 800; text-decoration: none; }
+.sport-chip:hover { border-color: #aebfd1; background: #fff; }
+.sport-chip.active { border-color: var(--accent); background: #ecfdf3; color: var(--accent-dark); box-shadow: inset 0 0 0 1px var(--accent); }
+.sport-score-table-panel { margin-bottom: 22px; }
+.score-thresholds { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+.score-threshold { display: inline-flex; align-items: center; gap: 4px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 999px; background: #f8fafc; color: #5f6b7a; font-size: 0.78rem; }
+.sport-score-table { min-width: 760px !important; }
+.sport-score-table th:not(:first-child), .sport-score-table td:not(:first-child) { text-align: center; }
+.sport-score-table td:nth-child(2) { min-width: 190px; text-align: left; }
+.sport-score-table td:nth-child(2) small { display: block; margin-top: 3px; }
+.sport-category-cell { min-width: 105px; vertical-align: middle; background: #f8fafc; }
+.bracket-category-block + .bracket-category-block { margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--line); }
+.bracket-category-title { margin-bottom: 8px; }
+.bracket-category-title h3 { margin: 0; font-size: 0.95rem; }
+.conditional-badge { justify-self: start; }
+.judged-championship-card { min-width: 280px; max-width: 340px; }
+.match-set-row { margin-bottom: 10px; }
+
+@media (max-width: 640px) {
+  .sport-chip-row { margin-inline: -2px; }
+  .sport-chip { min-height: 42px; padding-inline: 0.85rem; }
+  .score-thresholds { display: grid; }
+  .score-threshold { border-radius: 10px; line-height: 1.35; }
+  .sport-score-table { min-width: 680px !important; }
+  .judged-championship-card { min-width: 230px; }
+}

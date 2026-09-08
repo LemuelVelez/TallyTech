@@ -113,7 +113,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
     public function schedules(?int $eventId = null, ?string $resultType = null): array
     {
         $builder = $this->db->table('schedules sc')
-            ->select('sc.*, s.name sport_name, s.category, s.result_type, l.name location_name, ta.name team_a_name, tb.name team_b_name')
+            ->select('sc.*, s.name sport_name, s.category, s.result_type, s.set_count, s.winning_points, l.name location_name, ta.name team_a_name, tb.name team_b_name')
             ->join('sports s', 's.id=sc.sport_id')
             ->join('locations l', 'l.id=sc.location_id', 'left')
             ->join('teams ta', 'ta.id=sc.team_a_id', 'left')
@@ -186,7 +186,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
     public function results(?int $eventId = null, ?string $type = null): array
     {
         $builder = $this->db->table('results r')
-            ->select('r.*, sc.sport_id, sc.team_a_id, sc.team_b_id, sc.round, sc.tournament_format, sc.match_code, sc.phase, sc.bracket_side, sc.court_label, sc.match_date, s.name sport_name, s.category, s.result_type, l.name location_name, u.display_name submitted_by_name, v.display_name validated_by_name')
+            ->select('r.*, sc.sport_id, sc.team_a_id, sc.team_b_id, sc.round, sc.tournament_format, sc.match_code, sc.phase, sc.bracket_side, sc.court_label, sc.match_date, s.name sport_name, s.category, s.result_type, s.set_count, s.winning_points, l.name location_name, u.display_name submitted_by_name, v.display_name validated_by_name')
             ->join('schedules sc', 'sc.id=r.schedule_id')
             ->join('sports s', 's.id=sc.sport_id')
             ->join('locations l', 'l.id=sc.location_id', 'left')
@@ -1008,7 +1008,10 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
     public function getUserSettings(int $userId): array
     {
         $rows = $this->db->table('user_settings')->where('user_id', $userId)->get()->getResultArray();
-        $settings = [];
+        $settings = [
+            'compact_sidebar' => '0',
+            'result_density' => 'comfortable',
+        ];
         foreach ($rows as $row) {
             $settings[$row['setting_key']] = $row['setting_value'];
         }
@@ -1111,8 +1114,6 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
 
     public function resolveBracketSlots(array $schedules): array
     {
-        $byCode = [];
-        foreach ($schedules as $row) { if (! empty($row['match_code'])) $byCode[$row['match_code']] = $row; }
         foreach ($schedules as &$row) {
             $round = strtolower((string) ($row['round'] ?? ''));
             if (empty($row['phase'])) {
@@ -1121,11 +1122,23 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             if (empty($row['bracket_side'])) {
                 $row['bracket_side'] = str_contains($round, 'final') || str_contains($round, 'championship') ? 'grand' : 'upper';
             }
-            foreach (['a','b'] as $slot) {
-                $teamKey = 'team_'.$slot.'_name';
-                $row['slot_'.$slot.'_label'] = ! empty($row[$teamKey]) ? (string) $row[$teamKey] : 'TBD';
+            foreach (['a', 'b'] as $slot) {
+                $teamKey = 'team_' . $slot . '_name';
+                if (! empty($row[$teamKey])) {
+                    $row['slot_' . $slot . '_label'] = (string) $row[$teamKey];
+                    continue;
+                }
+
+                $sourceCode = strtoupper(trim((string) ($row['feeds_from_' . $slot] ?? '')));
+                $sourceType = strtolower(trim((string) ($row['feeds_from_' . $slot . '_type'] ?? '')));
+                if ($sourceCode !== '' && in_array($sourceType, ['winner', 'loser'], true)) {
+                    $row['slot_' . $slot . '_label'] = ucfirst($sourceType) . ' of ' . $sourceCode;
+                } else {
+                    $row['slot_' . $slot . '_label'] = 'TBD';
+                }
             }
         }
+        unset($row);
         return $schedules;
     }
 
@@ -1230,12 +1243,12 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         if (count($entries) !== 2) {
             return;
         }
-        usort($entries, static fn(array $a, array $b): int => (float) $b['raw_score'] <=> (float) $a['raw_score']);
-        if ((float) $entries[0]['raw_score'] === (float) $entries[1]['raw_score']) {
+        $outcome = $this->matchOutcome($entries);
+        if ($outcome === null) {
             return;
         }
-        $winnerId = (int) $entries[0]['team_id'];
-        $loserId = (int) $entries[1]['team_id'];
+        $winnerId = (int) $outcome['winner']['team_id'];
+        $loserId = (int) $outcome['loser']['team_id'];
 
         $targets = $this->db->table('schedules')
             ->where('event_id', $result['event_id'])
@@ -1362,7 +1375,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
     private function resultSchedule(int $scheduleId): array
     {
         $schedule = $this->db->table('schedules sc')
-            ->select('sc.*, s.result_type, s.name sport_name')
+            ->select('sc.*, s.result_type, s.name sport_name, s.category, s.set_count, s.winning_points')
             ->join('sports s', 's.id=sc.sport_id')
             ->where('sc.id', $scheduleId)
             ->get()->getRowArray();
@@ -1375,7 +1388,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
     private function resultWithSchedule(int $resultId): array
     {
         $result = $this->db->table('results r')
-            ->select('r.*, sc.sport_id, sc.team_a_id, sc.team_b_id, sc.round, sc.tournament_format, sc.match_code, sc.phase, sc.bracket_side, sc.is_conditional, sc.match_date, s.result_type, s.name sport_name')
+            ->select('r.*, sc.sport_id, sc.team_a_id, sc.team_b_id, sc.round, sc.tournament_format, sc.match_code, sc.phase, sc.bracket_side, sc.is_conditional, sc.match_date, s.result_type, s.name sport_name, s.category, s.set_count, s.winning_points')
             ->join('schedules sc', 'sc.id=r.schedule_id')
             ->join('sports s', 's.id=sc.sport_id')
             ->where('r.id', $resultId)
@@ -1422,11 +1435,73 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             if (! $scheduleOrResult['team_a_id'] || ! $scheduleOrResult['team_b_id']) {
                 throw new RuntimeException('Match schedules require Team A and Team B.');
             }
-            $scoreA = $this->decimalValue($data['team_a_score'] ?? null, self::MAX_RESULT_SCORE, 'Enter valid non-negative scores for both teams.');
-            $scoreB = $this->decimalValue($data['team_b_score'] ?? null, self::MAX_RESULT_SCORE, 'Enter valid non-negative scores for both teams.');
+
+            $setCount = max(1, min(9, (int) ($scheduleOrResult['set_count'] ?? 1)));
+            $rawSetsA = $data['team_a_sets'] ?? null;
+            $rawSetsB = $data['team_b_sets'] ?? null;
+            $setsA = [];
+            $setsB = [];
+
+            if (is_array($rawSetsA) && is_array($rawSetsB)) {
+                $rawSetsA = array_values($rawSetsA);
+                $rawSetsB = array_values($rawSetsB);
+                $blankReached = false;
+                for ($index = 0; $index < $setCount; $index++) {
+                    $rawA = $rawSetsA[$index] ?? '';
+                    $rawB = $rawSetsB[$index] ?? '';
+                    $blankA = $rawA === '' || $rawA === null;
+                    $blankB = $rawB === '' || $rawB === null;
+
+                    if ($blankA && $blankB) {
+                        $blankReached = true;
+                        continue;
+                    }
+                    if ($blankReached) {
+                        throw new RuntimeException('Set scores must be entered in order without skipping a set.');
+                    }
+                    if ($blankA || $blankB) {
+                        throw new RuntimeException('Enter both team scores for every played set.');
+                    }
+
+                    $scoreA = $this->decimalValue($rawA, self::MAX_RESULT_SCORE, 'Enter valid non-negative set scores for both teams.');
+                    $scoreB = $this->decimalValue($rawB, self::MAX_RESULT_SCORE, 'Enter valid non-negative set scores for both teams.');
+                    if ((float) $scoreA === (float) $scoreB) {
+                        throw new RuntimeException('A played set must have a winner. Enter the official tie-break score.');
+                    }
+                    $setsA[] = $scoreA;
+                    $setsB[] = $scoreB;
+                }
+            }
+
+            if (! $setsA && ! $setsB) {
+                $scoreA = $this->decimalValue($data['team_a_score'] ?? null, self::MAX_RESULT_SCORE, 'Enter valid non-negative scores for both teams.');
+                $scoreB = $this->decimalValue($data['team_b_score'] ?? null, self::MAX_RESULT_SCORE, 'Enter valid non-negative scores for both teams.');
+                if ((float) $scoreA === (float) $scoreB) {
+                    throw new RuntimeException('A match result must have a winner. Enter the official tie-break score.');
+                }
+                $setsA = [$scoreA];
+                $setsB = [$scoreB];
+            }
+
+            $totalA = array_sum(array_map('floatval', $setsA));
+            $totalB = array_sum(array_map('floatval', $setsB));
+            if ($totalA > self::MAX_RESULT_SCORE || $totalB > self::MAX_RESULT_SCORE) {
+                throw new RuntimeException('The total of all set scores must not exceed 99999999.99 for either team.');
+            }
+
             return [
-                ['team_id' => (int) $scheduleOrResult['team_a_id'], 'raw_score' => $scoreA, 'placement' => null],
-                ['team_id' => (int) $scheduleOrResult['team_b_id'], 'raw_score' => $scoreB, 'placement' => null],
+                [
+                    'team_id' => (int) $scheduleOrResult['team_a_id'],
+                    'raw_score' => $totalA,
+                    'set_scores' => json_encode(array_values($setsA), JSON_THROW_ON_ERROR),
+                    'placement' => null,
+                ],
+                [
+                    'team_id' => (int) $scheduleOrResult['team_b_id'],
+                    'raw_score' => $totalB,
+                    'set_scores' => json_encode(array_values($setsB), JSON_THROW_ON_ERROR),
+                    'placement' => null,
+                ],
             ];
         }
 
@@ -1446,7 +1521,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             }
             $value = $this->decimalValue($score, self::MAX_RESULT_SCORE, 'Judged scores must be non-negative numbers with at most 2 decimal places.');
             $this->requireRow('teams', $teamId, 'Team');
-            $entries[] = ['team_id' => $teamId, 'raw_score' => $value];
+            $entries[] = ['team_id' => $teamId, 'raw_score' => $value, 'set_scores' => null];
         }
         if (! $entries) {
             throw new RuntimeException('Enter at least one judged score.');
@@ -1470,11 +1545,13 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             if (count($entries) !== 2) {
                 throw new RuntimeException('Match results must contain exactly two team scores.');
             }
-            usort($entries, static fn(array $x, array $y): int => (float) $y['raw_score'] <=> (float) $x['raw_score']);
-            if ((float) $entries[0]['raw_score'] === (float) $entries[1]['raw_score']) {
-                throw new RuntimeException('Elimination matches require a winner. Enter the official tie-break result before validation.');
+            $outcome = $this->matchOutcome($entries);
+            if ($outcome === null) {
+                throw new RuntimeException('Elimination matches require a winner by sets won. Enter the official tie-break set before validation.');
             }
 
+            $winnerId = (int) $outcome['winner']['team_id'];
+            $loserId = (int) $outcome['loser']['team_id'];
             $format = (string) ($result['tournament_format'] ?? 'single_elimination');
             $side = (string) ($result['bracket_side'] ?? '');
             $phase = (string) ($result['phase'] ?? '');
@@ -1494,19 +1571,20 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
                 } elseif ($side === 'grand' && $phase === 'tiebreaker') {
                     $championshipMatch = true;
                 } elseif ($side === 'grand' && $phase === 'final') {
-                    $championshipMatch = (int) $entries[0]['team_id'] === (int) ($result['team_a_id'] ?? 0);
+                    $championshipMatch = $winnerId === (int) ($result['team_a_id'] ?? 0);
                 }
             } else {
                 $championshipMatch = $phase === 'final';
             }
 
-            foreach ($entries as $i => $entry) {
+            foreach ($entries as $entry) {
+                $entryTeamId = (int) $entry['team_id'];
                 $placement = null;
                 $points = 0.0;
                 if ($championshipMatch) {
-                    $placement = $i + 1;
+                    $placement = $entryTeamId === $winnerId ? 1 : 2;
                     $points = $this->pointsForPlacement($weightedPoints, $placement);
-                } elseif ($thirdPlaceLoser && $i === 1) {
+                } elseif ($thirdPlaceLoser && $entryTeamId === $loserId) {
                     $placement = 3;
                     $points = $this->pointsForPlacement($weightedPoints, 3);
                 }
@@ -1543,10 +1621,61 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
                 'result_id' => $resultId,
                 'team_id' => $entry['team_id'],
                 'raw_score' => $entry['raw_score'],
+                'set_scores' => $entry['set_scores'] ?? null,
                 'placement' => $entry['placement'] ?? null,
                 'allocated_points' => 0,
             ]);
         }
+    }
+
+    private function matchOutcome(array $entries): ?array
+    {
+        if (count($entries) !== 2) {
+            return null;
+        }
+
+        $setsA = $this->entrySetScores($entries[0]);
+        $setsB = $this->entrySetScores($entries[1]);
+        $setsPlayed = min(count($setsA), count($setsB));
+        if ($setsPlayed < 1) {
+            return null;
+        }
+
+        $winsA = 0;
+        $winsB = 0;
+        for ($index = 0; $index < $setsPlayed; $index++) {
+            $scoreA = (float) $setsA[$index];
+            $scoreB = (float) $setsB[$index];
+            if ($scoreA > $scoreB) {
+                $winsA++;
+            } elseif ($scoreB > $scoreA) {
+                $winsB++;
+            }
+        }
+
+        if ($winsA === $winsB) {
+            return null;
+        }
+
+        return $winsA > $winsB
+            ? ['winner' => $entries[0], 'loser' => $entries[1], 'winner_sets' => $winsA, 'loser_sets' => $winsB]
+            : ['winner' => $entries[1], 'loser' => $entries[0], 'winner_sets' => $winsB, 'loser_sets' => $winsA];
+    }
+
+    private function entrySetScores(array $entry): array
+    {
+        $raw = $entry['set_scores'] ?? null;
+        if (is_string($raw) && trim($raw) !== '') {
+            try {
+                $decoded = json_decode($raw, true, 32, JSON_THROW_ON_ERROR);
+                if (is_array($decoded)) {
+                    return array_values(array_map('floatval', $decoded));
+                }
+            } catch (\JsonException) {
+            }
+        }
+
+        return array_key_exists('raw_score', $entry) ? [(float) $entry['raw_score']] : [];
     }
 
     private function normaliseWeightedPointsData(array $data): array

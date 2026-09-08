@@ -27,10 +27,12 @@ class SettingsController extends BaseController
         } catch (\Throwable $e) {
             return redirect()->back()->with('error', 'Settings could not be saved.');
         }
-        session()->set([
-            'compact_sidebar' => $settings['compact_sidebar'] === '1',
-            'result_density' => $settings['result_density'],
-        ]);
+        session()->set('result_density', $settings['result_density']);
+        if ($settings['compact_sidebar'] === '1') {
+            session()->set('compact_sidebar', true);
+        } else {
+            session()->remove('compact_sidebar');
+        }
         return redirect()->back()->with('success', 'Settings saved.');
     }
 }

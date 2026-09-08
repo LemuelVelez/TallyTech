@@ -36,16 +36,19 @@ class AuthController extends BaseController
         $resultDensity = $settings['result_density'] ?? 'comfortable';
 
         session()->regenerate(true);
+        session()->remove('compact_sidebar');
         session()->set([
             'user_id' => $user['id'],
             'username' => $user['username'],
             'display_name' => $user['display_name'],
             'role' => $user['role'],
-            'compact_sidebar' => ($settings['compact_sidebar'] ?? '0') === '1',
             'result_density' => in_array($resultDensity, ['comfortable', 'compact'], true)
                 ? $resultDensity
                 : 'comfortable',
         ]);
+        if (($settings['compact_sidebar'] ?? '0') === '1') {
+            session()->set('compact_sidebar', true);
+        }
         return redirect()->to('/dashboard');
     }
 

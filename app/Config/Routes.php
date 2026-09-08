@@ -64,6 +64,7 @@ $routes->group('', ['filter' => 'auth'], static function (RouteCollection $route
     $routes->get('weighted-points', 'WeightedPointsController::index', ['filter' => 'role:manager,validator']);
 
     $routes->group('', ['filter' => 'role:manager'], static function (RouteCollection $routes): void {
+        $routes->get('sport-scores', 'SportScoresController::index');
         $routes->get('schedules', 'SchedulesController::index');
         $routes->post('schedules', 'SchedulesController::store');
         $routes->post('schedules/(:num)/update', 'SchedulesController::update/$1');

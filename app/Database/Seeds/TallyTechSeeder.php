@@ -20,7 +20,10 @@ class TallyTechSeeder extends Seeder
         if (! $this->db->tableExists('users')
             || ! $this->db->tableExists('events')
             || ! $this->db->tableExists('sport_categories')
-            || ! $this->db->fieldExists('is_active', 'locations')) {
+            || ! $this->db->fieldExists('is_active', 'locations')
+            || ! $this->db->fieldExists('set_count', 'sports')
+            || ! $this->db->fieldExists('winning_points', 'sports')
+            || ! $this->db->fieldExists('set_scores', 'result_entries')) {
             throw new RuntimeException('Database schema is not ready. Run "php spark migrate" before seeding.');
         }
 
@@ -66,6 +69,10 @@ class TallyTechSeeder extends Seeder
                 ]),
             ];
 
+            foreach ($ids as $userId) {
+                $this->ensureUserSetting($userId, 'compact_sidebar', '0');
+            }
+
             $eventId = $this->ensureEvent([
                 'name' => 'Intercollegiate Students Festival 2026',
                 'year' => 2026,
@@ -95,10 +102,10 @@ class TallyTechSeeder extends Seeder
             }
 
             $sports = [
-                'Basketball' => $this->ensureSport($eventId, 'Basketball', 'Men', 'match', $now),
-                'Volleyball' => $this->ensureSport($eventId, 'Volleyball', 'Women', 'match', $now),
-                'Badminton' => $this->ensureSport($eventId, 'Badminton', 'Men', 'match', $now),
-                'Cheerdance' => $this->ensureSport($eventId, 'Cheerdance', 'Mixed', 'judged', $now),
+                'Basketball' => $this->ensureSport($eventId, 'Basketball', 'Men', 'match', 1, null, $now),
+                'Volleyball' => $this->ensureSport($eventId, 'Volleyball', 'Women', 'match', 5, 25, $now),
+                'Badminton' => $this->ensureSport($eventId, 'Badminton', 'Men', 'match', 3, 21, $now),
+                'Cheerdance' => $this->ensureSport($eventId, 'Cheerdance', 'Mixed', 'judged', 1, null, $now),
             ];
 
             foreach ([$sports['Basketball'], $sports['Volleyball'], $sports['Badminton'], $sports['Cheerdance']] as $sportId) {
@@ -268,23 +275,65 @@ class TallyTechSeeder extends Seeder
         ]);
     }
 
-    private function ensureSport(int $eventId, string $name, string $category, string $resultType, string $now): int
+    private function ensureSport(int $eventId, string $name, string $category, string $resultType, int $setCount, float|int|null $winningPoints, string $now): int
     {
         $row = $this->db->table('sports')
-            ->select('id')
+            ->select('id,set_count,winning_points')
             ->where('event_id', $eventId)
             ->where('name', $name)
             ->where('category', $category)
             ->get()
             ->getRowArray();
 
-        return $this->existingOrInsert('sports', $row, [
+        $data = [
             'event_id' => $eventId,
             'name' => $name,
             'category' => $category,
             'result_type' => $resultType,
+            'set_count' => $setCount,
+            'winning_points' => $winningPoints,
             'created_at' => $now,
+        ];
+
+        if ($row) {
+            $currentWinningPoints = ($row['winning_points'] ?? null) === null ? null : (float) $row['winning_points'];
+            $targetWinningPoints = $winningPoints === null ? null : (float) $winningPoints;
+            if ((int) ($row['set_count'] ?? 0) !== $setCount || $currentWinningPoints !== $targetWinningPoints) {
+                $this->db->table('sports')->where('id', (int) $row['id'])->update([
+                    'set_count' => $setCount,
+                    'winning_points' => $winningPoints,
+                ]);
+                $this->changes++;
+            }
+            return (int) $row['id'];
+        }
+
+        return $this->existingOrInsert('sports', null, $data);
+    }
+
+    private function ensureUserSetting(int $userId, string $key, string $value): void
+    {
+        $row = $this->db->table('user_settings')
+            ->select('id,setting_value')
+            ->where('user_id', $userId)
+            ->where('setting_key', $key)
+            ->get()
+            ->getRowArray();
+
+        if ($row) {
+            if ((string) ($row['setting_value'] ?? '') !== $value) {
+                $this->db->table('user_settings')->where('id', (int) $row['id'])->update(['setting_value' => $value]);
+                $this->changes++;
+            }
+            return;
+        }
+
+        $this->db->table('user_settings')->insert([
+            'user_id' => $userId,
+            'setting_key' => $key,
+            'setting_value' => $value,
         ]);
+        $this->changes++;
     }
 
     private function ensureUserSport(int $userId, int $sportId): void

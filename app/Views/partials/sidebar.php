@@ -21,6 +21,7 @@ $menus = [
         ['team-ranking', 'Team Ranking', 'trophy'],
         ['teams', 'Teams', 'users'],
         ['sports', 'Sports', 'dumbbell'],
+        ['sport-scores', 'Sport Scores', 'clipboard-score'],
         ['schedules', 'Schedules', 'calendar-clock'],
         ['match-results', 'Match Results', 'clipboard-score'],
         ['brackets', 'Bracket Management', 'trophy'],
