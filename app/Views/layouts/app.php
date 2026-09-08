@@ -19,18 +19,18 @@ $jsVersion = $assetVersion('assets/js/app.js');
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
     <meta name="theme-color" content="#0c7e43">
     <title><?= esc($title ?? 'TallyTech') ?> · TallyTech</title>
-    <link rel="icon" type="image/png" href="<?= base_url('logo.png') ?>">
+    <link rel="icon" type="image/webp" href="<?= base_url('favicon.webp') ?>">
     <link rel="stylesheet" href="<?= esc(base_url('assets/css/app.css') . '?v=' . rawurlencode($cssVersion), 'attr') ?>">
 </head>
 <body class="app role-<?= esc($role) ?> <?= $compactSidebar ? 'sidebar-compact' : '' ?> density-<?= esc($resultDensity) ?>">
 <a class="skip-link" href="#main-content">Skip to main content</a>
 <header class="topbar">
     <button class="menu-toggle" type="button" data-nav-toggle aria-label="Open navigation" aria-controls="app-sidebar" aria-expanded="false"><?= ui_icon('menu') ?></button>
-    <a class="brand" href="<?= site_url('dashboard') ?>"><img src="<?= base_url('assets/img/logo.png') ?>" alt="TallyTech"><span><?= esc($roleLabel) ?></span></a>
+    <a class="brand" href="<?= site_url('dashboard') ?>"><img src="<?= base_url('assets/img/logo.webp') ?>" alt="TallyTech"><span><?= esc($roleLabel) ?></span></a>
 
     <div class="account-menu" data-account-menu>
         <button class="topbar-user" type="button" data-account-toggle aria-label="Open user menu for <?= esc($displayName, 'attr') ?>" aria-expanded="false" aria-controls="account-dropdown" aria-haspopup="menu">
-            <img class="user-avatar" src="<?= base_url('assets/img/logo.png') ?>" alt="">
+            <img class="user-avatar" src="<?= base_url('assets/img/logo.webp') ?>" alt="">
             <span class="user-identity">
                 <span class="user-name"><?= esc($displayName) ?></span>
                 <small><?= esc($accountRoleLabel) ?></small>

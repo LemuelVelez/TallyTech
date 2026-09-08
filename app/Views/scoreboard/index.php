@@ -44,14 +44,14 @@ $jsVersion = $assetVersion('assets/js/app.js');
     <meta name="tallytech-scoreboard-refresh" content="30" data-scoreboard-refresh>
     <meta name="theme-color" content="#061b3a">
     <title>Live Scoreboard · TallyTech</title>
-    <link rel="icon" type="image/png" href="<?= base_url('logo.png') ?>">
+    <link rel="icon" type="image/webp" href="<?= base_url('favicon.webp') ?>">
     <link rel="stylesheet" href="<?= esc(base_url('assets/css/app.css') . '?v=' . rawurlencode($cssVersion), 'attr') ?>">
 </head>
 <body class="viewer-page<?= $presentationFrame ? ' viewer-page--presentation-frame' : '' ?>"<?= $presentationFrame ? ' data-scoreboard-presentation-frame="true"' : '' ?>>
 <?php if (! $presentationFrame): ?>
 <a class="skip-link" href="#scoreboard-content">Skip to scoreboard content</a>
 <header class="viewer-nav">
-    <a class="viewer-brand" href="<?= site_url('scoreboard') ?>"><img src="<?= base_url('assets/img/logo.png') ?>" alt="TallyTech"><b>TallyTech</b></a>
+    <a class="viewer-brand" href="<?= site_url('scoreboard') ?>"><img src="<?= base_url('assets/img/logo.webp') ?>" alt="TallyTech"><b>TallyTech</b></a>
     <div><span><?= $hasActiveEvent ? 'LIVE' : 'IDLE' ?></span><a href="<?= site_url('login') ?>" class="btn viewer-login"><?= ui_icon('log-in') ?><span>Login</span></a></div>
 </header>
 <?php endif; ?>

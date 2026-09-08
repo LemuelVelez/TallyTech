@@ -128,8 +128,10 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .brand img, .viewer-brand img {
   width: 40px;
   height: 40px;
+  display: block;
   border-radius: 50%;
   object-fit: cover;
+  overflow: hidden;
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.18);
 }
 .menu-toggle, .sidebar-close, .sidebar-compact-toggle {
@@ -190,7 +192,9 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   border-radius: 50%;
   background: #fff;
   object-fit: cover;
+  overflow: hidden;
 }
+
 .user-identity { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
 .user-name { max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .user-identity small { margin-top: 3px; color: rgba(255, 255, 255, 0.76); font-size: 0.7rem; font-weight: 650; }
@@ -814,7 +818,7 @@ input[type="checkbox"], input[type="radio"] { width: 18px; min-height: 18px; hei
   backdrop-filter: blur(10px);
 }
 .login-logo { display: inline-flex; align-items: center; gap: 12px; color: #0c6d3a; font-size: 1.05rem; }
-.login-logo img { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; }
+.login-logo img { width: 48px; height: 48px; display: block; border-radius: 50%; object-fit: cover; overflow: hidden; }
 .login-card h1 { margin: 28px 0 6px; font-size: clamp(1.8rem, 1.5rem + 0.7vw, 2.25rem); line-height: 1.15; letter-spacing: -0.035em; }
 .login-card > p { margin: 0 0 24px; color: var(--muted); font-size: 0.95rem; }
 .login-card .btn { margin-top: 4px; min-height: 48px; }
