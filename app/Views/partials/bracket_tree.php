@@ -82,14 +82,37 @@ $matchIcon = static function (array $match, string $side): string {
     if ($side === 'lower') return 'target';
     return 'play-circle';
 };
+
+// Follow-up: add a team-logo upload migration/field before replacing these deterministic initials marks.
+$teamInitials = static function (string $name): string {
+    $name = trim($name);
+    if ($name === '') return '—';
+
+    $parts = preg_split('/\s+/', $name) ?: [];
+    $parts = array_values(array_filter($parts, static fn(string $part): bool => $part !== ''));
+    if (count($parts) >= 2) {
+        return strtoupper(substr($parts[0], 0, 1) . substr($parts[1], 0, 1));
+    }
+
+    return strtoupper(substr($name, 0, 2));
+};
+
+$teamMarkStyle = static function (string $name): string {
+    $seed = strtolower(trim($name));
+    $hue = hexdec(substr(md5($seed !== '' ? $seed : 'tbd'), 0, 4)) % 360;
+    return '--tt-team-hue: ' . $hue . ';';
+};
 ?>
 <div class="tt-bracket-component tt-bracket-component--<?= esc($bracketVariant, 'attr') ?>" data-bracket-component>
     <div class="tt-bracket-toolbar" aria-label="Bracket view controls">
         <span class="tt-bracket-toolbar-label"><?= ui_icon('sliders') ?><span>Bracket view</span></span>
-        <div class="tt-bracket-zoom-controls" role="group" aria-label="Bracket zoom">
-            <button type="button" class="tt-bracket-zoom-button" data-bracket-zoom-out aria-label="Zoom bracket out">−</button>
-            <button type="button" class="tt-bracket-zoom-reset" data-bracket-zoom-reset aria-label="Reset bracket zoom"><span data-bracket-zoom-value>100%</span></button>
-            <button type="button" class="tt-bracket-zoom-button" data-bracket-zoom-in aria-label="Zoom bracket in">+</button>
+        <div class="tt-bracket-toolbar-actions">
+            <span class="tt-bracket-zoom-hint" data-bracket-zoom-hint>Ctrl + scroll to zoom</span>
+            <div class="tt-bracket-zoom-controls" role="group" aria-label="Bracket zoom">
+                <button type="button" class="tt-bracket-zoom-button" data-bracket-zoom-out aria-label="Zoom bracket out">−</button>
+                <button type="button" class="tt-bracket-zoom-reset" data-bracket-zoom-reset aria-label="Reset bracket zoom"><span data-bracket-zoom-value>100%</span></button>
+                <button type="button" class="tt-bracket-zoom-button" data-bracket-zoom-in aria-label="Zoom bracket in">+</button>
+            </div>
         </div>
     </div>
     <div class="tt-bracket-scroll tt-bracket-scroll--<?= esc($bracketVariant, 'attr') ?>" data-bracket-scroll role="region" aria-label="<?= esc($bracketAriaLabel, 'attr') ?>" tabindex="0">
@@ -164,17 +187,24 @@ $matchIcon = static function (array $match, string $side): string {
                                             <div class="tt-bracket-judged">All participating teams</div>
                                         <?php else: ?>
                                             <div class="bracket-team tt-bracket-slot <?= $winner !== '' && $winner === $teamALabel ? 'winner' : '' ?>">
-                                                <span class="tt-bracket-team-name"><?= $winner !== '' && $winner === $teamALabel ? ui_icon('check-circle', 'tt-bracket-slot-icon') : '' ?><span><?= esc($teamALabel) ?></span></span>
-                                                <b><?= $scoreA !== '' ? esc($scoreA) : '<span aria-hidden="true">—</span>' ?></b>
+                                                <span class="tt-bracket-team-main">
+                                                    <span class="tt-bracket-team-mark" style="<?= esc($teamMarkStyle($teamALabel), 'attr') ?>" aria-hidden="true"><?= esc($teamInitials($teamALabel)) ?></span>
+                                                    <span class="tt-bracket-team-name"><span><?= esc($teamALabel) ?></span></span>
+                                                </span>
+                                                <b class="tt-bracket-score"><?= $scoreA !== '' ? esc($scoreA) : '<span aria-hidden="true">—</span>' ?></b>
                                             </div>
                                             <div class="bracket-team tt-bracket-slot <?= $winner !== '' && $winner === $teamBLabel ? 'winner' : '' ?>">
-                                                <span class="tt-bracket-team-name"><?= $winner !== '' && $winner === $teamBLabel ? ui_icon('check-circle', 'tt-bracket-slot-icon') : '' ?><span><?= esc($teamBLabel) ?></span></span>
-                                                <b><?= $scoreB !== '' ? esc($scoreB) : '<span aria-hidden="true">—</span>' ?></b>
+                                                <span class="tt-bracket-team-main">
+                                                    <span class="tt-bracket-team-mark" style="<?= esc($teamMarkStyle($teamBLabel), 'attr') ?>" aria-hidden="true"><?= esc($teamInitials($teamBLabel)) ?></span>
+                                                    <span class="tt-bracket-team-name"><span><?= esc($teamBLabel) ?></span></span>
+                                                </span>
+                                                <b class="tt-bracket-score"><?= $scoreB !== '' ? esc($scoreB) : '<span aria-hidden="true">—</span>' ?></b>
                                             </div>
                                         <?php endif; ?>
 
                                         <div class="tt-bracket-match-foot">
                                             <small><?= ! empty($match['match_date']) ? esc(date('M j · g:i A', strtotime((string) $match['match_date']))) : 'TBD' ?></small>
+                                            <span aria-hidden="true">·</span>
                                             <small><?= esc((string) ($match['court_label'] ?: ($match['location_name'] ?? '—'))) ?></small>
                                         </div>
 

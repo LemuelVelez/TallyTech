@@ -1021,56 +1021,231 @@
   };
 
   if (bracketBoards.length) {
-    let bracketFrame = 0;
-    const redrawBrackets = () => {
-      if (bracketFrame) window.cancelAnimationFrame(bracketFrame);
-      bracketFrame = window.requestAnimationFrame(() => {
-        bracketFrame = 0;
-        bracketBoards.forEach(drawBracketBoard);
-      });
+    const bracketZoomMin = 0.35;
+    const bracketZoomMax = 2.5;
+    const bracketZoomStep = 0.1;
+    const bracketFrames = new Map();
+    const bracketTrailingTimers = new WeakMap();
+    const clampBracketZoom = (value) => {
+      const parsed = Number.parseFloat(value);
+      const safeValue = Number.isFinite(parsed) ? parsed : 1;
+      return Math.min(bracketZoomMax, Math.max(bracketZoomMin, safeValue));
     };
 
-    const bracketZoomMin = 0.7;
-    const bracketZoomMax = 1.4;
-    const bracketZoomStep = 0.1;
-    const cssZoomSupported = typeof CSS !== 'undefined' && CSS.supports?.('zoom', '1');
-    const clampBracketZoom = (value) => Math.min(bracketZoomMax, Math.max(bracketZoomMin, Math.round(value * 10) / 10));
+    const syncBracketShell = (board) => {
+      const shell = board.closest('[data-bracket-zoom-shell]');
+      if (!shell) return;
+      const zoom = clampBracketZoom(board.dataset.bracketZoom || 1);
+      shell.style.width = `${Math.ceil(board.scrollWidth * zoom)}px`;
+      shell.style.height = `${Math.ceil(board.scrollHeight * zoom)}px`;
+    };
 
-    const setBracketZoom = (component, requestedZoom) => {
+    const redrawBracket = (board) => {
+      if (!board || bracketFrames.has(board)) return;
+      const frame = window.requestAnimationFrame(() => {
+        bracketFrames.delete(board);
+        syncBracketShell(board);
+        drawBracketBoard(board);
+      });
+      bracketFrames.set(board, frame);
+    };
+
+    const redrawBrackets = () => bracketBoards.forEach(redrawBracket);
+    const trailingBracketRedraw = (board, delay = 110) => {
+      const currentTimer = bracketTrailingTimers.get(board);
+      if (currentTimer) window.clearTimeout(currentTimer);
+      const timer = window.setTimeout(() => {
+        bracketTrailingTimers.delete(board);
+        redrawBracket(board);
+      }, delay);
+      bracketTrailingTimers.set(board, timer);
+    };
+
+    const currentBracketZoom = (board) => clampBracketZoom(board?.dataset.bracketZoom || 1);
+    const centerBracketAnchor = (scroll) => ({
+      scroll,
+      offsetX: scroll.clientWidth / 2,
+      offsetY: scroll.clientHeight / 2,
+    });
+
+    const setBracketZoom = (component, requestedZoom, anchor = null) => {
       const board = component.querySelector('[data-bracket-board]');
-      const shell = component.querySelector('[data-bracket-zoom-shell]');
-      if (!board || !shell) return;
+      const scroll = component.querySelector('[data-bracket-scroll]');
+      if (!board || !scroll) return 1;
 
+      const oldZoom = currentBracketZoom(board);
       const zoom = clampBracketZoom(requestedZoom);
       board.dataset.bracketZoom = String(zoom);
-      if (cssZoomSupported) {
-        board.style.zoom = String(zoom);
-        board.style.transform = '';
-        shell.style.width = '';
-        shell.style.height = '';
-      } else {
-        board.style.zoom = '';
-        board.style.transform = `scale(${zoom})`;
-        shell.style.width = `${Math.ceil(board.scrollWidth * zoom)}px`;
-        shell.style.height = `${Math.ceil(board.scrollHeight * zoom)}px`;
+      board.style.zoom = '';
+      board.style.transform = `scale(${zoom})`;
+      syncBracketShell(board);
+
+      if (anchor?.scroll === scroll && oldZoom > 0) {
+        const ratio = zoom / oldZoom;
+        scroll.scrollLeft = (scroll.scrollLeft + anchor.offsetX) * ratio - anchor.offsetX;
+        scroll.scrollTop = (scroll.scrollTop + anchor.offsetY) * ratio - anchor.offsetY;
       }
+
+      scroll.classList.toggle('is-zoomed', Math.abs(zoom - 1) > 0.001);
 
       const value = component.querySelector('[data-bracket-zoom-value]');
       const zoomOut = component.querySelector('[data-bracket-zoom-out]');
       const zoomIn = component.querySelector('[data-bracket-zoom-in]');
       if (value) value.textContent = `${Math.round(zoom * 100)}%`;
-      if (zoomOut) zoomOut.disabled = zoom <= bracketZoomMin;
-      if (zoomIn) zoomIn.disabled = zoom >= bracketZoomMax;
-      redrawBrackets();
+      if (zoomOut) zoomOut.disabled = zoom <= bracketZoomMin + 0.0001;
+      if (zoomIn) zoomIn.disabled = zoom >= bracketZoomMax - 0.0001;
+      redrawBracket(board);
+      return zoom;
     };
 
     document.querySelectorAll('[data-bracket-component]').forEach((component) => {
       const board = component.querySelector('[data-bracket-board]');
-      if (!board) return;
-      const currentZoom = () => Number.parseFloat(board.dataset.bracketZoom || '1') || 1;
-      component.querySelector('[data-bracket-zoom-out]')?.addEventListener('click', () => setBracketZoom(component, currentZoom() - bracketZoomStep));
-      component.querySelector('[data-bracket-zoom-in]')?.addEventListener('click', () => setBracketZoom(component, currentZoom() + bracketZoomStep));
-      component.querySelector('[data-bracket-zoom-reset]')?.addEventListener('click', () => setBracketZoom(component, 1));
+      const scroll = component.querySelector('[data-bracket-scroll]');
+      if (!board || !scroll) return;
+
+      const currentZoom = () => currentBracketZoom(board);
+      const steppedZoom = (direction) => Math.round((currentZoom() + (direction * bracketZoomStep)) * 10) / 10;
+      const centeredAnchor = () => centerBracketAnchor(scroll);
+      const zoomHint = component.querySelector('[data-bracket-zoom-hint]');
+      if (zoomHint) {
+        zoomHint.textContent = window.matchMedia?.('(pointer: coarse)').matches ? 'Pinch to zoom' : 'Ctrl + scroll to zoom';
+      }
+
+      component.querySelector('[data-bracket-zoom-out]')?.addEventListener('click', () => {
+        setBracketZoom(component, steppedZoom(-1), centeredAnchor());
+        trailingBracketRedraw(board);
+      });
+      component.querySelector('[data-bracket-zoom-in]')?.addEventListener('click', () => {
+        setBracketZoom(component, steppedZoom(1), centeredAnchor());
+        trailingBracketRedraw(board);
+      });
+      component.querySelector('[data-bracket-zoom-reset]')?.addEventListener('click', () => {
+        setBracketZoom(component, 1, centeredAnchor());
+        trailingBracketRedraw(board);
+      });
+
+      scroll.addEventListener('wheel', (event) => {
+        if (!event.ctrlKey && !event.metaKey) return;
+        event.preventDefault();
+
+        let deltaY = event.deltaY;
+        if (event.deltaMode === 1) deltaY *= 16;
+        else if (event.deltaMode === 2) deltaY *= Math.max(scroll.clientHeight, 1);
+
+        const rect = scroll.getBoundingClientRect();
+        const anchor = {
+          scroll,
+          offsetX: event.clientX - rect.left,
+          offsetY: event.clientY - rect.top,
+        };
+        setBracketZoom(component, currentZoom() * Math.exp(-deltaY * 0.0015), anchor);
+        trailingBracketRedraw(board);
+      }, { passive: false });
+
+      const distanceBetween = (a, b) => Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+      const midpointBetween = (a, b) => ({
+        clientX: (a.clientX + b.clientX) / 2,
+        clientY: (a.clientY + b.clientY) / 2,
+      });
+
+      if ('PointerEvent' in window) {
+        const pointers = new Map();
+        let pinch = null;
+
+        const beginPinch = () => {
+          if (pointers.size !== 2) {
+            pinch = null;
+            return;
+          }
+          const points = Array.from(pointers.values());
+          const startDistance = distanceBetween(points[0], points[1]);
+          if (startDistance <= 0) return;
+          pinch = { startDistance, startZoom: currentZoom() };
+          pointers.forEach((_, pointerId) => {
+            try { scroll.setPointerCapture?.(pointerId); } catch (_) {}
+          });
+        };
+
+        scroll.addEventListener('pointerdown', (event) => {
+          if (event.pointerType === 'mouse') return;
+          pointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY });
+          if (pointers.size === 2) beginPinch();
+          else if (pointers.size > 2) pinch = null;
+        });
+
+        scroll.addEventListener('pointermove', (event) => {
+          if (!pointers.has(event.pointerId)) return;
+          pointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY });
+          if (pointers.size !== 2 || !pinch) return;
+
+          event.preventDefault();
+          const points = Array.from(pointers.values());
+          const currentDistance = distanceBetween(points[0], points[1]);
+          if (currentDistance <= 0) return;
+          const midpoint = midpointBetween(points[0], points[1]);
+          const rect = scroll.getBoundingClientRect();
+          setBracketZoom(component, pinch.startZoom * (currentDistance / pinch.startDistance), {
+            scroll,
+            offsetX: midpoint.clientX - rect.left,
+            offsetY: midpoint.clientY - rect.top,
+          });
+        }, { passive: false });
+
+        const endPointer = (event) => {
+          if (!pointers.has(event.pointerId)) return;
+          pointers.delete(event.pointerId);
+          if (pointers.size === 2) beginPinch();
+          else pinch = null;
+          trailingBracketRedraw(board);
+        };
+        scroll.addEventListener('pointerup', endPointer);
+        scroll.addEventListener('pointercancel', endPointer);
+      } else {
+        let pinch = null;
+        const beginTouchPinch = (touches) => {
+          if (touches.length !== 2) {
+            pinch = null;
+            return;
+          }
+          const startDistance = distanceBetween(touches[0], touches[1]);
+          if (startDistance <= 0) return;
+          pinch = { startDistance, startZoom: currentZoom() };
+        };
+
+        scroll.addEventListener('touchstart', (event) => {
+          if (event.touches.length === 2) beginTouchPinch(event.touches);
+          else if (event.touches.length > 2) pinch = null;
+        }, { passive: true });
+
+        scroll.addEventListener('touchmove', (event) => {
+          if (event.touches.length !== 2 || !pinch) return;
+          event.preventDefault();
+          const currentDistance = distanceBetween(event.touches[0], event.touches[1]);
+          if (currentDistance <= 0) return;
+          const midpoint = midpointBetween(event.touches[0], event.touches[1]);
+          const rect = scroll.getBoundingClientRect();
+          setBracketZoom(component, pinch.startZoom * (currentDistance / pinch.startDistance), {
+            scroll,
+            offsetX: midpoint.clientX - rect.left,
+            offsetY: midpoint.clientY - rect.top,
+          });
+        }, { passive: false });
+
+        scroll.addEventListener('touchend', (event) => {
+          if (event.touches.length === 2) beginTouchPinch(event.touches);
+          else pinch = null;
+          trailingBracketRedraw(board);
+        }, { passive: true });
+        scroll.addEventListener('touchcancel', () => {
+          pinch = null;
+          trailingBracketRedraw(board);
+        }, { passive: true });
+      }
+
+      const preventSafariGestureZoom = (event) => event.preventDefault();
+      scroll.addEventListener('gesturestart', preventSafariGestureZoom, { passive: false });
+      scroll.addEventListener('gesturechange', preventSafariGestureZoom, { passive: false });
+
       setBracketZoom(component, 1);
     });
 
@@ -1109,14 +1284,18 @@
     redrawBrackets();
     window.addEventListener('load', redrawBrackets, { once: true });
     window.addEventListener('resize', redrawBrackets, { passive: true });
+    window.addEventListener('scroll', redrawBrackets, { passive: true });
 
     if (document.fonts?.ready) {
       document.fonts.ready.then(redrawBrackets).catch(() => {});
     }
 
     if ('ResizeObserver' in window) {
-      const bracketResizeObserver = new ResizeObserver(redrawBrackets);
+      const bracketResizeObserver = new ResizeObserver((entries) => {
+        entries.forEach((entry) => redrawBracket(entry.target));
+      });
       bracketBoards.forEach((board) => bracketResizeObserver.observe(board));
     }
   }
+
 })();
