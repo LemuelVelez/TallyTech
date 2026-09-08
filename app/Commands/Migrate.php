@@ -25,7 +25,11 @@ class Migrate extends BaseCommand
     {
         $runner = service('migrations');
         $runner->clearCliMessages();
-        CLI::write(lang('Migrations.latest'), 'yellow');
+
+        CLI::newLine();
+        CLI::write('🗄️  TALLYTECH DATABASE MIGRATIONS', 'cyan');
+        CLI::write(str_repeat('─', 38), 'light_gray');
+        CLI::write('🔎 Checking for pending migrations...', 'yellow');
 
         $namespace = $params['n'] ?? CLI::getOption('n');
         $group = $params['g'] ?? CLI::getOption('g');
@@ -37,25 +41,33 @@ class Migrate extends BaseCommand
                 $runner->setNamespace($namespace);
             }
 
-            $this->withSignalsBlocked(static function () use ($runner, $group): void {
-                if (! $runner->latest($group)) {
-                    CLI::error(lang('Migrations.generalFault'), 'light_gray', 'red');
-                }
+            $migrationSucceeded = true;
+            $this->withSignalsBlocked(static function () use ($runner, $group, &$migrationSucceeded): void {
+                $migrationSucceeded = $runner->latest($group);
             });
+
+            if (! $migrationSucceeded) {
+                CLI::error('❌ ' . lang('Migrations.generalFault'), 'white', 'red');
+                return;
+            }
 
             $messages = $runner->getCliMessages();
 
             if ($messages === []) {
-                CLI::write('No pending migrations; database already migrated.', 'green');
+                CLI::write('ℹ️  No pending migrations; database is already up to date.', 'green');
+                CLI::newLine();
                 return;
             }
 
+            CLI::write('🔄 Applying migrations...', 'yellow');
             foreach ($messages as $message) {
-                CLI::write($message);
+                CLI::write('   • ' . $message, 'light_gray');
             }
 
-            CLI::write(lang('Migrations.migrated'), 'green');
+            CLI::write('✅ Migrations completed successfully.', 'green');
+            CLI::newLine();
         } catch (Throwable $e) {
+            CLI::error('❌ Migration failed.', 'white', 'red');
             $this->showError($e);
         }
     }

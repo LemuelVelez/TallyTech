@@ -217,28 +217,55 @@ class TallyTechSeeder extends Seeder
         }
 
         if ($this->changes === 0) {
-            CLI::write('No pending seed; database already seeded.', 'green');
+            CLI::write('ℹ️  No pending seed data; database is already seeded.', 'green');
             return;
         }
 
-        CLI::write('Seeding complete.', 'green');
+        CLI::write('✅ Seed data synchronized successfully (' . $this->changes . ' change' . ($this->changes === 1 ? '' : 's') . ').', 'green');
     }
 
     private function ensureUser(array $data): int
     {
-        $row = $this->db->table('users')->select('id')->where('username', $data['username'])->get()->getRowArray();
+        $row = $this->db->table('users')
+            ->select('id,password_hash,display_name,role,status')
+            ->where('username', $data['username'])
+            ->get()
+            ->getRowArray();
+
         if ($row) {
-            $this->db->table('users')->where('id', (int) $row['id'])->update([
-                'password_hash' => $data['password_hash'],
-                'display_name' => $data['display_name'],
-                'role' => $data['role'],
-                'status' => $data['status'],
-            ]);
-            $this->changes++;
+            $updates = [];
+            $defaultPassword = $this->defaultPasswordForRole((string) $data['role']);
+
+            if (! password_verify($defaultPassword, (string) ($row['password_hash'] ?? ''))) {
+                $updates['password_hash'] = $data['password_hash'];
+            }
+
+            foreach (['display_name', 'role', 'status'] as $field) {
+                if ((string) ($row[$field] ?? '') !== (string) $data[$field]) {
+                    $updates[$field] = $data[$field];
+                }
+            }
+
+            if ($updates !== []) {
+                $this->db->table('users')->where('id', (int) $row['id'])->update($updates);
+                $this->changes++;
+            }
+
             return (int) $row['id'];
         }
 
         return $this->existingOrInsert('users', null, $data);
+    }
+
+    private function defaultPasswordForRole(string $role): string
+    {
+        return match ($role) {
+            'admin' => 'Admin_123',
+            'manager' => 'Manager_123',
+            'validator' => 'Validator_123',
+            'facilitator' => 'Facilitator_123',
+            default => throw new RuntimeException('Unsupported seeded role: ' . $role),
+        };
     }
 
     private function ensureEvent(array $data): int
