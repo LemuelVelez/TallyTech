@@ -26,7 +26,6 @@ $menus = [
         ['schedules', 'Schedules', 'calendar-clock'],
         ['match-results', 'Match Results', 'clipboard-score'],
         ['brackets', 'Bracket Management', 'trophy'],
-        ['draft-generator', 'Draft Generator', 'sliders'],
         ['reports', 'Reports', 'chart-bar'],
         ['settings', 'Settings', 'settings'],
     ],

@@ -55,8 +55,8 @@ $jsVersion = $assetVersion('assets/js/app.js');
     <?= view('partials/sidebar') ?>
     <button class="nav-backdrop" type="button" data-nav-close aria-label="Close navigation"></button>
     <main class="content" id="main-content">
-        <?php if (session()->getFlashdata('success')): ?><div class="alert success" role="status"><?= esc(session()->getFlashdata('success')) ?></div><?php endif; ?>
-        <?php if (session()->getFlashdata('error')): ?><div class="alert error" role="alert"><?= esc(session()->getFlashdata('error')) ?></div><?php endif; ?>
+        <?php if (session()->getFlashdata('success')): ?><div class="alert success" role="status" data-flash-alert data-dismiss-after="5000"><?= esc(session()->getFlashdata('success')) ?></div><?php endif; ?>
+        <?php if (session()->getFlashdata('error')): ?><div class="alert error" role="alert" data-flash-alert data-dismiss-after="5000"><?= esc(session()->getFlashdata('error')) ?></div><?php endif; ?>
         <?= $this->renderSection('content') ?>
         <footer>© 2026 TallyTech · Intramural Sports Festival Management System</footer>
     </main>
