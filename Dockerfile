@@ -41,9 +41,14 @@ WORKDIR /var/www/html
 COPY . .
 COPY --from=vendor /app/vendor ./vendor
 
-RUN mkdir -p writable/cache writable/debugbar writable/logs writable/session writable/uploads public/uploads/team-avatars \
+RUN install -D -m 0644 public/uploads/team-avatars/.htaccess /usr/local/share/tallytech/team-avatar.htaccess \
+    && mkdir -p writable/cache writable/debugbar writable/logs writable/session writable/uploads public/uploads/team-avatars \
     && chown -R www-data:www-data writable public/uploads/team-avatars \
     && chmod -R 775 writable public/uploads/team-avatars
+
+# Team avatars are runtime data. Mount a persistent volume at this exact path
+# (for Railway, attach a Volume with this Mount Path) so redeploys keep uploads.
+VOLUME ["/var/www/html/public/uploads/team-avatars"]
 
 ENV CI_ENVIRONMENT=production
 
@@ -52,4 +57,20 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD php -r '$s = @fsockopen("127.0.0.1", 3000, $errno, $errstr, 2); if (! $s) { exit(1); } fclose($s);'
 
-CMD ["sh", "-c", "php spark migrate --all && exec apache2-foreground"]
+CMD set -eu; \
+    AVATAR_DIR=/var/www/html/public/uploads/team-avatars; \
+    mkdir -p writable/cache writable/debugbar writable/logs writable/session writable/uploads "$AVATAR_DIR"; \
+    cp /usr/local/share/tallytech/team-avatar.htaccess "$AVATAR_DIR/.htaccess"; \
+    touch "$AVATAR_DIR/.gitkeep"; \
+    chown -R www-data:www-data writable "$AVATAR_DIR"; \
+    chmod -R 775 writable "$AVATAR_DIR"; \
+    chmod 644 "$AVATAR_DIR/.htaccess"; \
+    if [ -n "${RAILWAY_ENVIRONMENT_ID:-}" ]; then \
+        if [ -z "${RAILWAY_VOLUME_MOUNT_PATH:-}" ]; then \
+            echo >&2 'WARNING: team avatar storage is ephemeral. Attach a Railway Volume at /var/www/html/public/uploads/team-avatars.'; \
+        elif [ "$RAILWAY_VOLUME_MOUNT_PATH" != "$AVATAR_DIR" ]; then \
+            echo >&2 "WARNING: Railway Volume is mounted at $RAILWAY_VOLUME_MOUNT_PATH; team avatars require /var/www/html/public/uploads/team-avatars."; \
+        fi; \
+    fi; \
+    php spark migrate --all; \
+    exec apache2-foreground
