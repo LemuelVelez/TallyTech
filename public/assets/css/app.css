@@ -28,7 +28,7 @@
   scrollbar-width: thin;
   scrollbar-color: var(--accent) #dfe7ef;
 }
-html { scroll-behavior: smooth; scrollbar-gutter: stable; }
+html { scroll-behavior: smooth; }
 
 /* Global scrollbar: slim, visible, and themed without blending into the page. */
 html,
