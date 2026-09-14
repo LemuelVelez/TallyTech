@@ -3,6 +3,27 @@ $hasActiveEvent = ! empty($activeEvent);
 $sportGroups = $sportScoreTable['sportGroups'] ?? [];
 $selectedSportIds = array_map('intval', $sportScoreTable['selectedSportIds'] ?? []);
 $presentationFrame = (string) service('request')->getGet('presentation') === '1';
+$requestedScoreboard = strtolower(trim((string) service('request')->getGet('scoreboard')));
+$scoreboardMode = in_array($requestedScoreboard, ['official', 'unofficial'], true) ? $requestedScoreboard : 'official';
+$scoreboards = is_array($scoreboards ?? null) ? $scoreboards : [];
+$activeScoreboard = $scoreboards[$scoreboardMode] ?? ($scoreboardMode === 'unofficial' ? ($unofficialScoreboard ?? []) : ($officialScoreboard ?? []));
+$results = is_array($activeScoreboard['results'] ?? null) ? $activeScoreboard['results'] : [];
+$ranking = is_array($activeScoreboard['standings'] ?? null) ? $activeScoreboard['standings'] : [];
+$overallSportPoints = is_array($activeScoreboard['overallSportPoints'] ?? null) ? $activeScoreboard['overallSportPoints'] : [];
+$schedules = is_array($activeScoreboard['schedules'] ?? null) ? $activeScoreboard['schedules'] : [];
+$isOfficialScoreboard = $scoreboardMode === 'official';
+$selectedSportQueryId = (int) ($selectedSportIds[0] ?? 0);
+
+$scoreboardHref = static function (string $mode, int $sportId, bool $presentation): string {
+    $query = ['scoreboard' => $mode];
+    if ($sportId > 0) {
+        $query['sport'] = $sportId;
+    }
+    if ($presentation) {
+        $query['presentation'] = 1;
+    }
+    return site_url('scoreboard') . '?' . http_build_query($query);
+};
 
 $bracketsByCategory = [];
 foreach ($schedules as $schedule) {
@@ -31,7 +52,7 @@ uksort($bracketsByCategory, static function (string $a, string $b) use ($categor
 
 $assetVersion = static function (string $relativePath): string {
     $path = defined('FCPATH') ? FCPATH . ltrim($relativePath, '/\\') : '';
-    return $path !== '' && is_file($path) ? (string) filemtime($path) : '20260908-2';
+    return $path !== '' && is_file($path) ? (string) filemtime($path) : '20260914-1';
 };
 $cssVersion = $assetVersion('assets/css/app.css');
 $jsVersion = $assetVersion('assets/js/app.js');
@@ -43,11 +64,11 @@ $jsVersion = $assetVersion('assets/js/app.js');
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
     <meta name="tallytech-scoreboard-refresh" content="30" data-scoreboard-refresh>
     <meta name="theme-color" content="#061b3a">
-    <title>Live Scoreboard · TallyTech</title>
+    <title><?= esc($isOfficialScoreboard ? 'Official Scoreboard' : 'Unofficial Scoreboard') ?> · TallyTech</title>
     <link rel="icon" type="image/webp" href="<?= base_url('favicon.webp') ?>">
     <link rel="stylesheet" href="<?= esc(base_url('assets/css/app.css') . '?v=' . rawurlencode($cssVersion), 'attr') ?>">
 </head>
-<body class="viewer-page<?= $presentationFrame ? ' viewer-page--presentation-frame' : '' ?>"<?= $presentationFrame ? ' data-scoreboard-presentation-frame="true"' : '' ?>>
+<body class="viewer-page<?= $presentationFrame ? ' viewer-page--presentation-frame' : '' ?><?= $isOfficialScoreboard ? ' scoreboard-view--official' : ' scoreboard-view--unofficial' ?>"<?= $presentationFrame ? ' data-scoreboard-presentation-frame="true"' : '' ?>>
 <?php if (! $presentationFrame): ?>
 <a class="skip-link" href="#scoreboard-content">Skip to scoreboard content</a>
 <header class="viewer-nav">
@@ -61,10 +82,28 @@ $jsVersion = $assetVersion('assets/js/app.js');
         <div class="score-hero-inner">
             <div class="score-hero-copy">
                 <div class="live-pill"><?= $hasActiveEvent ? '● LIVE · ' . esc($activeEvent['name']) : 'NO ACTIVE EVENT' ?></div>
-                <h1 id="live-scoreboard-title">Live Scoreboard</h1>
-                <p><?= $selectedSport ? esc($selectedSport['name']) : 'Select a sport to view its live tournament bracket.' ?></p>
-                <small><?= $hasActiveEvent ? 'Validated results automatically update bracket progression, standings, and overall sport points.' : 'Brackets will appear when an event is activated.' ?></small>
+                <h1 id="live-scoreboard-title"><?= esc($activeScoreboard['label'] ?? ($isOfficialScoreboard ? 'Official Scoreboard' : 'Unofficial Scoreboard')) ?></h1>
+                <p><?= $selectedSport ? esc($selectedSport['name']) : 'Select a sport to view its scoreboard.' ?></p>
+                <small><?= $hasActiveEvent ? esc($activeScoreboard['description'] ?? '') : 'Scoreboards will appear when an event is activated.' ?></small>
             </div>
+
+            <nav class="scoreboard-mode-tabs" aria-label="Choose scoreboard type">
+                <a class="scoreboard-mode-tab<?= $isOfficialScoreboard ? ' active' : '' ?>" href="<?= esc($scoreboardHref('official', $selectedSportQueryId, $presentationFrame), 'attr') ?>" <?= $isOfficialScoreboard ? 'aria-current="page"' : '' ?>>
+                    <strong>Official Scoreboard</strong>
+                    <span>Confirmed</span>
+                </a>
+                <a class="scoreboard-mode-tab scoreboard-mode-tab--unofficial<?= ! $isOfficialScoreboard ? ' active' : '' ?>" href="<?= esc($scoreboardHref('unofficial', $selectedSportQueryId, $presentationFrame), 'attr') ?>" <?= ! $isOfficialScoreboard ? 'aria-current="page"' : '' ?>>
+                    <strong>Unofficial Scoreboard</strong>
+                    <span>Provisional</span>
+                </a>
+            </nav>
+
+            <?php if (! $isOfficialScoreboard): ?>
+                <div class="scoreboard-provisional-notice" role="status">
+                    <?= ui_icon('alert-triangle') ?>
+                    <span>Provisional scores are awaiting validation and are subject to change.</span>
+                </div>
+            <?php endif; ?>
 
             <?php if (! $presentationFrame): ?>
                 <div class="scoreboard-presentation-launch">
@@ -81,7 +120,7 @@ $jsVersion = $assetVersion('assets/js/app.js');
                     <strong data-scoreboard-rotation-countdown>15</strong><span data-scoreboard-rotation-unit aria-hidden="true">s</span>
                 </div>
                 <label class="scoreboard-rotation-switch">
-                    <input type="checkbox" role="switch" data-scoreboard-auto-rotate-toggle aria-label="Automatically rotate scoreboard sports" checked>
+                    <input type="checkbox" role="switch" data-scoreboard-auto-rotate-toggle aria-label="Automatically rotate scoreboard sports">
                     <span class="scoreboard-rotation-switch-track" aria-hidden="true"><span></span></span>
                     <span class="scoreboard-rotation-switch-label">Auto rotate</span>
                 </label>
@@ -90,7 +129,7 @@ $jsVersion = $assetVersion('assets/js/app.js');
             <nav class="score-hero-sports sport-chip-row" aria-label="Choose sport" data-scoreboard-sport-nav data-auto-rotate-ms="15000">
                 <?php foreach ($sportGroups as $sportGroup): ?>
                     <?php $active = in_array((int) $sportGroup['id'], $selectedSportIds, true); ?>
-                    <?php $sportHref = site_url('scoreboard') . '?sport=' . (int) $sportGroup['id'] . ($presentationFrame ? '&presentation=1' : ''); ?>
+                    <?php $sportHref = $scoreboardHref($scoreboardMode, (int) $sportGroup['id'], $presentationFrame); ?>
                     <a class="chip sport-chip <?= $active ? 'active' : '' ?>" data-scoreboard-sport-link href="<?= esc($sportHref, 'attr') ?>" <?= $active ? 'aria-current="page"' : '' ?>><?= esc($sportGroup['name']) ?></a>
                 <?php endforeach; ?>
                 <?php if (empty($sportGroups)): ?><span class="score-hero-empty">No sports are configured for the active event.</span><?php endif; ?>
@@ -108,7 +147,7 @@ $jsVersion = $assetVersion('assets/js/app.js');
                                 'bracketSchedules' => $bracketData['schedules'],
                                 'bracketFormat' => $bracketData['format'],
                                 'bracketVariant' => 'public',
-                                'bracketAriaLabel' => $selectedSport['name'] . ' ' . $category . ' ' . $bracketData['format_label'] . ' bracket',
+                                'bracketAriaLabel' => ($isOfficialScoreboard ? 'Official ' : 'Unofficial ') . $selectedSport['name'] . ' ' . $category . ' ' . $bracketData['format_label'] . ' bracket',
                             ]) ?>
                         </section>
                     <?php endforeach; ?>
@@ -116,7 +155,7 @@ $jsVersion = $assetVersion('assets/js/app.js');
             <?php elseif ($selectedSport): ?>
                 <div class="score-hero-empty score-hero-empty--panel">No bracket is available for <?= esc($selectedSport['name']) ?> yet.</div>
             <?php else: ?>
-                <div class="score-hero-empty score-hero-empty--panel">Select an available sport to load its bracket.</div>
+                <div class="score-hero-empty score-hero-empty--panel">Select an available sport to load its scoreboard.</div>
             <?php endif; ?>
         </div>
     </section>
@@ -125,36 +164,48 @@ $jsVersion = $assetVersion('assets/js/app.js');
     <div class="viewer-content scoreboard-below-bracket">
         <?php if ($selectedSport): ?>
             <div class="viewer-columns scoreboard-detail-columns">
-                <section class="viewer-panel">
-                    <div class="section-title"><h2>Recent Results</h2><span><?= esc($selectedSport['name']) ?> only</span></div>
+                <section class="viewer-panel<?= $isOfficialScoreboard ? '' : ' viewer-panel--provisional' ?>">
+                    <div class="section-title">
+                        <h2><?= $isOfficialScoreboard ? 'Recent Official Results' : 'Recent Unofficial Results' ?></h2>
+                        <span><?= esc($selectedSport['name']) ?> only</span>
+                    </div>
                     <div class="scroll-box">
                         <?php foreach ($results as $result): ?>
                             <article class="public-result">
-                                <div><b><?= esc($result['category'].' · '.$result['round']) ?></b><span class="badge <?= $result['status'] === 'validated' ? 'official' : 'unofficial' ?>"><?= $result['status'] === 'validated' ? 'OFFICIAL' : 'UNOFFICIAL' ?></span></div>
+                                <div>
+                                    <b><?= esc($result['category'].' · '.$result['round']) ?></b>
+                                    <span class="badge <?= $isOfficialScoreboard ? 'official' : 'unofficial' ?>"><?= $isOfficialScoreboard ? 'OFFICIAL' : 'PROVISIONAL' ?></span>
+                                </div>
                                 <?php foreach ($result['entries'] as $entry): ?><p><span><?= esc($entry['team_name']) ?></span><strong><?= esc(rtrim(rtrim(number_format((float) $entry['raw_score'], 2, '.', ''), '0'), '.')) ?></strong></p><?php endforeach; ?>
                                 <small><?= esc(date('M j, g:i A', strtotime($result['submitted_at']))) ?></small>
                             </article>
                         <?php endforeach; ?>
-                        <?php if (empty($results)): ?><div class="empty">No results have been submitted for this sport.</div><?php endif; ?>
+                        <?php if (empty($results)): ?><div class="empty">No <?= $isOfficialScoreboard ? 'validated' : 'pending' ?> results are available for this sport.</div><?php endif; ?>
                     </div>
                 </section>
 
-                <section class="viewer-panel">
-                    <div class="section-title"><h2>Sport Standings</h2><span>Validated results only</span></div>
+                <section class="viewer-panel<?= $isOfficialScoreboard ? '' : ' viewer-panel--provisional' ?>">
+                    <div class="section-title">
+                        <h2><?= $isOfficialScoreboard ? 'Official Sport Standings' : 'Unofficial Sport Standings' ?></h2>
+                        <span><?= $isOfficialScoreboard ? 'Validated results only' : 'Pending results · provisional' ?></span>
+                    </div>
                     <div class="viewer-podium compact-podium">
-                        <?php foreach (array_slice($ranking ?? [], 0, 4) as $i => $team): ?>
+                        <?php foreach (array_slice($ranking, 0, 4) as $i => $team): ?>
                             <article class="viewer-rank r<?= $i + 1 ?>"><span><?= ui_icon(['trophy', 'medal', 'award', 'target'][$i]) ?></span><b><?= $i + 1 ?></b><h3><?= esc($team['name']) ?></h3><strong><?= esc(format_points($team['total_points'])) ?></strong><small>points</small></article>
                         <?php endforeach; ?>
                     </div>
-                    <?php if (empty($ranking)): ?><div class="empty">No official standings are available for this sport.</div><?php endif; ?>
+                    <?php if (empty($ranking)): ?><div class="empty">No <?= $isOfficialScoreboard ? 'official' : 'provisional' ?> standings are available for this sport.</div><?php endif; ?>
                 </section>
             </div>
 
-            <section class="viewer-panel sport-points-panel">
-                <div class="section-title"><h2>Overall Sport Points</h2><span><?= esc($selectedSport['name']) ?> · validated results</span></div>
+            <section class="viewer-panel sport-points-panel<?= $isOfficialScoreboard ? '' : ' viewer-panel--provisional' ?>">
+                <div class="section-title">
+                    <h2><?= $isOfficialScoreboard ? 'Official Overall Sport Points' : 'Unofficial Overall Sport Points' ?></h2>
+                    <span><?= esc($selectedSport['name']) ?> · <?= $isOfficialScoreboard ? 'validated results' : 'pending results · subject to change' ?></span>
+                </div>
                 <div class="table-wrap"><table><thead><tr><th>Rank</th><th>Team</th><th>Points</th></tr></thead><tbody>
-                    <?php foreach ($ranking as $i => $team): ?><tr><td><b><?= $i + 1 ?></b></td><td><?= esc($team['name']) ?></td><td><b><?= esc(format_points($team['total_points'])) ?></b></td></tr><?php endforeach; ?>
-                    <?php if (empty($ranking)): ?><tr><td colspan="3" class="empty">No validated sport points yet.</td></tr><?php endif; ?>
+                    <?php foreach ($overallSportPoints as $i => $team): ?><tr><td><b><?= $i + 1 ?></b></td><td><?= esc($team['name']) ?></td><td><b><?= esc(format_points($team['total_points'])) ?></b></td></tr><?php endforeach; ?>
+                    <?php if (empty($overallSportPoints)): ?><tr><td colspan="3" class="empty">No <?= $isOfficialScoreboard ? 'validated' : 'provisional' ?> sport points yet.</td></tr><?php endif; ?>
                 </tbody></table></div>
             </section>
         <?php else: ?>

@@ -254,13 +254,13 @@
     let sportRotateTimer = null;
     let sportCountdownTimer = null;
     let rotationDeadline = 0;
-    let autoRotateEnabled = true;
+    let autoRotateEnabled = false;
 
     try {
       const storedAutoRotate = window.localStorage.getItem(SCOREBOARD_AUTO_ROTATE_KEY);
       if (storedAutoRotate !== null) autoRotateEnabled = storedAutoRotate !== '0';
     } catch (_) {
-      // Auto rotation still works when browser storage is unavailable.
+      // First-visit auto rotation remains off when browser storage is unavailable.
     }
 
     const persistAutoRotation = () => {

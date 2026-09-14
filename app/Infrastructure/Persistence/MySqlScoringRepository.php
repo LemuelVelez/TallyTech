@@ -185,24 +185,16 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
 
     public function results(?int $eventId = null, ?string $type = null): array
     {
-        $builder = $this->db->table('results r')
-            ->select('r.*, sc.sport_id, sc.team_a_id, sc.team_b_id, sc.round, sc.tournament_format, sc.match_code, sc.phase, sc.bracket_side, sc.court_label, sc.match_date, s.name sport_name, s.category, s.result_type, s.set_count, s.winning_points, l.name location_name, u.display_name submitted_by_name, v.display_name validated_by_name')
-            ->join('schedules sc', 'sc.id=r.schedule_id')
-            ->join('sports s', 's.id=sc.sport_id')
-            ->join('locations l', 'l.id=sc.location_id', 'left')
-            ->join('users u', 'u.id=r.submitted_by', 'left')
-            ->join('users v', 'v.id=r.validated_by', 'left');
-        if ($eventId !== null) {
-            $builder->where('r.event_id', $eventId);
+        return $this->resultRows($eventId, $type, null);
+    }
+
+    public function resultsByStatus(int $eventId, string $status, ?string $type = null): array
+    {
+        if ($eventId < 1) {
+            return [];
         }
-        if ($type) {
-            $builder->where('r.type', $type);
-        }
-        $rows = $builder->orderBy('r.id', 'DESC')->get()->getResultArray();
-        foreach ($rows as &$row) {
-            $row['entries'] = $this->resultEntries((int) $row['id']);
-        }
-        return $rows;
+
+        return $this->resultRows($eventId, $type, $this->scoreboardResultStatus($status));
     }
 
     public function resultEntries(int $resultId): array
@@ -234,10 +226,15 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             ->get()->getResultArray();
     }
 
-    public function rankingBySport(int $eventId, int $sportId): array
+    public function rankingBySport(int $eventId, int $sportId, string $status = 'validated'): array
     {
         if ($eventId < 1 || $sportId < 1) {
             return [];
+        }
+
+        $status = $this->scoreboardResultStatus($status);
+        if ($status === 'pending') {
+            return $this->provisionalRankingBySport($eventId, $sportId);
         }
 
         return $this->db->table('teams t')
@@ -1020,6 +1017,151 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             $settings[$row['setting_key']] = $row['setting_value'];
         }
         return $settings;
+    }
+
+    private function resultRows(?int $eventId, ?string $type, ?string $status): array
+    {
+        $builder = $this->db->table('results r')
+            ->select('r.*, sc.sport_id, sc.team_a_id, sc.team_b_id, sc.round, sc.tournament_format, sc.match_code, sc.phase, sc.bracket_side, sc.court_label, sc.match_date, s.name sport_name, s.category, s.result_type, s.set_count, s.winning_points, l.name location_name, u.display_name submitted_by_name, v.display_name validated_by_name')
+            ->join('schedules sc', 'sc.id=r.schedule_id')
+            ->join('sports s', 's.id=sc.sport_id')
+            ->join('locations l', 'l.id=sc.location_id', 'left')
+            ->join('users u', 'u.id=r.submitted_by', 'left')
+            ->join('users v', 'v.id=r.validated_by', 'left');
+        if ($eventId !== null) {
+            $builder->where('r.event_id', $eventId);
+        }
+        if ($type) {
+            $builder->where('r.type', $type);
+        }
+        if ($status !== null) {
+            $builder->where('r.status', $status);
+        }
+
+        $rows = $builder->orderBy('r.id', 'DESC')->get()->getResultArray();
+        foreach ($rows as &$row) {
+            $row['entries'] = $this->resultEntries((int) $row['id']);
+        }
+        unset($row);
+
+        return $rows;
+    }
+
+    private function scoreboardResultStatus(string $status): string
+    {
+        $status = strtolower(trim($status));
+        if (! in_array($status, ['validated', 'pending'], true)) {
+            throw new RuntimeException('Unsupported scoreboard result status.');
+        }
+
+        return $status;
+    }
+
+    private function provisionalRankingBySport(int $eventId, int $sportId): array
+    {
+        $results = array_values(array_filter(
+            $this->resultsByStatus($eventId, 'pending'),
+            static fn(array $result): bool => (int) ($result['sport_id'] ?? 0) === $sportId
+        ));
+        if ($results === []) {
+            return [];
+        }
+
+        $weightedPoints = $this->db->table('weighted_points')
+            ->where([
+                'event_id' => $eventId,
+                'sport_id' => $sportId,
+                'status' => 'validated',
+            ])
+            ->get()
+            ->getRowArray();
+
+        $ranking = [];
+        foreach ($results as $result) {
+            $entries = is_array($result['entries'] ?? null) ? $result['entries'] : [];
+            $placements = [];
+
+            if (($result['type'] ?? $result['result_type'] ?? '') === 'match') {
+                $outcome = $this->matchOutcome($entries);
+                if ($outcome !== null) {
+                    $winnerId = (int) ($outcome['winner']['team_id'] ?? 0);
+                    $loserId = (int) ($outcome['loser']['team_id'] ?? 0);
+                    $format = (string) ($result['tournament_format'] ?? 'single_elimination');
+                    $side = (string) ($result['bracket_side'] ?? '');
+                    $phase = (string) ($result['phase'] ?? '');
+                    $round = strtolower((string) ($result['round'] ?? ''));
+                    if ($phase === '' && (str_contains($round, 'final') || str_contains($round, 'championship'))) {
+                        $phase = 'final';
+                    }
+                    if ($side === '' && $phase === 'final') {
+                        $side = 'grand';
+                    }
+
+                    if ($format === 'double_elimination') {
+                        if ($side === 'lower' && $phase === 'final') {
+                            $placements[$loserId] = 3;
+                        } elseif ($side === 'grand' && $phase === 'tiebreaker') {
+                            $placements[$winnerId] = 1;
+                            $placements[$loserId] = 2;
+                        } elseif ($side === 'grand' && $phase === 'final' && $winnerId === (int) ($result['team_a_id'] ?? 0)) {
+                            $placements[$winnerId] = 1;
+                            $placements[$loserId] = 2;
+                        }
+                    } elseif ($phase === 'final') {
+                        $placements[$winnerId] = 1;
+                        $placements[$loserId] = 2;
+                    }
+                }
+            } else {
+                foreach ($entries as $entry) {
+                    $placement = (int) ($entry['placement'] ?? 0);
+                    if ($placement > 0) {
+                        $placements[(int) ($entry['team_id'] ?? 0)] = $placement;
+                    }
+                }
+            }
+
+            foreach ($entries as $entry) {
+                $teamId = (int) ($entry['team_id'] ?? 0);
+                if ($teamId < 1) {
+                    continue;
+                }
+                if (! isset($ranking[$teamId])) {
+                    $ranking[$teamId] = [
+                        'id' => $teamId,
+                        'name' => (string) ($entry['team_name'] ?? 'Team'),
+                        'code' => (string) ($entry['team_code'] ?? ''),
+                        'total_points' => 0.0,
+                        'firsts' => 0,
+                        'seconds' => 0,
+                        'thirds' => 0,
+                    ];
+                }
+
+                $placement = $placements[$teamId] ?? null;
+                if ($placement === null) {
+                    continue;
+                }
+                if ($weightedPoints) {
+                    $ranking[$teamId]['total_points'] += $this->pointsForPlacement($weightedPoints, (int) $placement);
+                }
+                if ((int) $placement === 1) {
+                    $ranking[$teamId]['firsts']++;
+                } elseif ((int) $placement === 2) {
+                    $ranking[$teamId]['seconds']++;
+                } elseif ((int) $placement === 3) {
+                    $ranking[$teamId]['thirds']++;
+                }
+            }
+        }
+
+        $rows = array_values($ranking);
+        usort($rows, static fn(array $a, array $b): int => ((float) $b['total_points'] <=> (float) $a['total_points'])
+            ?: ((int) $b['firsts'] <=> (int) $a['firsts'])
+            ?: ((int) $b['seconds'] <=> (int) $a['seconds'])
+            ?: strcasecmp((string) $a['name'], (string) $b['name']));
+
+        return $rows;
     }
 
     private function requireRow(string $table, int $id, string $label): array

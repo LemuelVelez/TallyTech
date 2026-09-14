@@ -24,16 +24,22 @@ final class ScoringServiceTest extends TestCase
     {
         $repository = $this->createMock(ScoringRepositoryInterface::class);
         $repository->method('activeEvent')->willReturn(null);
-        $repository->expects($this->once())->method('results')->with(0)->willReturn([]);
-        $repository->expects($this->once())->method('schedules')->with(0)->willReturn([]);
-        $repository->expects($this->once())->method('ranking')->with(0)->willReturn([]);
+        $repository->expects($this->once())->method('sports')->with(0)->willReturn([]);
+        $repository->expects($this->never())->method('resultsByStatus');
+        $repository->expects($this->never())->method('schedules');
+        $repository->expects($this->never())->method('rankingBySport');
 
         $data = (new ScoringService($repository))->scoreboard();
 
         $this->assertNull($data['activeEvent']);
-        $this->assertSame([], $data['ranking']);
-        $this->assertSame([], $data['results']);
-        $this->assertSame([], $data['schedules']);
+        $this->assertSame([], $data['officialScoreboard']['results']);
+        $this->assertSame([], $data['officialScoreboard']['standings']);
+        $this->assertSame([], $data['officialScoreboard']['overallSportPoints']);
+        $this->assertSame([], $data['officialScoreboard']['schedules']);
+        $this->assertSame([], $data['unofficialScoreboard']['results']);
+        $this->assertSame([], $data['unofficialScoreboard']['standings']);
+        $this->assertSame([], $data['unofficialScoreboard']['overallSportPoints']);
+        $this->assertSame([], $data['unofficialScoreboard']['schedules']);
     }
 
     public function testDashboardScopesEveryEventSpecificCollectionToActiveEvent(): void

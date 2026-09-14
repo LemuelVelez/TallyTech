@@ -20,9 +20,10 @@ interface ScoringRepositoryInterface
     public function notifications(int $limit = 30): array;
     public function weightedPoints(?int $eventId = null): array;
     public function results(?int $eventId = null, ?string $type = null): array;
+    public function resultsByStatus(int $eventId, string $status, ?string $type = null): array;
     public function resultEntries(int $resultId): array;
     public function ranking(?int $eventId = null): array;
-    public function rankingBySport(int $eventId, int $sportId): array;
+    public function rankingBySport(int $eventId, int $sportId, string $status = 'validated'): array;
     public function reportSummary(?int $eventId = null): array;
 
     public function createTeam(array $data, int $actorId): int;

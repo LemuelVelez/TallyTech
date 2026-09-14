@@ -57,46 +57,176 @@ class ScoringService
 
     public function scoreboard(?int $requestedSportId = null): array
     {
-        $data = $this->sportScores($requestedSportId);
-        $event = $data['activeEvent'];
+        $event = $this->repository->activeEvent();
         $eventId = (int) ($event['id'] ?? 0);
-        $selectedSport = $data['selectedSport'];
-        $selectedSportIds = $data['selectedSportIds'];
+        $sports = $this->repository->sports($eventId);
+        $selection = $this->scoreboardSportSelection($sports, $requestedSportId);
+        $selectedSportIds = $selection['selectedSportIds'];
 
-        if (! $eventId || ! $selectedSportIds) {
-            return $data + [
-                'results' => [],
-                'schedules' => [],
-            ];
+        $official = $this->buildScoreboardDataset($eventId, $selectedSportIds, 'validated');
+        $unofficial = $this->buildScoreboardDataset($eventId, $selectedSportIds, 'pending');
+
+        return [
+            'activeEvent' => $event,
+            'sports' => $sports,
+            'selectedSport' => $selection['selectedSport'],
+            'selectedSportIds' => $selectedSportIds,
+            'sportScoreTable' => [
+                'sportGroups' => $selection['sportGroups'],
+                'selectedSport' => $selection['selectedSport'],
+                'selectedSportIds' => $selectedSportIds,
+            ],
+            'scoreboards' => [
+                'official' => $official,
+                'unofficial' => $unofficial,
+            ],
+            'officialScoreboard' => $official,
+            'unofficialScoreboard' => $unofficial,
+        ];
+    }
+
+    public function saveResult(array $data, int $actorId): int
+    {
+        if (empty($data['schedule_id'])) {
+            throw new RuntimeException('Select a schedule.');
+        }
+        return $this->repository->createResult($data, $actorId);
+    }
+
+    private function scoreboardSportSelection(array $sports, ?int $requestedSportId): array
+    {
+        $groups = [];
+        foreach ($sports as $sport) {
+            $name = trim((string) ($sport['name'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+            if (! isset($groups[$name])) {
+                $groups[$name] = [
+                    'id' => (int) $sport['id'],
+                    'name' => $name,
+                    'sport_ids' => [],
+                ];
+            }
+            $groups[$name]['sport_ids'][] = (int) $sport['id'];
+        }
+        $sportGroups = array_values($groups);
+        usort($sportGroups, static fn(array $a, array $b): int => strcasecmp($a['name'], $b['name']));
+
+        $selectedName = null;
+        if ($requestedSportId !== null) {
+            foreach ($sports as $sport) {
+                if ((int) ($sport['id'] ?? 0) === $requestedSportId) {
+                    $selectedName = (string) ($sport['name'] ?? '');
+                    break;
+                }
+            }
+        }
+        $selectedName ??= (string) ($sportGroups[0]['name'] ?? '');
+
+        $selectedSports = array_values(array_filter(
+            $sports,
+            static fn(array $sport): bool => (string) ($sport['name'] ?? '') === $selectedName
+        ));
+        $categoryOrder = static fn(string $category): int => match (strtolower($category)) {
+            'men' => 0,
+            'women' => 1,
+            'mixed' => 2,
+            default => 3,
+        };
+        usort($selectedSports, static function (array $a, array $b) use ($categoryOrder): int {
+            $order = $categoryOrder((string) ($a['category'] ?? '')) <=> $categoryOrder((string) ($b['category'] ?? ''));
+            return $order ?: strcasecmp((string) ($a['category'] ?? ''), (string) ($b['category'] ?? ''));
+        });
+
+        return [
+            'sportGroups' => $sportGroups,
+            'selectedSport' => $selectedSports[0] ?? null,
+            'selectedSportIds' => array_map('intval', array_column($selectedSports, 'id')),
+        ];
+    }
+
+    private function buildScoreboardDataset(int $eventId, array $selectedSportIds, string $status): array
+    {
+        $official = $status === 'validated';
+        $dataset = [
+            'status' => $status,
+            'label' => $official ? 'Official Scoreboard' : 'Unofficial Scoreboard',
+            'description' => $official
+                ? 'Confirmed and final results, standings, and sport points.'
+                : 'Provisional scores awaiting validation and subject to change.',
+            'results' => [],
+            'standings' => [],
+            'overallSportPoints' => [],
+            'schedules' => [],
+        ];
+
+        if ($eventId < 1 || $selectedSportIds === []) {
+            return $dataset;
         }
 
         $results = array_values(array_filter(
-            $this->repository->results($eventId),
-            static fn(array $result): bool => in_array((int) $result['sport_id'], $selectedSportIds, true)
+            $this->repository->resultsByStatus($eventId, $status),
+            static fn(array $result): bool => in_array((int) ($result['sport_id'] ?? 0), $selectedSportIds, true)
         ));
+        $ranking = $this->combinedSportRanking($eventId, $selectedSportIds, $status);
+        $resultTeamIds = [];
+        foreach ($results as $result) {
+            foreach ($result['entries'] ?? [] as $entry) {
+                $teamId = (int) ($entry['team_id'] ?? 0);
+                if ($teamId > 0) {
+                    $resultTeamIds[$teamId] = true;
+                }
+            }
+        }
+        $ranking = array_values(array_filter(
+            $ranking,
+            static fn(array $row): bool => isset($resultTeamIds[(int) ($row['id'] ?? 0)])
+        ));
+
+        $dataset['results'] = $results;
+        $dataset['standings'] = $ranking;
+        $dataset['overallSportPoints'] = $ranking;
+        $dataset['schedules'] = $this->buildScoreboardSchedules($eventId, $selectedSportIds, $results, $status);
+
+        return $dataset;
+    }
+
+    private function buildScoreboardSchedules(int $eventId, array $selectedSportIds, array $results, string $status): array
+    {
+        $otherStatus = $status === 'validated' ? 'pending' : 'validated';
+        $otherResultScheduleIds = [];
+        foreach ($this->repository->resultsByStatus($eventId, $otherStatus) as $result) {
+            if (in_array((int) ($result['sport_id'] ?? 0), $selectedSportIds, true)) {
+                $otherResultScheduleIds[(int) ($result['schedule_id'] ?? 0)] = true;
+            }
+        }
+
         $schedules = array_values(array_filter(
             $this->repository->resolveBracketSlots($this->repository->schedules($eventId)),
-            static fn(array $schedule): bool => in_array((int) $schedule['sport_id'], $selectedSportIds, true)
+            static fn(array $schedule): bool => in_array((int) ($schedule['sport_id'] ?? 0), $selectedSportIds, true)
+                && ! isset($otherResultScheduleIds[(int) ($schedule['id'] ?? 0)])
         ));
         usort($schedules, static fn(array $a, array $b): int => ((int) ($a['sport_id'] ?? 0) <=> (int) ($b['sport_id'] ?? 0))
             ?: (((int) ($a['bracket_order'] ?? 0) <=> (int) ($b['bracket_order'] ?? 0))
-            ?: strcmp((string) $a['match_date'], (string) $b['match_date'])));
+            ?: strcmp((string) ($a['match_date'] ?? ''), (string) ($b['match_date'] ?? ''))));
 
         $resultBySchedule = [];
         foreach ($results as $result) {
-            $resultBySchedule[(int) $result['schedule_id']] = $result;
+            $resultBySchedule[(int) ($result['schedule_id'] ?? 0)] = $result;
         }
+
         foreach ($schedules as &$schedule) {
-            $result = $resultBySchedule[(int) $schedule['id']] ?? null;
+            $result = $resultBySchedule[(int) ($schedule['id'] ?? 0)] ?? null;
             $schedule['result_status'] = $result['status'] ?? null;
             $schedule['result_entries'] = $result['entries'] ?? [];
             $schedule['score_by_team'] = [];
             foreach ($schedule['result_entries'] as $entry) {
-                $schedule['score_by_team'][(int) $entry['team_id']] = $entry['raw_score'];
+                $schedule['score_by_team'][(int) ($entry['team_id'] ?? 0)] = $entry['raw_score'] ?? 0;
             }
             $schedule['winner_name'] = null;
             $schedule['loser_name'] = null;
-            if ($result && ($result['status'] ?? '') === 'validated' && ($result['type'] ?? '') === 'match') {
+            if ($result && $status === 'validated' && ($result['type'] ?? '') === 'match') {
                 $outcome = $this->matchOutcome($result['entries'] ?? []);
                 if ($outcome !== null) {
                     $schedule['winner_name'] = $outcome['winner']['team_name'] ?? null;
@@ -106,18 +236,7 @@ class ScoringService
         }
         unset($schedule);
 
-        $data['selectedSport'] = $selectedSport;
-        $data['results'] = $results;
-        $data['schedules'] = $schedules;
-        return $data;
-    }
-
-    public function saveResult(array $data, int $actorId): int
-    {
-        if (empty($data['schedule_id'])) {
-            throw new RuntimeException('Select a schedule.');
-        }
-        return $this->repository->createResult($data, $actorId);
+        return $schedules;
     }
 
     private function buildSportScoreTable(int $eventId, array $sports, ?int $requestedSportId): array
@@ -279,11 +398,11 @@ class ScoringService
         ];
     }
 
-    private function combinedSportRanking(int $eventId, array $sportIds): array
+    private function combinedSportRanking(int $eventId, array $sportIds, string $status = 'validated'): array
     {
         $combined = [];
         foreach ($sportIds as $sportId) {
-            foreach ($this->repository->rankingBySport($eventId, (int) $sportId) as $row) {
+            foreach ($this->repository->rankingBySport($eventId, (int) $sportId, $status) as $row) {
                 $teamId = (int) $row['id'];
                 if (! isset($combined[$teamId])) {
                     $combined[$teamId] = [
