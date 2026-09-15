@@ -65,7 +65,7 @@ $jsVersion = $assetVersion('assets/js/app.js');
     <meta name="tallytech-scoreboard-refresh" content="30" data-scoreboard-refresh>
     <meta name="theme-color" content="#061b3a">
     <title><?= esc($isOfficialScoreboard ? 'Official Scoreboard' : 'Unofficial Scoreboard') ?> · TallyTech</title>
-    <link rel="icon" type="image/webp" href="<?= base_url('favicon.webp') ?>">
+    <link rel="icon" type="image/x-icon" href="<?= base_url('favicon.ico') ?>?v=2">
     <link rel="stylesheet" href="<?= esc(base_url('assets/css/app.css') . '?v=' . rawurlencode($cssVersion), 'attr') ?>">
 </head>
 <body class="viewer-page<?= $presentationFrame ? ' viewer-page--presentation-frame' : '' ?><?= $isOfficialScoreboard ? ' scoreboard-view--official' : ' scoreboard-view--unofficial' ?>"<?= $presentationFrame ? ' data-scoreboard-presentation-frame="true"' : '' ?>>

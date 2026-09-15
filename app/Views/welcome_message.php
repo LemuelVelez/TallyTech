@@ -5,7 +5,7 @@
     <title>Welcome to CodeIgniter 4!</title>
     <meta name="description" content="The small framework with powerful features">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/webp" href="/favicon.webp">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2">
 
     <!-- STYLES -->
 
