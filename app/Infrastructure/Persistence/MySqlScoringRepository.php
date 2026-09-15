@@ -208,17 +208,24 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             ->get()->getResultArray();
     }
 
-    public function ranking(?int $eventId = null): array
+    public function ranking(?int $eventId = null, bool $officialOnly = true): array
     {
         $eventId ??= (int) ($this->activeEvent()['id'] ?? 0);
         if (! $eventId) {
             return [];
         }
-        return $this->db->table('teams t')
-            ->select('t.id,t.name,t.code,COALESCE(SUM(CASE WHEN r.status="validated" THEN re.allocated_points ELSE 0 END),0) total_points, SUM(CASE WHEN r.status="validated" AND re.placement=1 THEN 1 ELSE 0 END) firsts, SUM(CASE WHEN r.status="validated" AND re.placement=2 THEN 1 ELSE 0 END) seconds, SUM(CASE WHEN r.status="validated" AND re.placement=3 THEN 1 ELSE 0 END) thirds')
-            ->join('result_entries re', 're.team_id=t.id', 'left')
-            ->join('results r', 'r.id=re.result_id AND r.event_id=' . $this->db->escape($eventId), 'left')
-            ->groupBy('t.id,t.name,t.code')
+        $builder = $this->db->table('teams t')
+            ->select('t.id,t.name,t.code,COALESCE(SUM(CASE WHEN r.status="validated" THEN re.allocated_points ELSE 0 END),0) total_points, SUM(CASE WHEN r.status="validated" AND re.placement=1 THEN 1 ELSE 0 END) firsts, SUM(CASE WHEN r.status="validated" AND re.placement=2 THEN 1 ELSE 0 END) seconds, SUM(CASE WHEN r.status="validated" AND re.placement=3 THEN 1 ELSE 0 END) thirds');
+        if ($officialOnly) {
+            $builder->join('result_entries re', 're.team_id=t.id')
+                ->join('results r', 'r.id=re.result_id AND r.event_id=' . $this->db->escape($eventId))
+                ->having('total_points >', 0);
+        } else {
+            $builder->join('result_entries re', 're.team_id=t.id', 'left')
+                ->join('results r', 'r.id=re.result_id AND r.event_id=' . $this->db->escape($eventId), 'left');
+        }
+        $builder->groupBy('t.id,t.name,t.code');
+        return $builder
             ->orderBy('total_points', 'DESC')
             ->orderBy('firsts', 'DESC')
             ->orderBy('seconds', 'DESC')
@@ -260,6 +267,78 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             'unofficial_results' => $eventId ? $this->db->table('results')->where(['event_id' => $eventId, 'status' => 'pending'])->countAllResults() : 0,
             'sports' => $eventId ? $this->db->table('sports')->where('event_id', $eventId)->countAllResults() : 0,
         ];
+    }
+
+    public function reportRows(string $type, array $filters): array
+    {
+        $eventId = (int) ($filters['event_id'] ?? 0);
+        if ($eventId < 1) {
+            return [];
+        }
+
+        if ($type === 'standings' || $type === 'medal_tally') {
+            $builder = $this->db->table('teams t')
+                ->select('t.id,t.name team,t.code,COALESCE(SUM(re.allocated_points),0) points,SUM(CASE WHEN re.placement=1 THEN 1 ELSE 0 END) firsts,SUM(CASE WHEN re.placement=2 THEN 1 ELSE 0 END) seconds,SUM(CASE WHEN re.placement=3 THEN 1 ELSE 0 END) thirds')
+                ->join('result_entries re', 're.team_id=t.id')
+                ->join('results r', 'r.id=re.result_id')
+                ->join('schedules sc', 'sc.id=r.schedule_id')
+                ->join('sports s', 's.id=sc.sport_id');
+            $this->applyReportFilters($builder, $filters);
+            $builder->groupBy('t.id,t.name,t.code');
+            if (($filters['status'] ?? '') === 'validated' && $type === 'standings') {
+                $builder->having('points >', 0);
+            }
+            if ($type === 'medal_tally') {
+                return $builder->select('SUM(CASE WHEN re.placement=1 THEN 1 ELSE 0 END) gold,SUM(CASE WHEN re.placement=2 THEN 1 ELSE 0 END) silver,SUM(CASE WHEN re.placement=3 THEN 1 ELSE 0 END) bronze')
+                    ->orderBy('gold', 'DESC')->orderBy('silver', 'DESC')->orderBy('bronze', 'DESC')->orderBy('points', 'DESC')->orderBy('t.name', 'ASC')->get()->getResultArray();
+            }
+            return $builder->orderBy('points', 'DESC')->orderBy('firsts', 'DESC')->orderBy('seconds', 'DESC')->orderBy('t.name', 'ASC')->get()->getResultArray();
+        }
+
+        if ($type === 'sport_rankings') {
+            $builder = $this->db->table('teams t')
+                ->select('s.id sport_id,s.name sport,s.category,t.id team_id,t.name team,t.code,COALESCE(SUM(re.allocated_points),0) points,SUM(CASE WHEN re.placement=1 THEN 1 ELSE 0 END) firsts,SUM(CASE WHEN re.placement=2 THEN 1 ELSE 0 END) seconds,SUM(CASE WHEN re.placement=3 THEN 1 ELSE 0 END) thirds')
+                ->join('result_entries re', 're.team_id=t.id')
+                ->join('results r', 'r.id=re.result_id')
+                ->join('schedules sc', 'sc.id=r.schedule_id')
+                ->join('sports s', 's.id=sc.sport_id');
+            $this->applyReportFilters($builder, $filters);
+            $builder->groupBy('s.id,s.name,s.category,t.id,t.name,t.code');
+            if (($filters['status'] ?? '') === 'validated') {
+                $builder->having('points >', 0);
+            }
+            return $builder->orderBy('s.name', 'ASC')->orderBy('s.category', 'ASC')->orderBy('points', 'DESC')->orderBy('firsts', 'DESC')->orderBy('seconds', 'DESC')->orderBy('t.name', 'ASC')->get()->getResultArray();
+        }
+
+        if ($type === 'validation_log') {
+            $builder = $this->db->table('results r')
+                ->select('s.name sport,s.category,sc.round,r.status,u.display_name submitted_by,r.submitted_at,v.display_name validated_by,r.validated_at')
+                ->join('schedules sc', 'sc.id=r.schedule_id')
+                ->join('sports s', 's.id=sc.sport_id')
+                ->join('users u', 'u.id=r.submitted_by', 'left')
+                ->join('users v', 'v.id=r.validated_by', 'left');
+            $this->applyReportFilters($builder, $filters);
+            return $builder->orderBy('COALESCE(r.validated_at,r.submitted_at)', 'DESC', false)->orderBy('r.id', 'DESC')->get()->getResultArray();
+        }
+
+        $builder = $this->db->table('results r')
+            ->join('schedules sc', 'sc.id=r.schedule_id')
+            ->join('sports s', 's.id=sc.sport_id')
+            ->join('result_entries re', 're.result_id=r.id')
+            ->join('teams t', 't.id=re.team_id')
+            ->join('users u', 'u.id=r.submitted_by', 'left')
+            ->join('users v', 'v.id=r.validated_by', 'left');
+        $this->applyReportFilters($builder, $filters);
+        if ($type === 'sport_results') {
+            return $builder->select('DATE(sc.match_date) date,s.name sport,s.category,sc.round,t.name team,re.raw_score score,re.placement,re.allocated_points points,r.status')
+                ->orderBy('sc.match_date', 'DESC')->orderBy('s.name', 'ASC')->orderBy('re.placement', 'ASC')->orderBy('t.name', 'ASC')->get()->getResultArray();
+        }
+        if ($type === 'full_event') {
+            return $builder->select('DATE(sc.match_date) date,s.name sport,s.category,sc.round,t.name team,re.raw_score score,re.placement,re.allocated_points points,r.status,u.display_name submitted_by,v.display_name validated_by')
+                ->orderBy('sc.match_date', 'ASC')->orderBy('s.name', 'ASC')->orderBy('re.placement', 'ASC')->orderBy('t.name', 'ASC')->get()->getResultArray();
+        }
+
+        return [];
     }
 
     public function createTeam(array $data, int $actorId): int
@@ -1012,11 +1091,38 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         $settings = [
             'compact_sidebar' => '0',
             'result_density' => 'comfortable',
+            'theme' => 'system',
+            'font_size' => 'medium',
+            'paper_size' => 'letter',
+            'orientation' => 'portrait',
+            'include_team_ranking' => '1',
+            'include_filter_summary' => '1',
+            'show_timestamp' => '1',
         ];
         foreach ($rows as $row) {
             $settings[$row['setting_key']] = $row['setting_value'];
         }
         return $settings;
+    }
+
+    private function applyReportFilters($builder, array $filters): void
+    {
+        $builder->where('r.event_id', (int) $filters['event_id']);
+        if (! empty($filters['sport_id'])) {
+            $builder->where('s.id', (int) $filters['sport_id']);
+        }
+        if (($filters['category'] ?? '') !== '') {
+            $builder->where('s.category', (string) $filters['category']);
+        }
+        if (($filters['status'] ?? '') !== '') {
+            $builder->where('r.status', (string) $filters['status']);
+        }
+        if (($filters['date_from'] ?? '') !== '') {
+            $builder->where('sc.match_date >=', (string) $filters['date_from'] . ' 00:00:00');
+        }
+        if (($filters['date_to'] ?? '') !== '') {
+            $builder->where('sc.match_date <=', (string) $filters['date_to'] . ' 23:59:59');
+        }
     }
 
     private function resultRows(?int $eventId, ?string $type, ?string $status): array

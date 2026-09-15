@@ -13,6 +13,6 @@ class DashboardController extends BaseController
     public function ranking()
     {
         $event=$this->repository()->activeEvent();
-        return view('dashboard/ranking',['title'=>'Team Ranking','activeEvent'=>$event,'ranking'=>$this->repository()->ranking((int)($event['id']??0))]);
+        return view('dashboard/ranking',['title'=>'Team Ranking','activeEvent'=>$event,'ranking'=>$this->repository()->ranking((int)($event['id']??0),false)]);
     }
 }

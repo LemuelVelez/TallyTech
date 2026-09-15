@@ -4,6 +4,10 @@ $roleLabel = ['admin' => 'Admin Panel', 'manager' => 'Tournament Manager', 'vali
 $accountRoleLabel = ['admin' => 'Administrator', 'manager' => 'Tournament Manager', 'validator' => 'Validator', 'facilitator' => 'Facilitator'][$role] ?? ucfirst($role);
 $compactSidebar = (bool) session()->get('compact_sidebar');
 $resultDensity = (string) (session()->get('result_density') ?: 'comfortable');
+$theme = (string) (session()->get('theme') ?: 'system');
+$fontSize = (string) (session()->get('font_size') ?: 'medium');
+$theme = in_array($theme, ['light', 'dark', 'system'], true) ? $theme : 'system';
+$fontSize = in_array($fontSize, ['small', 'medium', 'large'], true) ? $fontSize : 'medium';
 $displayName = (string) session()->get('display_name');
 $assetVersion = static function (string $relativePath): string {
     $path = defined('FCPATH') ? FCPATH . ltrim($relativePath, '/\\') : '';
@@ -13,7 +17,7 @@ $cssVersion = $assetVersion('assets/css/app.css');
 $jsVersion = $assetVersion('assets/js/app.js');
 ?>
 <!doctype html>
-<html lang="en">
+<html lang="en" class="font-root-<?= esc($fontSize) ?>">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -22,7 +26,7 @@ $jsVersion = $assetVersion('assets/js/app.js');
     <link rel="icon" type="image/webp" href="<?= base_url('favicon.webp') ?>">
     <link rel="stylesheet" href="<?= esc(base_url('assets/css/app.css') . '?v=' . rawurlencode($cssVersion), 'attr') ?>">
 </head>
-<body class="app role-<?= esc($role) ?> <?= $compactSidebar ? 'sidebar-compact' : '' ?> density-<?= esc($resultDensity) ?>">
+<body class="app role-<?= esc($role) ?> <?= $compactSidebar ? 'sidebar-compact' : '' ?> density-<?= esc($resultDensity) ?> theme-<?= esc($theme) ?> font-<?= esc($fontSize) ?>">
 <a class="skip-link" href="#main-content">Skip to main content</a>
 <header class="topbar">
     <button class="menu-toggle" type="button" data-nav-toggle aria-label="Open navigation" aria-controls="app-sidebar" aria-expanded="false"><?= ui_icon('menu') ?></button>

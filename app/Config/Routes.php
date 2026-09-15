@@ -28,6 +28,8 @@ $routes->group('', ['filter' => 'auth'], static function (RouteCollection $route
         $routes->post('sports/(:num)/delete', 'SportsController::delete/$1');
 
         $routes->get('reports', 'ReportsController::index');
+        $routes->get('reports/print', 'ReportsController::print');
+        $routes->get('reports/xlsx', 'ReportsController::xlsx');
     });
 
     $routes->group('', ['filter' => 'role:admin'], static function (RouteCollection $routes): void {

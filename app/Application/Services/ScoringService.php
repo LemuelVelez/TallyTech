@@ -27,7 +27,7 @@ class ScoringService
         $eventId = (int) ($event['id'] ?? 0);
         return [
             'activeEvent' => $event,
-            'ranking' => $this->repository->ranking($eventId),
+            'ranking' => $this->repository->ranking($eventId, false),
             'results' => $this->repository->results($eventId),
             'schedules' => $this->repository->schedules($eventId),
             'teams' => $this->repository->teams(),

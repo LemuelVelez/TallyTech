@@ -33,7 +33,16 @@ class AuthController extends BaseController
                 ->with('login_username', $username);
         }
 
-        $resultDensity = $settings['result_density'] ?? 'comfortable';
+        $resultDensity = (string) ($settings['result_density'] ?? 'comfortable');
+        $theme = (string) ($settings['theme'] ?? 'system');
+        $fontSize = (string) ($settings['font_size'] ?? 'medium');
+        $paperSize = (string) ($settings['paper_size'] ?? 'letter');
+        $orientation = (string) ($settings['orientation'] ?? 'portrait');
+        $resultDensity = in_array($resultDensity, ['comfortable', 'compact'], true) ? $resultDensity : 'comfortable';
+        $theme = in_array($theme, ['light', 'dark', 'system'], true) ? $theme : 'system';
+        $fontSize = in_array($fontSize, ['small', 'medium', 'large'], true) ? $fontSize : 'medium';
+        $paperSize = in_array($paperSize, ['letter', 'a4', 'legal'], true) ? $paperSize : 'letter';
+        $orientation = in_array($orientation, ['portrait', 'landscape'], true) ? $orientation : 'portrait';
 
         session()->regenerate(true);
         session()->remove('compact_sidebar');
@@ -42,9 +51,14 @@ class AuthController extends BaseController
             'username' => $user['username'],
             'display_name' => $user['display_name'],
             'role' => $user['role'],
-            'result_density' => in_array($resultDensity, ['comfortable', 'compact'], true)
-                ? $resultDensity
-                : 'comfortable',
+            'result_density' => $resultDensity,
+            'theme' => $theme,
+            'font_size' => $fontSize,
+            'paper_size' => $paperSize,
+            'orientation' => $orientation,
+            'include_team_ranking' => ($settings['include_team_ranking'] ?? '1') === '1' ? '1' : '0',
+            'include_filter_summary' => ($settings['include_filter_summary'] ?? '1') === '1' ? '1' : '0',
+            'show_timestamp' => ($settings['show_timestamp'] ?? '1') === '1' ? '1' : '0',
         ]);
         if (($settings['compact_sidebar'] ?? '0') === '1') {
             session()->set('compact_sidebar', true);

@@ -22,9 +22,10 @@ interface ScoringRepositoryInterface
     public function results(?int $eventId = null, ?string $type = null): array;
     public function resultsByStatus(int $eventId, string $status, ?string $type = null): array;
     public function resultEntries(int $resultId): array;
-    public function ranking(?int $eventId = null): array;
+    public function ranking(?int $eventId = null, bool $officialOnly = true): array;
     public function rankingBySport(int $eventId, int $sportId, string $status = 'validated'): array;
     public function reportSummary(?int $eventId = null): array;
+    public function reportRows(string $type, array $filters): array;
 
     public function createTeam(array $data, int $actorId): int;
     public function updateTeam(int $id, array $data, int $actorId): ?string;
