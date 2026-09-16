@@ -16,10 +16,10 @@ class ReportingService
     ];
 
     private const COLUMNS = [
-        'standings' => ['rank', 'team', 'firsts', 'seconds', 'thirds', 'points'],
+        'standings' => ['rank', 'team', 'firsts', 'seconds', 'thirds', 'fourths', 'points'],
         'medal_tally' => ['team', 'gold', 'silver', 'bronze', 'total_medals', 'points'],
         'sport_results' => ['date', 'sport', 'category', 'round', 'team', 'score', 'placement', 'points', 'status'],
-        'sport_rankings' => ['sport', 'category', 'rank', 'team', 'firsts', 'seconds', 'thirds', 'points'],
+        'sport_rankings' => ['sport', 'category', 'rank', 'team', 'firsts', 'seconds', 'thirds', 'fourths', 'points'],
         'validation_log' => ['sport', 'category', 'round', 'status', 'submitted_by', 'submitted_at', 'validated_by', 'validated_at'],
         'full_event' => ['date', 'sport', 'category', 'round', 'team', 'score', 'placement', 'points', 'status', 'submitted_by', 'validated_by'],
     ];
@@ -30,6 +30,7 @@ class ReportingService
         'firsts' => '1st',
         'seconds' => '2nd',
         'thirds' => '3rd',
+        'fourths' => '4th',
         'points' => 'Points',
         'gold' => 'Gold',
         'silver' => 'Silver',
@@ -66,6 +67,7 @@ class ReportingService
                     'firsts' => (int) $row['firsts'],
                     'seconds' => (int) $row['seconds'],
                     'thirds' => (int) $row['thirds'],
+                    'fourths' => (int) $row['fourths'],
                     'points' => (float) $row['points'],
                 ];
             }
@@ -100,6 +102,7 @@ class ReportingService
                     'firsts' => (int) $row['firsts'],
                     'seconds' => (int) $row['seconds'],
                     'thirds' => (int) $row['thirds'],
+                    'fourths' => (int) $row['fourths'],
                     'points' => (float) $row['points'],
                 ];
             }
@@ -143,10 +146,10 @@ class ReportingService
     public function numericColumns(string $type): array
     {
         return match ($type) {
-            'standings' => ['rank', 'firsts', 'seconds', 'thirds', 'points'],
+            'standings' => ['rank', 'firsts', 'seconds', 'thirds', 'fourths', 'points'],
             'medal_tally' => ['gold', 'silver', 'bronze', 'total_medals', 'points'],
             'sport_results' => ['score', 'placement', 'points'],
-            'sport_rankings' => ['rank', 'firsts', 'seconds', 'thirds', 'points'],
+            'sport_rankings' => ['rank', 'firsts', 'seconds', 'thirds', 'fourths', 'points'],
             'full_event' => ['score', 'placement', 'points'],
             default => [],
         };

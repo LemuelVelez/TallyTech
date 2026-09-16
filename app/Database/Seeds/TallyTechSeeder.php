@@ -306,6 +306,7 @@ class TallyTechSeeder extends Seeder
             'first_points' => 10,
             'second_points' => 7,
             'third_points' => 5,
+            'fourth_points' => 3,
             'participation_points' => 2,
             'status' => 'validated',
             'submitted_by' => $managerId,

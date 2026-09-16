@@ -80,6 +80,7 @@ class SchedulesController extends BaseController
         $parsedStart = $this->parseDateTime($rawStart);
         $interval = $this->postPositiveInt('interval_minutes') ?: 60;
         $courtLabel = trim($this->postString('court_label'));
+        $thirdPlacePlayoff = $this->request->getPost('third_place_playoff') !== null;
 
         if (! $sportId || ! $locationId || ! in_array($format, self::TOURNAMENT_FORMATS, true) || ! $parsedStart) {
             return redirect()->back()->withInput()->with('error', 'Sport, tournament format, location, and bracket start time are required.');
@@ -106,6 +107,7 @@ class SchedulesController extends BaseController
                 'start_time' => $parsedStart->format('Y-m-d H:i:s'),
                 'interval_minutes' => $interval,
                 'court_label' => $courtLabel ?: null,
+                'third_place_playoff' => $thirdPlacePlayoff,
             ], $teamIds, (int) session()->get('user_id'));
         } catch (\Throwable $e) {
             return redirect()->back()->withInput()->with('error', $this->safeErrorMessage($e, 'The bracket could not be generated.'));
@@ -216,6 +218,7 @@ class SchedulesController extends BaseController
             'playoff' => ['round' => 'Playoff', 'phase' => 'playoff', 'bracket_side' => 'upper'],
             'quarter' => ['round' => 'Quarter Final', 'phase' => 'quarter', 'bracket_side' => 'upper'],
             'semi' => ['round' => 'Semi Final', 'phase' => 'semi', 'bracket_side' => 'upper'],
+            'third_place' => ['round' => '3rd Place Playoff', 'phase' => 'third_place', 'bracket_side' => 'lower'],
             'final' => ['round' => 'Final', 'phase' => 'final', 'bracket_side' => 'grand'],
             'lower_r1' => ['round' => 'Lower Round 1', 'phase' => 'lower_r1', 'bracket_side' => 'lower'],
             'upper_final' => ['round' => 'Upper Final', 'phase' => 'final', 'bracket_side' => 'upper'],

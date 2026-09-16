@@ -152,7 +152,7 @@ class XlsxReportService
     private function label(string $column): string
     {
         $labels = [
-            'rank' => 'Rank', 'team' => 'Team', 'firsts' => '1st', 'seconds' => '2nd', 'thirds' => '3rd', 'points' => 'Points',
+            'rank' => 'Rank', 'team' => 'Team', 'firsts' => '1st', 'seconds' => '2nd', 'thirds' => '3rd', 'fourths' => '4th', 'points' => 'Points',
             'gold' => 'Gold', 'silver' => 'Silver', 'bronze' => 'Bronze', 'total_medals' => 'Total Medals', 'date' => 'Date',
             'sport' => 'Sport', 'category' => 'Category', 'round' => 'Round', 'score' => 'Score', 'placement' => 'Placement',
             'status' => 'Result Status', 'submitted_by' => 'Submitted By', 'submitted_at' => 'Submitted At', 'validated_by' => 'Validated By', 'validated_at' => 'Validated At',

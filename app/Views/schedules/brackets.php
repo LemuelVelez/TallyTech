@@ -41,7 +41,8 @@ $bracketFormat = (string) ($schedules[0]['tournament_format'] ?? 'single_elimina
         </div>
         <span class="field-label">Participating Teams</span>
         <div class="sport-checks bracket-team-checks"><?php foreach ($teams as $team): ?><label class="check"><input type="checkbox" name="team_ids[]" value="<?= (int) $team['id'] ?>" checked> <?= esc($team['name']) ?></label><?php endforeach; ?></div>
-        <p class="form-note">Single elimination supports 2, 4, 8, or 16 teams. Double elimination uses a four-team winner/loser bracket with an automatic conditional reset final.</p>
+        <label class="check"><input type="checkbox" name="third_place_playoff" value="1"> Add 3rd-place playoff for single elimination</label>
+        <p class="form-note">Single elimination supports 2, 4, 8, or 16 teams; the optional 3rd-place playoff uses the two semifinal losers when available. Double elimination uses a four-team winner/loser bracket with an automatic conditional reset final.</p>
         <button class="btn primary full"><?= ui_icon('trophy') ?><span>Generate Bracket</span></button>
     </form>
 </dialog>

@@ -413,12 +413,14 @@ class ScoringService
                         'firsts' => 0,
                         'seconds' => 0,
                         'thirds' => 0,
+                        'fourths' => 0,
                     ];
                 }
                 $combined[$teamId]['total_points'] += (float) ($row['total_points'] ?? 0);
                 $combined[$teamId]['firsts'] += (int) ($row['firsts'] ?? 0);
                 $combined[$teamId]['seconds'] += (int) ($row['seconds'] ?? 0);
                 $combined[$teamId]['thirds'] += (int) ($row['thirds'] ?? 0);
+                $combined[$teamId]['fourths'] += (int) ($row['fourths'] ?? 0);
             }
         }
 
@@ -426,6 +428,8 @@ class ScoringService
         usort($rows, static fn(array $a, array $b): int => ((float) $b['total_points'] <=> (float) $a['total_points'])
             ?: ((int) $b['firsts'] <=> (int) $a['firsts'])
             ?: ((int) $b['seconds'] <=> (int) $a['seconds'])
+            ?: ((int) $b['thirds'] <=> (int) $a['thirds'])
+            ?: ((int) $b['fourths'] <=> (int) $a['fourths'])
             ?: strcasecmp((string) $a['name'], (string) $b['name']));
         return $rows;
     }

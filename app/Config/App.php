@@ -130,10 +130,13 @@ class App extends BaseConfig
      * The default timezone that will be used in your application to display
      * dates with the date helper, and can be retrieved through app_timezone()
      *
+     * Historical DATETIME rows written before this timezone change are left as-is
+     * to avoid double-shifting any data that may already have been corrected.
+     *
      * @see https://www.php.net/manual/en/timezones.php for list of timezones
      *      supported by PHP.
      */
-    public string $appTimezone = 'UTC';
+    public string $appTimezone = 'Asia/Manila';
 
     /**
      * --------------------------------------------------------------------------

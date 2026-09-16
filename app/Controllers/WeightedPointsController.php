@@ -78,7 +78,7 @@ class WeightedPointsController extends BaseController
         }
 
         $values = [];
-        foreach (['first_points', 'second_points', 'third_points', 'participation_points'] as $field) {
+        foreach (['first_points', 'second_points', 'third_points', 'fourth_points', 'participation_points'] as $field) {
             $value = $this->validDecimal($this->postString($field), self::MAX_POINTS);
             if ($value === null) {
                 return ['error' => 'All point values must be non-negative numbers with at most 2 decimal places and no more than 999999.99.'];

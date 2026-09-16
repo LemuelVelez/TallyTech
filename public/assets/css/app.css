@@ -497,7 +497,7 @@ tbody tr:hover { background: var(--table-hover); }
 .event-banner { margin-bottom: 18px; padding: 0.875rem; border-left: 4px solid #2478d5; border-radius: 11px; background: #edf5ff; color: #315a86; font-size: 0.9rem; }
 
 /* Rankings */
-.podium { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-bottom: 22px; }
+.podium { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; margin-bottom: 22px; }
 .podium-card {
   min-height: 148px;
   padding: 22px;
@@ -513,6 +513,7 @@ tbody tr:hover { background: var(--table-hover); }
 .podium-card.p1 { background: linear-gradient(135deg, #586d7d, #2f475a); }
 .podium-card.p2 { background: linear-gradient(135deg, #f7b219, #f18f08); }
 .podium-card.p3 { background: linear-gradient(135deg, #c36a35, #9a4924); }
+.podium-card.p4 { background: linear-gradient(135deg, #68758a, #445166); }
 .podium-card > span { grid-area: icon; display: inline-flex; align-items: center; }
 .podium-card > span .ui-icon { width: 31px; height: 31px; }
 .podium-card small { grid-area: place; font-size: 0.75rem; opacity: 0.86; }
@@ -1095,7 +1096,7 @@ input[type="checkbox"], input[type="radio"] { width: 18px; min-height: 18px; hei
   .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .action-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .two-col, .viewer-columns { grid-template-columns: 1fr; }
-  .viewer-podium { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .viewer-podium, .podium { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 860px) {

@@ -6,6 +6,7 @@ $stageValue = static function (array $schedule): string {
     if ($phase === 'lower_r1') return 'lower_r1';
     if ($phase === 'quarter') return 'quarter';
     if ($phase === 'semi') return 'semi';
+    if ($phase === 'third_place') return 'third_place';
     if ($phase === 'playoff') return 'playoff';
     if ($phase === 'tiebreaker') return 'tiebreaker';
     if ($phase === 'final' && $side === 'upper') return 'upper_final';
@@ -17,6 +18,7 @@ $stageOptions = [
     'playoff' => 'Playoff / Round of 16',
     'quarter' => 'Quarter Final',
     'semi' => 'Semi Final',
+    'third_place' => '3rd Place Playoff',
     'final' => 'Final',
     'lower_r1' => 'Lower Round 1',
     'upper_final' => 'Upper Final',

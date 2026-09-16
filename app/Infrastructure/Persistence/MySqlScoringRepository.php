@@ -215,7 +215,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             return [];
         }
         $builder = $this->db->table('teams t')
-            ->select('t.id,t.name,t.code,COALESCE(SUM(CASE WHEN r.status="validated" THEN re.allocated_points ELSE 0 END),0) total_points, SUM(CASE WHEN r.status="validated" AND re.placement=1 THEN 1 ELSE 0 END) firsts, SUM(CASE WHEN r.status="validated" AND re.placement=2 THEN 1 ELSE 0 END) seconds, SUM(CASE WHEN r.status="validated" AND re.placement=3 THEN 1 ELSE 0 END) thirds');
+            ->select('t.id,t.name,t.code,COALESCE(SUM(CASE WHEN r.status="validated" THEN re.allocated_points ELSE 0 END),0) total_points, SUM(CASE WHEN r.status="validated" AND re.placement=1 THEN 1 ELSE 0 END) firsts, SUM(CASE WHEN r.status="validated" AND re.placement=2 THEN 1 ELSE 0 END) seconds, SUM(CASE WHEN r.status="validated" AND re.placement=3 THEN 1 ELSE 0 END) thirds, SUM(CASE WHEN r.status="validated" AND re.placement=4 THEN 1 ELSE 0 END) fourths');
         if ($officialOnly) {
             $builder->join('result_entries re', 're.team_id=t.id')
                 ->join('results r', 'r.id=re.result_id AND r.event_id=' . $this->db->escape($eventId))
@@ -229,6 +229,8 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             ->orderBy('total_points', 'DESC')
             ->orderBy('firsts', 'DESC')
             ->orderBy('seconds', 'DESC')
+            ->orderBy('thirds', 'DESC')
+            ->orderBy('fourths', 'DESC')
             ->orderBy('t.name', 'ASC')
             ->get()->getResultArray();
     }
@@ -245,7 +247,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         }
 
         return $this->db->table('teams t')
-            ->select('t.id,t.name,t.code,COALESCE(SUM(CASE WHEN r.status="validated" AND sc.sport_id=' . $this->db->escape($sportId) . ' THEN re.allocated_points ELSE 0 END),0) total_points, SUM(CASE WHEN r.status="validated" AND sc.sport_id=' . $this->db->escape($sportId) . ' AND re.placement=1 THEN 1 ELSE 0 END) firsts, SUM(CASE WHEN r.status="validated" AND sc.sport_id=' . $this->db->escape($sportId) . ' AND re.placement=2 THEN 1 ELSE 0 END) seconds, SUM(CASE WHEN r.status="validated" AND sc.sport_id=' . $this->db->escape($sportId) . ' AND re.placement=3 THEN 1 ELSE 0 END) thirds')
+            ->select('t.id,t.name,t.code,COALESCE(SUM(CASE WHEN r.status="validated" AND sc.sport_id=' . $this->db->escape($sportId) . ' THEN re.allocated_points ELSE 0 END),0) total_points, SUM(CASE WHEN r.status="validated" AND sc.sport_id=' . $this->db->escape($sportId) . ' AND re.placement=1 THEN 1 ELSE 0 END) firsts, SUM(CASE WHEN r.status="validated" AND sc.sport_id=' . $this->db->escape($sportId) . ' AND re.placement=2 THEN 1 ELSE 0 END) seconds, SUM(CASE WHEN r.status="validated" AND sc.sport_id=' . $this->db->escape($sportId) . ' AND re.placement=3 THEN 1 ELSE 0 END) thirds, SUM(CASE WHEN r.status="validated" AND sc.sport_id=' . $this->db->escape($sportId) . ' AND re.placement=4 THEN 1 ELSE 0 END) fourths')
             ->join('result_entries re', 're.team_id=t.id', 'left')
             ->join('results r', 'r.id=re.result_id AND r.event_id=' . $this->db->escape($eventId), 'left')
             ->join('schedules sc', 'sc.id=r.schedule_id', 'left')
@@ -253,6 +255,8 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             ->orderBy('total_points', 'DESC')
             ->orderBy('firsts', 'DESC')
             ->orderBy('seconds', 'DESC')
+            ->orderBy('thirds', 'DESC')
+            ->orderBy('fourths', 'DESC')
             ->orderBy('t.name', 'ASC')
             ->get()->getResultArray();
     }
@@ -278,7 +282,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
 
         if ($type === 'standings' || $type === 'medal_tally') {
             $builder = $this->db->table('teams t')
-                ->select('t.id,t.name team,t.code,COALESCE(SUM(re.allocated_points),0) points,SUM(CASE WHEN re.placement=1 THEN 1 ELSE 0 END) firsts,SUM(CASE WHEN re.placement=2 THEN 1 ELSE 0 END) seconds,SUM(CASE WHEN re.placement=3 THEN 1 ELSE 0 END) thirds')
+                ->select('t.id,t.name team,t.code,COALESCE(SUM(re.allocated_points),0) points,SUM(CASE WHEN re.placement=1 THEN 1 ELSE 0 END) firsts,SUM(CASE WHEN re.placement=2 THEN 1 ELSE 0 END) seconds,SUM(CASE WHEN re.placement=3 THEN 1 ELSE 0 END) thirds,SUM(CASE WHEN re.placement=4 THEN 1 ELSE 0 END) fourths')
                 ->join('result_entries re', 're.team_id=t.id')
                 ->join('results r', 'r.id=re.result_id')
                 ->join('schedules sc', 'sc.id=r.schedule_id')
@@ -292,12 +296,12 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
                 return $builder->select('SUM(CASE WHEN re.placement=1 THEN 1 ELSE 0 END) gold,SUM(CASE WHEN re.placement=2 THEN 1 ELSE 0 END) silver,SUM(CASE WHEN re.placement=3 THEN 1 ELSE 0 END) bronze')
                     ->orderBy('gold', 'DESC')->orderBy('silver', 'DESC')->orderBy('bronze', 'DESC')->orderBy('points', 'DESC')->orderBy('t.name', 'ASC')->get()->getResultArray();
             }
-            return $builder->orderBy('points', 'DESC')->orderBy('firsts', 'DESC')->orderBy('seconds', 'DESC')->orderBy('t.name', 'ASC')->get()->getResultArray();
+            return $builder->orderBy('points', 'DESC')->orderBy('firsts', 'DESC')->orderBy('seconds', 'DESC')->orderBy('thirds', 'DESC')->orderBy('fourths', 'DESC')->orderBy('t.name', 'ASC')->get()->getResultArray();
         }
 
         if ($type === 'sport_rankings') {
             $builder = $this->db->table('teams t')
-                ->select('s.id sport_id,s.name sport,s.category,t.id team_id,t.name team,t.code,COALESCE(SUM(re.allocated_points),0) points,SUM(CASE WHEN re.placement=1 THEN 1 ELSE 0 END) firsts,SUM(CASE WHEN re.placement=2 THEN 1 ELSE 0 END) seconds,SUM(CASE WHEN re.placement=3 THEN 1 ELSE 0 END) thirds')
+                ->select('s.id sport_id,s.name sport,s.category,t.id team_id,t.name team,t.code,COALESCE(SUM(re.allocated_points),0) points,SUM(CASE WHEN re.placement=1 THEN 1 ELSE 0 END) firsts,SUM(CASE WHEN re.placement=2 THEN 1 ELSE 0 END) seconds,SUM(CASE WHEN re.placement=3 THEN 1 ELSE 0 END) thirds,SUM(CASE WHEN re.placement=4 THEN 1 ELSE 0 END) fourths')
                 ->join('result_entries re', 're.team_id=t.id')
                 ->join('results r', 'r.id=re.result_id')
                 ->join('schedules sc', 'sc.id=r.schedule_id')
@@ -307,7 +311,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             if (($filters['status'] ?? '') === 'validated') {
                 $builder->having('points >', 0);
             }
-            return $builder->orderBy('s.name', 'ASC')->orderBy('s.category', 'ASC')->orderBy('points', 'DESC')->orderBy('firsts', 'DESC')->orderBy('seconds', 'DESC')->orderBy('t.name', 'ASC')->get()->getResultArray();
+            return $builder->orderBy('s.name', 'ASC')->orderBy('s.category', 'ASC')->orderBy('points', 'DESC')->orderBy('firsts', 'DESC')->orderBy('seconds', 'DESC')->orderBy('thirds', 'DESC')->orderBy('fourths', 'DESC')->orderBy('t.name', 'ASC')->get()->getResultArray();
         }
 
         if ($type === 'validation_log') {
@@ -694,6 +698,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         $start = (string) ($data['start_time'] ?? '');
         $intervalMinutes = (int) ($data['interval_minutes'] ?? 60);
         $courtLabel = $this->optionalTextValue($data['court_label'] ?? null);
+        $thirdPlacePlayoff = ! empty($data['third_place_playoff']);
 
         if (! $eventId || ! $sportId || ! $locationId || ! in_array($format, ['single_elimination', 'double_elimination'], true)) {
             throw new RuntimeException('Bracket configuration is incomplete.');
@@ -763,7 +768,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
                 'round' => 'Final', 'phase' => 'final', 'bracket_side' => 'grand', 'team_a_id' => null, 'team_b_id' => null,
                 'feeds_from_a' => null, 'feeds_from_a_type' => null, 'feeds_from_b' => null, 'feeds_from_b_type' => null, 'is_conditional' => 0,
             ]]
-            : ($format === 'double_elimination' ? $this->fourTeamDoubleEliminationRows($teamIds) : $this->singleEliminationRows($teamIds));
+            : ($format === 'double_elimination' ? $this->fourTeamDoubleEliminationRows($teamIds) : $this->singleEliminationRows($teamIds, $thirdPlacePlayoff));
 
         foreach ($rows as $index => $row) {
             $payload = array_merge($row, [
@@ -872,6 +877,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             'first_points' => $data['first_points'],
             'second_points' => $data['second_points'],
             'third_points' => $data['third_points'],
+            'fourth_points' => $data['fourth_points'],
             'participation_points' => $data['participation_points'],
             'status' => 'pending',
             'submitted_by' => $actorId,
@@ -904,6 +910,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             'first_points' => $data['first_points'],
             'second_points' => $data['second_points'],
             'third_points' => $data['third_points'],
+            'fourth_points' => $data['fourth_points'],
             'participation_points' => $data['participation_points'],
             'status' => 'pending',
             'submitted_by' => $actorId,
@@ -1204,7 +1211,9 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
                     }
 
                     if ($format === 'double_elimination') {
-                        if ($side === 'lower' && $phase === 'final') {
+                        if ($side === 'lower' && $phase === 'lower_r1') {
+                            $placements[$loserId] = 4;
+                        } elseif ($side === 'lower' && $phase === 'final') {
                             $placements[$loserId] = 3;
                         } elseif ($side === 'grand' && $phase === 'tiebreaker') {
                             $placements[$winnerId] = 1;
@@ -1213,6 +1222,9 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
                             $placements[$winnerId] = 1;
                             $placements[$loserId] = 2;
                         }
+                    } elseif ($phase === 'third_place') {
+                        $placements[$winnerId] = 3;
+                        $placements[$loserId] = 4;
                     } elseif ($phase === 'final') {
                         $placements[$winnerId] = 1;
                         $placements[$loserId] = 2;
@@ -1241,6 +1253,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
                         'firsts' => 0,
                         'seconds' => 0,
                         'thirds' => 0,
+                        'fourths' => 0,
                     ];
                 }
 
@@ -1257,6 +1270,8 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
                     $ranking[$teamId]['seconds']++;
                 } elseif ((int) $placement === 3) {
                     $ranking[$teamId]['thirds']++;
+                } elseif ((int) $placement === 4) {
+                    $ranking[$teamId]['fourths']++;
                 }
             }
         }
@@ -1265,6 +1280,8 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         usort($rows, static fn(array $a, array $b): int => ((float) $b['total_points'] <=> (float) $a['total_points'])
             ?: ((int) $b['firsts'] <=> (int) $a['firsts'])
             ?: ((int) $b['seconds'] <=> (int) $a['seconds'])
+            ?: ((int) $b['thirds'] <=> (int) $a['thirds'])
+            ?: ((int) $b['fourths'] <=> (int) $a['fourths'])
             ?: strcasecmp((string) $a['name'], (string) $b['name']));
 
         return $rows;
@@ -1410,7 +1427,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         return 'M' . ($max + 1);
     }
 
-    private function singleEliminationRows(array $teamIds): array
+    private function singleEliminationRows(array $teamIds, bool $thirdPlacePlayoff = false): array
     {
         $rows = [];
         $currentSources = [];
@@ -1439,6 +1456,16 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         while (count($currentSources) > 1) {
             $nextSources = [];
             $matchesInRound = count($currentSources) / 2;
+
+            if ($thirdPlacePlayoff && count($currentSources) === 2) {
+                $rows[] = [
+                    'round' => '3rd Place Playoff', 'phase' => 'third_place', 'bracket_side' => 'lower',
+                    'team_a_id' => null, 'team_b_id' => null,
+                    'feeds_from_a' => $currentSources[0], 'feeds_from_a_type' => 'loser',
+                    'feeds_from_b' => $currentSources[1], 'feeds_from_b_type' => 'loser', 'is_conditional' => 0,
+                ];
+            }
+
             for ($i = 0; $i < count($currentSources); $i += 2) {
                 $round = $this->eliminationRoundLabel((int) $matchesInRound);
                 $phase = $this->eliminationPhase((int) $matchesInRound);
@@ -1819,10 +1846,14 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
                 $side = 'grand';
             }
             $championshipMatch = false;
+            $thirdPlaceMatch = false;
             $thirdPlaceLoser = false;
+            $fourthPlaceLoser = false;
 
             if ($format === 'double_elimination') {
-                if ($side === 'lower' && $phase === 'final') {
+                if ($side === 'lower' && $phase === 'lower_r1') {
+                    $fourthPlaceLoser = true;
+                } elseif ($side === 'lower' && $phase === 'final') {
                     $thirdPlaceLoser = true;
                 } elseif ($side === 'grand' && $phase === 'tiebreaker') {
                     $championshipMatch = true;
@@ -1830,6 +1861,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
                     $championshipMatch = $winnerId === (int) ($result['team_a_id'] ?? 0);
                 }
             } else {
+                $thirdPlaceMatch = $phase === 'third_place';
                 $championshipMatch = $phase === 'final';
             }
 
@@ -1840,9 +1872,15 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
                 if ($championshipMatch) {
                     $placement = $entryTeamId === $winnerId ? 1 : 2;
                     $points = $this->pointsForPlacement($weightedPoints, $placement);
+                } elseif ($thirdPlaceMatch) {
+                    $placement = $entryTeamId === $winnerId ? 3 : 4;
+                    $points = $this->pointsForPlacement($weightedPoints, $placement);
                 } elseif ($thirdPlaceLoser && $entryTeamId === $loserId) {
                     $placement = 3;
                     $points = $this->pointsForPlacement($weightedPoints, 3);
+                } elseif ($fourthPlaceLoser && $entryTeamId === $loserId) {
+                    $placement = 4;
+                    $points = $this->pointsForPlacement($weightedPoints, 4);
                 }
                 $this->db->table('result_entries')->where('id', $entry['id'])->update([
                     'placement' => $placement,
@@ -1943,7 +1981,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         }
         $data['event_id'] = $eventId;
         $data['sport_id'] = $sportId;
-        foreach (['first_points', 'second_points', 'third_points', 'participation_points'] as $field) {
+        foreach (['first_points', 'second_points', 'third_points', 'fourth_points', 'participation_points'] as $field) {
             $data[$field] = $this->decimalValue(
                 $data[$field] ?? null,
                 999999.99,
@@ -2036,6 +2074,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             1 => (float) $weightedPoints['first_points'],
             2 => (float) $weightedPoints['second_points'],
             3 => (float) $weightedPoints['third_points'],
+            4 => (float) $weightedPoints['fourth_points'],
             default => (float) $weightedPoints['participation_points'],
         };
     }
