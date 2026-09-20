@@ -11,6 +11,12 @@ class AuthController extends BaseController
         if (session()->get('user_id')) {
             return redirect()->to('/dashboard');
         }
+
+        if ($this->request->getGet('logged_out') === '1') {
+            session()->setFlashdata('success', 'Logged out successfully.');
+            return redirect()->to('/login');
+        }
+
         return view('auth/login', ['title' => 'Sign in']);
     }
 
@@ -63,12 +69,13 @@ class AuthController extends BaseController
         if (($settings['compact_sidebar'] ?? '0') === '1') {
             session()->set('compact_sidebar', true);
         }
-        return redirect()->to('/dashboard');
+        return redirect()->to('/dashboard')->with('success', 'Signed in successfully.');
     }
 
     public function logout()
     {
         session()->destroy();
-        return redirect()->to('/login');
+
+        return redirect()->to('/login?logged_out=1');
     }
 }

@@ -27,6 +27,7 @@ $jsVersion = $assetVersion('assets/js/app.js');
     <link rel="stylesheet" href="<?= esc(base_url('assets/css/app.css') . '?v=' . rawurlencode($cssVersion), 'attr') ?>">
 </head>
 <body class="app role-<?= esc($role) ?> <?= $compactSidebar ? 'sidebar-compact' : '' ?> density-<?= esc($resultDensity) ?> theme-<?= esc($theme) ?> font-<?= esc($fontSize) ?>">
+<?= view('partials/toasts') ?>
 <a class="skip-link" href="#main-content">Skip to main content</a>
 <header class="topbar">
     <button class="menu-toggle" type="button" data-nav-toggle aria-label="Open navigation" aria-controls="app-sidebar" aria-expanded="false"><?= ui_icon('menu') ?></button>
@@ -59,8 +60,6 @@ $jsVersion = $assetVersion('assets/js/app.js');
     <?= view('partials/sidebar') ?>
     <button class="nav-backdrop" type="button" data-nav-close aria-label="Close navigation"></button>
     <main class="content" id="main-content">
-        <?php if (session()->getFlashdata('success')): ?><div class="alert success" role="status" data-flash-alert data-dismiss-after="5000"><?= esc(session()->getFlashdata('success')) ?></div><?php endif; ?>
-        <?php if (session()->getFlashdata('error')): ?><div class="alert error" role="alert" data-flash-alert data-dismiss-after="5000"><?= esc(session()->getFlashdata('error')) ?></div><?php endif; ?>
         <?= $this->renderSection('content') ?>
         <footer>© 2026 TallyTech · Intramural Sports Festival Management System</footer>
     </main>

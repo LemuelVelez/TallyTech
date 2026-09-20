@@ -18,9 +18,26 @@
   let pendingConfirmSubmitter = null;
 
 
-  document.querySelectorAll('[data-flash-alert]').forEach((alert) => {
-    const delay = Number.parseInt(alert.dataset.dismissAfter || '5000', 10);
-    window.setTimeout(() => alert.remove(), Number.isFinite(delay) && delay >= 0 ? delay : 5000);
+  const dismissToast = (toast) => {
+    if (!toast || toast.dataset.dismissing === '1') return;
+    toast.dataset.dismissing = '1';
+    toast.classList.add('is-dismissing');
+    window.setTimeout(() => {
+      toast.remove();
+      const stack = document.querySelector('[data-toast-stack]');
+      if (stack && !stack.querySelector('[data-toast]')) stack.remove();
+    }, 220);
+  };
+
+  document.querySelectorAll('[data-toast]').forEach((toast) => {
+    const delay = Number.parseInt(toast.dataset.dismissAfter || '5000', 10);
+    const timeout = Number.isFinite(delay) && delay >= 0 ? delay : 5000;
+    if (timeout > 0) window.setTimeout(() => dismissToast(toast), timeout);
+  });
+
+  document.addEventListener('click', (event) => {
+    const close = event.target.closest('[data-toast-close]');
+    if (close) dismissToast(close.closest('[data-toast]'));
   });
 
   const scoreboardPresentationFrame = body.matches('[data-scoreboard-presentation-frame]');
