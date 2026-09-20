@@ -25,6 +25,7 @@ $menus = [
         ['weighted-points', 'Weighted Points', 'sliders'],
         ['schedules', 'Schedules', 'calendar-clock'],
         ['match-results', 'Match Results', 'clipboard-score'],
+        ['facilitators', 'Facilitators', 'user-cog'],
         ['brackets', 'Bracket Management', 'trophy'],
         ['reports', 'Reports', 'chart-bar'],
         ['settings', 'Settings', 'settings'],

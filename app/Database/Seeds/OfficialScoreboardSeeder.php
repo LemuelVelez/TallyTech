@@ -28,12 +28,12 @@ class OfficialScoreboardSeeder extends Seeder
             $eventId = $this->activeOrDemoEvent($now);
             $facilitatorId = $this->ensureUser('scoreboard.facilitator', 'Scoreboard Facilitator', 'facilitator', 'Facilitator_123', $now);
             $validatorId = $this->ensureUser('scoreboard.validator', 'Scoreboard Validator', 'validator', 'Validator_123', $now);
-            $locationId = $this->ensureLocation('Scoreboard Demo Court', $now);
+            $locationId = $this->ensureLocation('Scoreboard Demo Venue', $now);
             $this->ensureSportCategory('Men', $now);
 
             $teams = [
                 'CBA' => $this->ensureTeam('CBA Lions', 'CBA', $now),
-                'CCS-CAF' => $this->ensureTeam('CCS Panthers & CAF Buffaloes', 'CCS-CAF', $now),
+                'CCS-CAF' => $this->ensureTeam('CCS Panthers & CAF Buffalo', 'CCS-CAF', $now),
             ];
 
             $sportId = $this->ensureSport($eventId, '3x3 Basketball', 'Men', $now);
@@ -52,7 +52,6 @@ class OfficialScoreboardSeeder extends Seeder
                 'feeds_from_a_type' => null,
                 'feeds_from_b' => null,
                 'feeds_from_b_type' => null,
-                'court_label' => 'Center Court',
                 'is_conditional' => 0,
                 'scheduling_note' => 'Official 3x3 Basketball Men championship match.',
                 'match_date' => '2026-08-18 18:00:00',
@@ -102,7 +101,7 @@ class OfficialScoreboardSeeder extends Seeder
             }
         }
 
-        foreach (['tournament_format', 'match_code', 'phase', 'bracket_side', 'bracket_order', 'court_label', 'is_conditional', 'scheduling_note'] as $field) {
+        foreach (['tournament_format', 'match_code', 'phase', 'bracket_side', 'bracket_order', 'is_conditional', 'scheduling_note'] as $field) {
             if (! $this->db->fieldExists($field, 'schedules')) {
                 throw new RuntimeException('Bracket scheduling schema is incomplete. Run "php spark migrate" before seeding the official scoreboard.');
             }

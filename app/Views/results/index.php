@@ -55,7 +55,7 @@ $ordinal = static function (int $number): string {
                                                     <div class="match-meta"><span class="badge neutral"><?= esc($match['match_code'] ?? '—') ?></span><span><?= esc($statusLabel($match)) ?></span></div>
                                                     <div class="bracket-team <?= $winnerTeamId > 0 && $winnerTeamId === (int) ($match['team_a_id'] ?? 0) ? 'winner' : '' ?>"><span><?= esc($match['slot_a_label'] ?? 'TBD') ?></span><b><?= esc($scoreFor($match, !empty($match['team_a_id']) ? (int) $match['team_a_id'] : null)) ?></b></div>
                                                     <div class="bracket-team <?= $winnerTeamId > 0 && $winnerTeamId === (int) ($match['team_b_id'] ?? 0) ? 'winner' : '' ?>"><span><?= esc($match['slot_b_label'] ?? 'TBD') ?></span><b><?= esc($scoreFor($match, !empty($match['team_b_id']) ? (int) $match['team_b_id'] : null)) ?></b></div>
-                                                    <small><?= esc($match['court_label'] ?: ($match['location_name'] ?? '—')) ?> · <?= esc(date('M j, Y · g:i A', strtotime($match['match_date']))) ?></small>
+                                                    <small><?= esc($match['location_name'] ?? '—') ?> · <?= esc(date('M j, Y · g:i A', strtotime($match['match_date']))) ?></small>
                                                     <?php if (!empty($match['is_conditional']) && ($match['status'] ?? '') === 'cancelled'): ?><span class="badge neutral conditional-badge">IF NECESSARY</span><?php endif; ?>
                                                 </article>
                                             <?php endforeach; ?>
@@ -78,7 +78,7 @@ $ordinal = static function (int $number): string {
                     <strong><?= esc($schedule['sport_name'].' · '.$schedule['category']) ?></strong>
                     <div class="bracket-team"><span>Championship</span><b><?= esc($schedule['round']) ?></b></div>
                     <small>All participating teams</small>
-                    <small><?= esc($schedule['court_label'] ?: ($schedule['location_name'] ?? '—')) ?> · <?= esc(date('M j, Y · g:i A', strtotime($schedule['match_date']))) ?></small>
+                    <small><?= esc($schedule['location_name'] ?? '—') ?> · <?= esc(date('M j, Y · g:i A', strtotime($schedule['match_date']))) ?></small>
                 </article>
             <?php endforeach; ?>
             <?php if (!$judgedBySport): ?><div class="empty">No schedules available.</div><?php endif; ?>
@@ -86,7 +86,7 @@ $ordinal = static function (int $number): string {
     <?php endif; ?>
 </section>
 
-<section class="panel"><div class="panel-head"><div><h2><?= $resultType === 'match' ? 'Match Schedules' : 'Judged Schedules' ?></h2><p>Detailed active-event schedule list.</p></div></div><div class="table-wrap"><table><thead><tr><th>Sport</th><th>Round</th><th>Location</th><th>Teams</th><th>Date</th><th>Status</th></tr></thead><tbody><?php foreach ($schedules as $schedule): ?><tr><td><b><?= esc($schedule['sport_name']) ?></b><small class="muted"><?= esc($schedule['category']) ?></small></td><td><?= esc($schedule['round']) ?></td><td><?= esc($schedule['court_label'] ?: ($schedule['location_name'] ?? '—')) ?></td><td><?= $resultType === 'match' ? esc(($schedule['slot_a_label'] ?? 'TBD').' vs '.($schedule['slot_b_label'] ?? 'TBD')) : 'All participating teams' ?></td><td><?= esc(date('M j, g:i A', strtotime($schedule['match_date']))) ?></td><td><span class="badge neutral"><?= strtoupper(esc($schedule['status'])) ?></span></td></tr><?php endforeach; ?><?php if (!$schedules): ?><tr><td colspan="6" class="empty">No schedules available.</td></tr><?php endif; ?></tbody></table></div></section>
+<section class="panel"><div class="panel-head"><div><h2><?= $resultType === 'match' ? 'Match Schedules' : 'Judged Schedules' ?></h2><p>Detailed active-event schedule list.</p></div></div><div class="table-wrap"><table><thead><tr><th>Sport</th><th>Round</th><th>Location</th><th>Teams</th><th>Date</th><th>Status</th></tr></thead><tbody><?php foreach ($schedules as $schedule): ?><tr><td><b><?= esc($schedule['sport_name']) ?></b><small class="muted"><?= esc($schedule['category']) ?></small></td><td><?= esc($schedule['round']) ?></td><td><?= esc($schedule['location_name'] ?? '—') ?></td><td><?= $resultType === 'match' ? esc(($schedule['slot_a_label'] ?? 'TBD').' vs '.($schedule['slot_b_label'] ?? 'TBD')) : 'All participating teams' ?></td><td><?= esc(date('M j, g:i A', strtotime($schedule['match_date']))) ?></td><td><span class="badge neutral"><?= strtoupper(esc($schedule['status'])) ?></span></td></tr><?php endforeach; ?><?php if (!$schedules): ?><tr><td colspan="6" class="empty">No schedules available.</td></tr><?php endif; ?></tbody></table></div></section>
 
 <section class="panel"><div class="panel-head"><div><h2><?= esc($title) ?></h2><p>Official and unofficial results are clearly separated by status.</p></div></div><div class="result-list">
 <?php if (!$results): ?><div class="empty">No results have been submitted yet.</div><?php endif; ?>

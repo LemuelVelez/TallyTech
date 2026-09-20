@@ -28,12 +28,12 @@ class UnofficialScoreboardSeeder extends Seeder
             $eventId = $this->activeOrDemoEvent($now);
             $facilitatorId = $this->ensureUser('scoreboard.facilitator', 'Scoreboard Facilitator', 'facilitator', 'Facilitator_123', $now);
             $validatorId = $this->ensureUser('scoreboard.validator', 'Scoreboard Validator', 'validator', 'Validator_123', $now);
-            $locationId = $this->ensureLocation('Scoreboard Demo Court', $now);
+            $locationId = $this->ensureLocation('Scoreboard Demo Venue', $now);
             $this->ensureSportCategory('Women', $now);
 
             $teams = [
-                'CIT-COC' => $this->ensureTeam('CIT Dragons & COC Stallions', 'CIT-COC', $now),
-                'SCA-CLAIM' => $this->ensureTeam('SCA Eagles & CLAIM Phoenix', 'SCA-CLAIM', $now),
+                'COE-CTED' => $this->ensureTeam('COE Stallions & CTED Dragons', 'COE-CTED', $now),
+                'SCJE-CLAMS' => $this->ensureTeam('SCJE Eagles & CLAMS Phoenix', 'SCJE-CLAMS', $now),
             ];
 
             $sportId = $this->ensureSport($eventId, '3x3 Basketball', 'Women', $now);
@@ -52,12 +52,11 @@ class UnofficialScoreboardSeeder extends Seeder
                 'feeds_from_a_type' => null,
                 'feeds_from_b' => null,
                 'feeds_from_b_type' => null,
-                'court_label' => 'Center Court',
                 'is_conditional' => 0,
                 'scheduling_note' => 'Unofficial 3x3 Basketball Women championship match awaiting validation.',
                 'match_date' => '2026-08-18 19:00:00',
-                'team_a_id' => $teams['CIT-COC'],
-                'team_b_id' => $teams['SCA-CLAIM'],
+                'team_a_id' => $teams['COE-CTED'],
+                'team_b_id' => $teams['SCJE-CLAMS'],
                 'status' => 'played',
                 'created_at' => $now,
             ]);
@@ -74,8 +73,8 @@ class UnofficialScoreboardSeeder extends Seeder
                 'validated_at' => null,
             ]);
 
-            $this->ensureResultEntry($resultId, $teams['CIT-COC'], 19, [19], null, 0);
-            $this->ensureResultEntry($resultId, $teams['SCA-CLAIM'], 16, [16], null, 0);
+            $this->ensureResultEntry($resultId, $teams['COE-CTED'], 19, [19], null, 0);
+            $this->ensureResultEntry($resultId, $teams['SCJE-CLAMS'], 16, [16], null, 0);
             $this->removeUnexpectedResultEntries($resultId, array_values($teams));
 
             if (! $this->db->transComplete()) {
@@ -102,7 +101,7 @@ class UnofficialScoreboardSeeder extends Seeder
             }
         }
 
-        foreach (['tournament_format', 'match_code', 'phase', 'bracket_side', 'bracket_order', 'court_label', 'is_conditional', 'scheduling_note'] as $field) {
+        foreach (['tournament_format', 'match_code', 'phase', 'bracket_side', 'bracket_order', 'is_conditional', 'scheduling_note'] as $field) {
             if (! $this->db->fieldExists($field, 'schedules')) {
                 throw new RuntimeException('Bracket scheduling schema is incomplete. Run "php spark migrate" before seeding the unofficial scoreboard.');
             }

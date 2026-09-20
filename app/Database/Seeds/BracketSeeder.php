@@ -26,7 +26,6 @@ class BracketSeeder extends Seeder
             'feeds_from_a_type',
             'feeds_from_b',
             'feeds_from_b_type',
-            'court_label',
             'is_conditional',
             'scheduling_note',
             'tournament_format',
@@ -85,14 +84,14 @@ class BracketSeeder extends Seeder
 
             $teams = [
                 'CBA' => $this->ensureTeam(['name' => 'CBA Lions', 'code' => 'CBA', 'created_at' => $now]),
-                'CCS-CAF' => $this->ensureTeam(['name' => 'CCS Panthers & CAF Buffaloes', 'code' => 'CCS-CAF', 'created_at' => $now]),
-                'CIT-COC' => $this->ensureTeam(['name' => 'CIT Dragons & COC Stallions', 'code' => 'CIT-COC', 'created_at' => $now]),
-                'SCA-CLAIM' => $this->ensureTeam(['name' => 'SCA Eagles & CLAIM Phoenix', 'code' => 'SCA-CLAIM', 'created_at' => $now]),
+                'CCS-CAF' => $this->ensureTeam(['name' => 'CCS Panthers & CAF Buffalo', 'code' => 'CCS-CAF', 'created_at' => $now]),
+                'COE-CTED' => $this->ensureTeam(['name' => 'COE Stallions & CTED Dragons', 'code' => 'COE-CTED', 'created_at' => $now]),
+                'SCJE-CLAMS' => $this->ensureTeam(['name' => 'SCJE Eagles & CLAMS Phoenix', 'code' => 'SCJE-CLAMS', 'created_at' => $now]),
             ];
 
             $locations = [
                 'Main Gymnasium' => $this->ensureLocation('Main Gymnasium', $now),
-                'Covered Court' => $this->ensureLocation('Covered Court', $now),
+                'Covered Gymnasium' => $this->ensureLocation('Covered Gymnasium', $now),
                 'Auditorium' => $this->ensureLocation('Auditorium', $now),
             ];
 
@@ -109,8 +108,8 @@ class BracketSeeder extends Seeder
             ];
 
             $this->seedBasketballSingleElimination($eventId, $sports['Basketball Men'], $locations['Main Gymnasium'], $teams, $facilitatorId, $validatorId, $now);
-            $this->seedVolleyballMenSingleElimination($eventId, $sports['Volleyball Men'], $locations['Covered Court'], $teams, $facilitatorId, $validatorId, $now);
-            $this->seedVolleyballWomenDoubleElimination($eventId, $sports['Volleyball Women'], $locations['Covered Court'], $teams, $facilitatorId, $validatorId, $now);
+            $this->seedVolleyballMenSingleElimination($eventId, $sports['Volleyball Men'], $locations['Covered Gymnasium'], $teams, $facilitatorId, $validatorId, $now);
+            $this->seedVolleyballWomenDoubleElimination($eventId, $sports['Volleyball Women'], $locations['Covered Gymnasium'], $teams, $facilitatorId, $validatorId, $now);
             $this->seedBadmintonSingleElimination($eventId, $sports['Badminton Men'], $locations['Main Gymnasium'], $teams, $facilitatorId, $validatorId, $now);
             $this->seedCheerdanceChampionship($eventId, $sports['Cheerdance Mixed'], $locations['Auditorium'], $teams, $facilitatorId, $now);
 
@@ -146,7 +145,6 @@ class BracketSeeder extends Seeder
             'feeds_from_a_type' => null,
             'feeds_from_b' => null,
             'feeds_from_b_type' => null,
-            'court_label' => 'Court 1',
             'is_conditional' => 0,
             'scheduling_note' => 'Winner advances to M3.',
             'match_date' => '2026-08-15 09:00:00',
@@ -169,12 +167,11 @@ class BracketSeeder extends Seeder
             'feeds_from_a_type' => null,
             'feeds_from_b' => null,
             'feeds_from_b_type' => null,
-            'court_label' => 'Court 1',
             'is_conditional' => 0,
             'scheduling_note' => 'Winner advances to M3.',
             'match_date' => '2026-08-15 10:30:00',
-            'team_a_id' => $teams['CIT-COC'],
-            'team_b_id' => $teams['SCA-CLAIM'],
+            'team_a_id' => $teams['COE-CTED'],
+            'team_b_id' => $teams['SCJE-CLAMS'],
             'status' => 'played',
             'created_at' => $now,
         ]);
@@ -192,18 +189,17 @@ class BracketSeeder extends Seeder
             'feeds_from_a_type' => 'winner',
             'feeds_from_b' => 'M2',
             'feeds_from_b_type' => 'winner',
-            'court_label' => 'Court 1',
             'is_conditional' => 0,
             'scheduling_note' => 'Championship match.',
             'match_date' => '2026-08-15 18:00:00',
             'team_a_id' => $teams['CBA'],
-            'team_b_id' => $teams['SCA-CLAIM'],
+            'team_b_id' => $teams['SCJE-CLAMS'],
             'status' => 'scheduled',
             'created_at' => $now,
         ]);
 
         $this->ensureMatchResult($eventId, $m1, $teams['CBA'], 86, null, $teams['CCS-CAF'], 78, null, $facilitatorId, $validatorId, '2026-08-15 10:20:00');
-        $this->ensureMatchResult($eventId, $m2, $teams['CIT-COC'], 75, null, $teams['SCA-CLAIM'], 82, null, $facilitatorId, $validatorId, '2026-08-15 11:50:00');
+        $this->ensureMatchResult($eventId, $m2, $teams['COE-CTED'], 75, null, $teams['SCJE-CLAMS'], 82, null, $facilitatorId, $validatorId, '2026-08-15 11:50:00');
     }
 
     private function seedVolleyballMenSingleElimination(int $eventId, int $sportId, int $locationId, array $teams, int $facilitatorId, int $validatorId, string $now): void
@@ -222,12 +218,11 @@ class BracketSeeder extends Seeder
             'feeds_from_a_type' => null,
             'feeds_from_b' => null,
             'feeds_from_b_type' => null,
-            'court_label' => 'Court 1',
             'is_conditional' => 0,
             'scheduling_note' => 'Winner advances to M3.',
             'match_date' => '2026-08-16 08:00:00',
             'team_a_id' => $teams['CBA'],
-            'team_b_id' => $teams['SCA-CLAIM'],
+            'team_b_id' => $teams['SCJE-CLAMS'],
             'status' => 'played',
             'created_at' => $now,
         ]);
@@ -245,12 +240,11 @@ class BracketSeeder extends Seeder
             'feeds_from_a_type' => null,
             'feeds_from_b' => null,
             'feeds_from_b_type' => null,
-            'court_label' => 'Court 1',
             'is_conditional' => 0,
             'scheduling_note' => 'Winner advances to M3.',
             'match_date' => '2026-08-16 09:30:00',
             'team_a_id' => $teams['CCS-CAF'],
-            'team_b_id' => $teams['CIT-COC'],
+            'team_b_id' => $teams['COE-CTED'],
             'status' => 'played',
             'created_at' => $now,
         ]);
@@ -268,18 +262,17 @@ class BracketSeeder extends Seeder
             'feeds_from_a_type' => 'winner',
             'feeds_from_b' => 'M2',
             'feeds_from_b_type' => 'winner',
-            'court_label' => 'Court 1',
             'is_conditional' => 0,
             'scheduling_note' => 'Championship match.',
             'match_date' => '2026-08-16 13:00:00',
             'team_a_id' => $teams['CBA'],
-            'team_b_id' => $teams['CIT-COC'],
+            'team_b_id' => $teams['COE-CTED'],
             'status' => 'scheduled',
             'created_at' => $now,
         ]);
 
-        $this->ensureMatchResult($eventId, $m1, $teams['CBA'], 3, [25, 20, 25, 25], $teams['SCA-CLAIM'], 1, [18, 25, 21, 19], $facilitatorId, $validatorId, '2026-08-16 09:15:00');
-        $this->ensureMatchResult($eventId, $m2, $teams['CCS-CAF'], 2, [25, 18, 22, 25, 12], $teams['CIT-COC'], 3, [21, 25, 25, 19, 15], $facilitatorId, $validatorId, '2026-08-16 11:10:00');
+        $this->ensureMatchResult($eventId, $m1, $teams['CBA'], 3, [25, 20, 25, 25], $teams['SCJE-CLAMS'], 1, [18, 25, 21, 19], $facilitatorId, $validatorId, '2026-08-16 09:15:00');
+        $this->ensureMatchResult($eventId, $m2, $teams['CCS-CAF'], 2, [25, 18, 22, 25, 12], $teams['COE-CTED'], 3, [21, 25, 25, 19, 15], $facilitatorId, $validatorId, '2026-08-16 11:10:00');
     }
 
     private function seedVolleyballWomenDoubleElimination(int $eventId, int $sportId, int $locationId, array $teams, int $facilitatorId, int $validatorId, string $now): void
@@ -298,12 +291,11 @@ class BracketSeeder extends Seeder
             'feeds_from_a_type' => null,
             'feeds_from_b' => null,
             'feeds_from_b_type' => null,
-            'court_label' => 'Court 1',
             'is_conditional' => 0,
             'scheduling_note' => 'Winner advances to M4; loser drops to M3.',
             'match_date' => '2026-08-17 08:00:00',
-            'team_a_id' => $teams['CIT-COC'],
-            'team_b_id' => $teams['SCA-CLAIM'],
+            'team_a_id' => $teams['COE-CTED'],
+            'team_b_id' => $teams['SCJE-CLAMS'],
             'status' => 'played',
             'created_at' => $now,
         ]);
@@ -321,7 +313,6 @@ class BracketSeeder extends Seeder
             'feeds_from_a_type' => null,
             'feeds_from_b' => null,
             'feeds_from_b_type' => null,
-            'court_label' => 'Court 1',
             'is_conditional' => 0,
             'scheduling_note' => 'Winner advances to M4; loser drops to M3.',
             'match_date' => '2026-08-17 09:30:00',
@@ -344,11 +335,10 @@ class BracketSeeder extends Seeder
             'feeds_from_a_type' => 'loser',
             'feeds_from_b' => 'M2',
             'feeds_from_b_type' => 'loser',
-            'court_label' => 'Court 1',
             'is_conditional' => 0,
             'scheduling_note' => 'Loser is eliminated; winner advances to M5.',
             'match_date' => '2026-08-17 11:30:00',
-            'team_a_id' => $teams['SCA-CLAIM'],
+            'team_a_id' => $teams['SCJE-CLAMS'],
             'team_b_id' => $teams['CBA'],
             'status' => 'played',
             'created_at' => $now,
@@ -367,11 +357,10 @@ class BracketSeeder extends Seeder
             'feeds_from_a_type' => 'winner',
             'feeds_from_b' => 'M2',
             'feeds_from_b_type' => 'winner',
-            'court_label' => 'Court 1',
             'is_conditional' => 0,
             'scheduling_note' => 'Winner advances to M6; loser drops to M5.',
             'match_date' => '2026-08-17 13:30:00',
-            'team_a_id' => $teams['CIT-COC'],
+            'team_a_id' => $teams['COE-CTED'],
             'team_b_id' => $teams['CCS-CAF'],
             'status' => 'played',
             'created_at' => $now,
@@ -390,7 +379,6 @@ class BracketSeeder extends Seeder
             'feeds_from_a_type' => 'winner',
             'feeds_from_b' => 'M4',
             'feeds_from_b_type' => 'loser',
-            'court_label' => 'Court 1',
             'is_conditional' => 0,
             'scheduling_note' => 'Winner advances to M6; loser is eliminated.',
             'match_date' => '2026-08-17 15:30:00',
@@ -413,11 +401,10 @@ class BracketSeeder extends Seeder
             'feeds_from_a_type' => 'winner',
             'feeds_from_b' => 'M5',
             'feeds_from_b_type' => 'winner',
-            'court_label' => 'Center Court',
             'is_conditional' => 0,
             'scheduling_note' => 'Winner-bracket champion vs loser-bracket champion.',
             'match_date' => '2026-08-17 18:00:00',
-            'team_a_id' => $teams['CIT-COC'],
+            'team_a_id' => $teams['COE-CTED'],
             'team_b_id' => $teams['CCS-CAF'],
             'status' => 'scheduled',
             'created_at' => $now,
@@ -436,7 +423,6 @@ class BracketSeeder extends Seeder
             'feeds_from_a_type' => 'winner',
             'feeds_from_b' => 'M6',
             'feeds_from_b_type' => 'loser',
-            'court_label' => 'Center Court',
             'is_conditional' => 1,
             'scheduling_note' => 'If necessary: played only if the loser-bracket finalist wins M6.',
             'match_date' => '2026-08-17 20:00:00',
@@ -446,10 +432,10 @@ class BracketSeeder extends Seeder
             'created_at' => $now,
         ]);
 
-        $this->ensureMatchResult($eventId, $m1, $teams['CIT-COC'], 3, [25, 22, 25, 25], $teams['SCA-CLAIM'], 1, [18, 25, 19, 21], $facilitatorId, $validatorId, '2026-08-17 09:20:00');
+        $this->ensureMatchResult($eventId, $m1, $teams['COE-CTED'], 3, [25, 22, 25, 25], $teams['SCJE-CLAMS'], 1, [18, 25, 19, 21], $facilitatorId, $validatorId, '2026-08-17 09:20:00');
         $this->ensureMatchResult($eventId, $m2, $teams['CBA'], 2, [25, 20, 22, 25, 13], $teams['CCS-CAF'], 3, [21, 25, 25, 20, 15], $facilitatorId, $validatorId, '2026-08-17 11:15:00');
-        $this->ensureMatchResult($eventId, $m3, $teams['SCA-CLAIM'], 0, [19, 18, 22], $teams['CBA'], 3, [25, 25, 25], $facilitatorId, $validatorId, '2026-08-17 12:50:00');
-        $this->ensureMatchResult($eventId, $m4, $teams['CIT-COC'], 3, [25, 21, 25, 25], $teams['CCS-CAF'], 1, [20, 25, 18, 22], $facilitatorId, $validatorId, '2026-08-17 15:05:00');
+        $this->ensureMatchResult($eventId, $m3, $teams['SCJE-CLAMS'], 0, [19, 18, 22], $teams['CBA'], 3, [25, 25, 25], $facilitatorId, $validatorId, '2026-08-17 12:50:00');
+        $this->ensureMatchResult($eventId, $m4, $teams['COE-CTED'], 3, [25, 21, 25, 25], $teams['CCS-CAF'], 1, [20, 25, 18, 22], $facilitatorId, $validatorId, '2026-08-17 15:05:00');
         $this->ensureMatchResult($eventId, $m5, $teams['CBA'], 2, [25, 20, 25, 21, 12], $teams['CCS-CAF'], 3, [22, 25, 19, 25, 15], $facilitatorId, $validatorId, '2026-08-17 17:20:00');
     }
 
@@ -469,7 +455,6 @@ class BracketSeeder extends Seeder
             'feeds_from_a_type' => null,
             'feeds_from_b' => null,
             'feeds_from_b_type' => null,
-            'court_label' => 'Court 2',
             'is_conditional' => 0,
             'scheduling_note' => 'Winner advances to M3.',
             'match_date' => '2026-08-18 08:00:00',
@@ -492,12 +477,11 @@ class BracketSeeder extends Seeder
             'feeds_from_a_type' => null,
             'feeds_from_b' => null,
             'feeds_from_b_type' => null,
-            'court_label' => 'Court 2',
             'is_conditional' => 0,
             'scheduling_note' => 'Winner advances to M3.',
             'match_date' => '2026-08-18 09:00:00',
-            'team_a_id' => $teams['CIT-COC'],
-            'team_b_id' => $teams['SCA-CLAIM'],
+            'team_a_id' => $teams['COE-CTED'],
+            'team_b_id' => $teams['SCJE-CLAMS'],
             'status' => 'played',
             'created_at' => $now,
         ]);
@@ -515,18 +499,17 @@ class BracketSeeder extends Seeder
             'feeds_from_a_type' => 'winner',
             'feeds_from_b' => 'M2',
             'feeds_from_b_type' => 'winner',
-            'court_label' => 'Court 2',
             'is_conditional' => 0,
             'scheduling_note' => 'Championship match.',
             'match_date' => '2026-08-18 13:00:00',
             'team_a_id' => $teams['CBA'],
-            'team_b_id' => $teams['SCA-CLAIM'],
+            'team_b_id' => $teams['SCJE-CLAMS'],
             'status' => 'scheduled',
             'created_at' => $now,
         ]);
 
         $this->ensureMatchResult($eventId, $m1, $teams['CBA'], 2, [21, 21], $teams['CCS-CAF'], 0, [15, 18], $facilitatorId, $validatorId, '2026-08-18 08:50:00');
-        $this->ensureMatchResult($eventId, $m2, $teams['CIT-COC'], 1, [21, 17, 18], $teams['SCA-CLAIM'], 2, [19, 21, 21], $facilitatorId, $validatorId, '2026-08-18 10:10:00');
+        $this->ensureMatchResult($eventId, $m2, $teams['COE-CTED'], 1, [21, 17, 18], $teams['SCJE-CLAMS'], 2, [19, 21, 21], $facilitatorId, $validatorId, '2026-08-18 10:10:00');
     }
 
     private function seedCheerdanceChampionship(int $eventId, int $sportId, int $locationId, array $teams, int $facilitatorId, string $now): void
@@ -545,7 +528,6 @@ class BracketSeeder extends Seeder
             'feeds_from_a_type' => null,
             'feeds_from_b' => null,
             'feeds_from_b_type' => null,
-            'court_label' => 'Main Stage',
             'is_conditional' => 0,
             'scheduling_note' => 'Judged championship for all participating teams.',
             'match_date' => '2026-08-16 14:00:00',
@@ -566,8 +548,8 @@ class BracketSeeder extends Seeder
             'validated_at' => null,
         ]);
 
-        $this->ensureResultEntry($resultId, $teams['SCA-CLAIM'], 94.5, 1, 0, null);
-        $this->ensureResultEntry($resultId, $teams['CIT-COC'], 92, 2, 0, null);
+        $this->ensureResultEntry($resultId, $teams['SCJE-CLAMS'], 94.5, 1, 0, null);
+        $this->ensureResultEntry($resultId, $teams['COE-CTED'], 92, 2, 0, null);
         $this->ensureResultEntry($resultId, $teams['CBA'], 89.5, 3, 0, null);
         $this->ensureResultEntry($resultId, $teams['CCS-CAF'], 87, 4, 0, null);
     }

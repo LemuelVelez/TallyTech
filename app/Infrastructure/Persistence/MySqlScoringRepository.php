@@ -235,6 +235,75 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             ->get()->getResultArray();
     }
 
+    public function rankingByStatus(int $eventId, string $status, bool $includeAllTeams = true): array
+    {
+        if ($eventId < 1) {
+            return [];
+        }
+
+        $status = $this->scoreboardResultStatus($status);
+        if ($status === 'validated') {
+            return $this->ranking($eventId, ! $includeAllTeams);
+        }
+
+        $combined = [];
+        if ($includeAllTeams) {
+            foreach ($this->teams() as $team) {
+                $teamId = (int) ($team['id'] ?? 0);
+                if ($teamId < 1) {
+                    continue;
+                }
+                $combined[$teamId] = [
+                    'id' => $teamId,
+                    'name' => (string) ($team['name'] ?? ''),
+                    'code' => (string) ($team['code'] ?? ''),
+                    'total_points' => 0.0,
+                    'firsts' => 0,
+                    'seconds' => 0,
+                    'thirds' => 0,
+                    'fourths' => 0,
+                ];
+            }
+        }
+
+        $sports = $this->db->table('sports')->select('id')->where('event_id', $eventId)->get()->getResultArray();
+        foreach ($sports as $sport) {
+            foreach ($this->provisionalRankingBySport($eventId, (int) $sport['id']) as $row) {
+                $teamId = (int) ($row['id'] ?? 0);
+                if ($teamId < 1) {
+                    continue;
+                }
+                if (! isset($combined[$teamId])) {
+                    $combined[$teamId] = [
+                        'id' => $teamId,
+                        'name' => (string) ($row['name'] ?? ''),
+                        'code' => (string) ($row['code'] ?? ''),
+                        'total_points' => 0.0,
+                        'firsts' => 0,
+                        'seconds' => 0,
+                        'thirds' => 0,
+                        'fourths' => 0,
+                    ];
+                }
+                $combined[$teamId]['total_points'] += (float) ($row['total_points'] ?? 0);
+                $combined[$teamId]['firsts'] += (int) ($row['firsts'] ?? 0);
+                $combined[$teamId]['seconds'] += (int) ($row['seconds'] ?? 0);
+                $combined[$teamId]['thirds'] += (int) ($row['thirds'] ?? 0);
+                $combined[$teamId]['fourths'] += (int) ($row['fourths'] ?? 0);
+            }
+        }
+
+        $rows = array_values($combined);
+        usort($rows, static fn(array $a, array $b): int => ((float) $b['total_points'] <=> (float) $a['total_points'])
+            ?: ((int) $b['firsts'] <=> (int) $a['firsts'])
+            ?: ((int) $b['seconds'] <=> (int) $a['seconds'])
+            ?: ((int) $b['thirds'] <=> (int) $a['thirds'])
+            ?: ((int) $b['fourths'] <=> (int) $a['fourths'])
+            ?: strcasecmp((string) $a['name'], (string) $b['name']));
+
+        return $rows;
+    }
+
     public function rankingBySport(int $eventId, int $sportId, string $status = 'validated'): array
     {
         if ($eventId < 1 || $sportId < 1) {
@@ -697,7 +766,6 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         $format = (string) ($data['tournament_format'] ?? '');
         $start = (string) ($data['start_time'] ?? '');
         $intervalMinutes = (int) ($data['interval_minutes'] ?? 60);
-        $courtLabel = $this->optionalTextValue($data['court_label'] ?? null);
         $thirdPlacePlayoff = ! empty($data['third_place_playoff']);
 
         if (! $eventId || ! $sportId || ! $locationId || ! in_array($format, ['single_elimination', 'double_elimination'], true)) {
@@ -705,9 +773,6 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         }
         if ($intervalMinutes < 15 || $intervalMinutes > 360) {
             throw new RuntimeException('Match interval must be between 15 and 360 minutes.');
-        }
-        if ($courtLabel !== null && mb_strlen($courtLabel) > 60) {
-            throw new RuntimeException('Court label is too long.');
         }
         $startDate = \DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', $start);
         $errors = \DateTimeImmutable::getLastErrors();
@@ -780,7 +845,6 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
                 'status' => ! empty($row['is_conditional']) ? 'cancelled' : 'scheduled',
                 'match_code' => 'M' . ($index + 1),
                 'bracket_order' => $index + 1,
-                'court_label' => $courtLabel,
                 'scheduling_note' => ! empty($row['is_conditional']) ? 'Played only if the lower-bracket finalist wins the first grand final.' : null,
                 'created_at' => date('Y-m-d H:i:s'),
             ]);
@@ -1135,7 +1199,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
     private function resultRows(?int $eventId, ?string $type, ?string $status): array
     {
         $builder = $this->db->table('results r')
-            ->select('r.*, sc.sport_id, sc.team_a_id, sc.team_b_id, sc.round, sc.tournament_format, sc.match_code, sc.phase, sc.bracket_side, sc.court_label, sc.match_date, s.name sport_name, s.category, s.result_type, s.set_count, s.winning_points, l.name location_name, u.display_name submitted_by_name, v.display_name validated_by_name')
+            ->select('r.*, sc.sport_id, sc.team_a_id, sc.team_b_id, sc.round, sc.tournament_format, sc.match_code, sc.phase, sc.bracket_side, sc.match_date, s.name sport_name, s.category, s.result_type, s.set_count, s.winning_points, l.name location_name, u.display_name submitted_by_name, v.display_name validated_by_name')
             ->join('schedules sc', 'sc.id=r.schedule_id')
             ->join('sports s', 's.id=sc.sport_id')
             ->join('locations l', 'l.id=sc.location_id', 'left')
@@ -1369,7 +1433,6 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             if ($existingScheduleId !== null) { $exists->where('id !=', $existingScheduleId); }
             if ($exists->countAllResults() > 0) { throw new RuntimeException('Match ID already exists for this sport.'); }
         }
-        if (! empty($data['court_label']) && mb_strlen($data['court_label']) > 60) throw new RuntimeException('Court label is too long.');
         if (! empty($data['scheduling_note']) && mb_strlen($data['scheduling_note']) > 255) throw new RuntimeException('Scheduling note is too long.');
         if ($teamA) {
             $this->requireRow('teams', $teamA, 'Team A');

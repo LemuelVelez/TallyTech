@@ -8,7 +8,10 @@ class ScoreboardController extends BaseController
     {
         $rawSport = $this->request->getGet('sport');
         $sportId = is_scalar($rawSport) && preg_match('/^[1-9]\d*$/', (string) $rawSport) ? (int) $rawSport : null;
-        $data = $this->scoringService()->scoreboard($sportId);
+        $requestedView = strtolower(trim((string) $this->request->getGet('view')));
+        $overall = $requestedView === 'overall' || $sportId === null;
+
+        $data = $this->scoringService()->scoreboard($sportId, $overall);
         $data['title'] = 'Live Scoreboard';
         return view('scoreboard/index', $data);
     }

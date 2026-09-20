@@ -85,14 +85,14 @@ class TallyTechSeeder extends Seeder
 
             $teams = [
                 'CBA' => $this->ensureTeam(['name' => 'CBA Lions', 'code' => 'CBA', 'created_at' => $now]),
-                'CCS-CAF' => $this->ensureTeam(['name' => 'CCS Panthers & CAF Buffaloes', 'code' => 'CCS-CAF', 'created_at' => $now]),
-                'CIT-COC' => $this->ensureTeam(['name' => 'CIT Dragons & COC Stallions', 'code' => 'CIT-COC', 'created_at' => $now]),
-                'SCA-CLAIM' => $this->ensureTeam(['name' => 'SCA Eagles & CLAIM Phoenix', 'code' => 'SCA-CLAIM', 'created_at' => $now]),
+                'CCS-CAF' => $this->ensureTeam(['name' => 'CCS Panthers & CAF Buffalo', 'code' => 'CCS-CAF', 'created_at' => $now]),
+                'COE-CTED' => $this->ensureTeam(['name' => 'COE Stallions & CTED Dragons', 'code' => 'COE-CTED', 'created_at' => $now]),
+                'SCJE-CLAMS' => $this->ensureTeam(['name' => 'SCJE Eagles & CLAMS Phoenix', 'code' => 'SCJE-CLAMS', 'created_at' => $now]),
             ];
 
             $locations = [
                 'Main Gymnasium' => $this->ensureLocation('Main Gymnasium', $now),
-                'Covered Court' => $this->ensureLocation('Covered Court', $now),
+                'Covered Gymnasium' => $this->ensureLocation('Covered Gymnasium', $now),
                 'ISF Field' => $this->ensureLocation('ISF Field', $now),
                 'Auditorium' => $this->ensureLocation('Auditorium', $now),
             ];

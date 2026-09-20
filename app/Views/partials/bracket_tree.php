@@ -206,7 +206,7 @@ $teamMarkStyle = static function (string $name): string {
                                         <div class="tt-bracket-match-foot">
                                             <small><?= ! empty($match['match_date']) ? esc(date('M j · g:i A', strtotime((string) $match['match_date']))) : 'TBD' ?></small>
                                             <span aria-hidden="true">·</span>
-                                            <small><?= esc((string) ($match['court_label'] ?: ($match['location_name'] ?? '—'))) ?></small>
+                                            <small><?= esc((string) ($match['location_name'] ?? '—')) ?></small>
                                         </div>
 
                                         <?php if ($isConditional): ?>

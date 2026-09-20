@@ -69,7 +69,7 @@ $activeAdminCount = $isAdminManagement
                     <td><span class="badge <?= $user['status'] === 'active' ? 'official' : 'neutral' ?>"><?= strtoupper(esc($user['status'])) ?></span></td>
                     <td>
                         <?php if ($userRole === 'facilitator' && ! empty($user['sports'])): ?>
-                            <?php foreach ($user['sports'] as $sport): ?><span class="chip"><?= esc($sport['name'] . ' ' . $sport['category']) ?></span><?php endforeach; ?>
+                            <?php foreach ($user['sports'] as $sport): ?><span class="chip"><?= esc($sport['name'] . ' · ' . $sport['category']) ?></span><?php endforeach; ?>
                         <?php elseif ($userRole === 'facilitator'): ?>
                             <span class="muted"><?= $hasActiveEvent ? 'No active-event sports assigned' : 'No active event' ?></span>
                         <?php else: ?>
@@ -100,6 +100,48 @@ $activeAdminCount = $isAdminManagement
         </table>
     </div>
 </section>
+
+<?php if (! $isAdminManagement && $manageMode === 'facilitator' && $hasActiveEvent): ?>
+<section class="panel">
+    <div class="panel-head">
+        <div>
+            <h2>Sport Assignment Summary</h2>
+            <p><?= esc($activeEvent['name'] ?? 'Active event') ?> · spot sports that still need a facilitator.</p>
+        </div>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Sport · Category</th><th>Assigned Facilitators</th></tr></thead>
+            <tbody>
+            <?php foreach ($sports as $sport): ?>
+                <?php
+                $assignedFacilitators = [];
+                foreach ($users as $facilitator) {
+                    foreach ($facilitator['sports'] ?? [] as $assignedSport) {
+                        if ((int) ($assignedSport['id'] ?? 0) === (int) $sport['id']) {
+                            $assignedFacilitators[] = (string) ($facilitator['display_name'] ?? '');
+                            break;
+                        }
+                    }
+                }
+                ?>
+                <tr>
+                    <td><b><?= esc($sport['name']) ?></b><small class="muted"><?= esc($sport['category']) ?></small></td>
+                    <td>
+                        <?php if ($assignedFacilitators): ?>
+                            <?php foreach ($assignedFacilitators as $facilitatorName): ?><span class="chip"><?= esc($facilitatorName) ?></span><?php endforeach; ?>
+                        <?php else: ?>
+                            <span class="badge unofficial">No facilitator assigned</span>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            <?php if (! $sports): ?><tr><td colspan="2" class="empty">No sports are configured for the active event.</td></tr><?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+</section>
+<?php endif; ?>
 
 <?php foreach ($users as $user): ?>
     <?php

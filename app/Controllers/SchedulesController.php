@@ -79,7 +79,6 @@ class SchedulesController extends BaseController
         $rawStart = trim($this->postString('start_time'));
         $parsedStart = $this->parseDateTime($rawStart);
         $interval = $this->postPositiveInt('interval_minutes') ?: 60;
-        $courtLabel = trim($this->postString('court_label'));
         $thirdPlacePlayoff = $this->request->getPost('third_place_playoff') !== null;
 
         if (! $sportId || ! $locationId || ! in_array($format, self::TOURNAMENT_FORMATS, true) || ! $parsedStart) {
@@ -106,7 +105,6 @@ class SchedulesController extends BaseController
                 'tournament_format' => $format,
                 'start_time' => $parsedStart->format('Y-m-d H:i:s'),
                 'interval_minutes' => $interval,
-                'court_label' => $courtLabel ?: null,
                 'third_place_playoff' => $thirdPlacePlayoff,
             ], $teamIds, (int) session()->get('user_id'));
         } catch (\Throwable $e) {
@@ -188,6 +186,37 @@ class SchedulesController extends BaseController
             return ['error' => 'Enter a valid match date and time.'];
         }
 
+        $sport = null;
+        foreach ($this->repository()->sports((int) $event['id']) as $candidate) {
+            if ((int) ($candidate['id'] ?? 0) === $sportId) {
+                $sport = $candidate;
+                break;
+            }
+        }
+        if (! $sport) {
+            return ['error' => 'Select a sport from the active event.'];
+        }
+
+        $rawTeamIds = $this->request->getPost('team_ids');
+        if ($rawTeamIds !== null && ! is_array($rawTeamIds)) {
+            return ['error' => 'Selected teams are invalid.'];
+        }
+        $teamIds = [];
+        foreach (is_array($rawTeamIds) ? $rawTeamIds : [] as $rawTeamId) {
+            if (! is_scalar($rawTeamId) || ! preg_match('/^[1-9]\d*$/', (string) $rawTeamId)) {
+                return ['error' => 'Selected teams are invalid.'];
+            }
+            $teamIds[] = (int) $rawTeamId;
+        }
+        $teamIds = array_values(array_unique($teamIds));
+
+        if (($sport['result_type'] ?? '') === 'match' && count($teamIds) !== 2) {
+            return ['error' => 'Match schedules require exactly two participating teams.'];
+        }
+        if (($sport['result_type'] ?? '') === 'judged' && count($teamIds) > 2) {
+            return ['error' => 'Judged schedules can include at most two participating teams.'];
+        }
+
         return [
             'event_id' => (int) $event['id'],
             'sport_id' => $sportId,
@@ -195,8 +224,8 @@ class SchedulesController extends BaseController
             'round' => $stageData['round'],
             'tournament_format' => $format,
             'match_date' => $parsed->format('Y-m-d H:i:s'),
-            'team_a_id' => $this->postPositiveInt('team_a_id') ?: null,
-            'team_b_id' => $this->postPositiveInt('team_b_id') ?: null,
+            'team_a_id' => $teamIds[0] ?? null,
+            'team_b_id' => $teamIds[1] ?? null,
             'status' => $status,
             'match_code' => strtoupper(trim($this->postString('match_code'))) ?: null,
             'phase' => $stageData['phase'],
@@ -206,7 +235,6 @@ class SchedulesController extends BaseController
             'feeds_from_a_type' => trim($this->postString('feeds_from_a_type')) ?: null,
             'feeds_from_b' => strtoupper(trim($this->postString('feeds_from_b'))) ?: null,
             'feeds_from_b_type' => trim($this->postString('feeds_from_b_type')) ?: null,
-            'court_label' => trim($this->postString('court_label')) ?: null,
             'is_conditional' => $this->postPositiveInt('is_conditional') ? 1 : 0,
             'scheduling_note' => trim($this->postString('scheduling_note')) ?: null,
         ];

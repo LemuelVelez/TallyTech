@@ -55,25 +55,30 @@ class ScoringService
         ];
     }
 
-    public function scoreboard(?int $requestedSportId = null): array
+    public function scoreboard(?int $requestedSportId = null, bool $overall = false): array
     {
         $event = $this->repository->activeEvent();
         $eventId = (int) ($event['id'] ?? 0);
         $sports = $this->repository->sports($eventId);
+        $isOverall = $overall || $requestedSportId === null;
         $selection = $this->scoreboardSportSelection($sports, $requestedSportId);
-        $selectedSportIds = $selection['selectedSportIds'];
+        $selectedSportIds = $isOverall ? [] : $selection['selectedSportIds'];
+        $selectedSport = $isOverall ? null : $selection['selectedSport'];
 
         $official = $this->buildScoreboardDataset($eventId, $selectedSportIds, 'validated');
         $unofficial = $this->buildScoreboardDataset($eventId, $selectedSportIds, 'pending');
+        $official['overallRanking'] = $eventId > 0 ? $this->repository->ranking($eventId, false) : [];
+        $unofficial['overallRanking'] = $eventId > 0 ? $this->repository->rankingByStatus($eventId, 'pending', true) : [];
 
         return [
             'activeEvent' => $event,
             'sports' => $sports,
-            'selectedSport' => $selection['selectedSport'],
+            'isOverall' => $isOverall,
+            'selectedSport' => $selectedSport,
             'selectedSportIds' => $selectedSportIds,
             'sportScoreTable' => [
                 'sportGroups' => $selection['sportGroups'],
-                'selectedSport' => $selection['selectedSport'],
+                'selectedSport' => $selectedSport,
                 'selectedSportIds' => $selectedSportIds,
             ],
             'scoreboards' => [

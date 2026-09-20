@@ -2390,3 +2390,59 @@ body.is-scoreboard-presentation {
   .scoreboard-present-button,
   .scoreboard-presentation-control { transition: none; }
 }
+
+/* Overall public scoreboard ranking */
+.scoreboard-overall-ranking {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+}
+.team-ranking--scoreboard { width: 100%; color: #10233c; }
+.team-ranking--scoreboard .team-ranking-podium { margin: 0 0 16px; }
+.team-ranking--scoreboard .podium-card {
+  min-height: 138px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.22);
+}
+.team-ranking--scoreboard .team-ranking-table-panel {
+  margin: 0;
+  padding: clamp(16px, 2vw, 24px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.18);
+}
+.team-ranking--scoreboard.team-ranking--provisional .team-ranking-table-panel {
+  border-color: rgba(255, 206, 37, 0.72);
+}
+.team-ranking--scoreboard .panel-head { margin-bottom: 12px; }
+.team-ranking--scoreboard .panel-head p { color: #66768a; }
+.team-ranking--scoreboard .table-wrap { max-height: 340px; overflow: auto; }
+.team-ranking--scoreboard table { min-width: 720px; }
+.team-ranking--scoreboard .muted { display: block; }
+
+.viewer-page--presentation-frame .scoreboard-overall-ranking { width: min(1380px, 100%); }
+.viewer-page--presentation-frame .team-ranking--scoreboard .team-ranking-podium {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.viewer-page--presentation-frame .team-ranking--scoreboard .podium-card {
+  min-height: 112px;
+  padding: 14px 16px;
+}
+.viewer-page--presentation-frame .team-ranking--scoreboard .podium-card b { font-size: 1.6rem; }
+.viewer-page--presentation-frame .team-ranking--scoreboard .team-ranking-table-panel { padding: 14px 18px; }
+.viewer-page--presentation-frame .team-ranking--scoreboard .panel-head { margin-bottom: 8px; }
+.viewer-page--presentation-frame .team-ranking--scoreboard th,
+.viewer-page--presentation-frame .team-ranking--scoreboard td { padding-top: 9px; padding-bottom: 9px; }
+
+@media (max-width: 760px) {
+  .team-ranking--scoreboard .team-ranking-podium { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .scoreboard-overall-ranking { width: 100%; }
+}
+.viewer-page--presentation-frame .team-ranking--scoreboard .podium-card small,
+.viewer-page--presentation-frame .team-ranking--scoreboard td small.muted {
+  display: block;
+}
+.viewer-page--presentation-frame .team-ranking--scoreboard .panel-head p {
+  margin: 0;
+  font-size: 0.8rem;
+}

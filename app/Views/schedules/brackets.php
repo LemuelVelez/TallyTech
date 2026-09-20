@@ -35,7 +35,6 @@ $bracketFormat = (string) ($schedules[0]['tournament_format'] ?? 'single_elimina
             <label>Sport<select name="sport_id" required><option value="">Select sport</option><?php foreach ($sports as $sport): ?><option value="<?= (int) $sport['id'] ?>" <?= (int) $sport['id'] === (int) $selectedSportId ? 'selected' : '' ?>><?= esc($sport['name'].' · '.$sport['category'].' · '.ucfirst($sport['result_type'])) ?></option><?php endforeach; ?></select></label>
             <label>Tournament Format<select name="tournament_format" required><option value="single_elimination">Single Elimination</option><option value="double_elimination">Double Elimination</option></select></label>
             <label>Location<select name="location_id" required><option value="">Select location</option><?php foreach ($locations as $location): ?><option value="<?= (int) $location['id'] ?>"><?= esc($location['name']) ?></option><?php endforeach; ?></select></label>
-            <label>Court<input name="court_label" maxlength="60" placeholder="Court 1"></label>
             <label>Start Date & Time<input type="datetime-local" name="start_time" required></label>
             <label>Match Interval (minutes)<input type="number" name="interval_minutes" min="15" max="360" step="5" value="60" required></label>
         </div>

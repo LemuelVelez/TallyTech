@@ -299,7 +299,7 @@
         return;
       }
 
-      if (rotationLabel) rotationLabel.textContent = 'Next sport in';
+      if (rotationLabel) rotationLabel.textContent = 'Next view in';
       if (rotationUnit) rotationUnit.hidden = false;
       if (rotationCountdown) {
         const remainingMs = Math.max(0, rotationDeadline - Date.now());
@@ -809,6 +809,56 @@
   document.addEventListener('scroll', () => {
     if (openSelectState) positionSleekSelect(openSelectState);
   }, true);
+
+  document.querySelectorAll('[data-schedule-team-form]').forEach((form) => {
+    const sportSelect = form.querySelector('[data-schedule-sport]');
+    const teamCheckboxes = Array.from(form.querySelectorAll('[data-schedule-team-checks] input[name="team_ids[]"]'));
+    const note = form.querySelector('[data-schedule-team-note]');
+    const saveButton = form.querySelector('[data-schedule-save]');
+
+    const scheduleTeamState = () => {
+      const selectedOption = sportSelect?.options?.[sportSelect.selectedIndex] || null;
+      const resultType = selectedOption?.dataset?.resultType || '';
+      const checkedCount = teamCheckboxes.filter((checkbox) => checkbox.checked).length;
+
+      if (!resultType) {
+        return { valid: false, message: 'Select a sport to set the participating-team rule.' };
+      }
+      if (resultType === 'match') {
+        return {
+          valid: checkedCount === 2,
+          message: checkedCount === 2
+            ? 'Exactly 2 teams selected. The first selected team is Team A and the second is Team B.'
+            : `Match sports require exactly 2 participating teams (${checkedCount} selected).`,
+        };
+      }
+
+      return {
+        valid: checkedCount <= 2,
+        message: checkedCount <= 2
+          ? 'Judged sports may leave participating teams empty or select up to 2 teams.'
+          : `Judged sports can include at most 2 participating teams (${checkedCount} selected).`,
+      };
+    };
+
+    const syncScheduleTeams = () => {
+      const state = scheduleTeamState();
+      if (note) note.textContent = state.message;
+      if (saveButton) saveButton.disabled = !state.valid;
+      teamCheckboxes.forEach((checkbox) => checkbox.setCustomValidity(''));
+    };
+
+    sportSelect?.addEventListener('change', syncScheduleTeams);
+    teamCheckboxes.forEach((checkbox) => checkbox.addEventListener('change', syncScheduleTeams));
+    form.addEventListener('submit', (event) => {
+      const state = scheduleTeamState();
+      if (state.valid) return;
+      event.preventDefault();
+      if (note) note.textContent = state.message;
+    });
+
+    syncScheduleTeams();
+  });
 
   document.querySelectorAll('[data-role-managed-form]').forEach((form) => {
     const roleSelect = form.querySelector('[data-user-role]');

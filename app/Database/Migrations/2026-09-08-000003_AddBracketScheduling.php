@@ -17,7 +17,6 @@ class AddBracketScheduling extends Migration
             'feeds_from_a_type' => ['type'=>'ENUM','constraint'=>['winner','loser'],'null'=>true],
             'feeds_from_b' => ['type'=>'VARCHAR','constraint'=>10,'null'=>true],
             'feeds_from_b_type' => ['type'=>'ENUM','constraint'=>['winner','loser'],'null'=>true],
-            'court_label' => ['type'=>'VARCHAR','constraint'=>60,'null'=>true],
             'is_conditional' => ['type'=>'TINYINT','constraint'=>1,'default'=>0],
             'scheduling_note' => ['type'=>'VARCHAR','constraint'=>255,'null'=>true],
         ]);
@@ -25,6 +24,6 @@ class AddBracketScheduling extends Migration
 
     public function down()
     {
-        $this->forge->dropColumn('schedules', ['match_code','phase','bracket_side','bracket_order','feeds_from_a','feeds_from_a_type','feeds_from_b','feeds_from_b_type','court_label','is_conditional','scheduling_note']);
+        $this->forge->dropColumn('schedules', ['match_code','phase','bracket_side','bracket_order','feeds_from_a','feeds_from_a_type','feeds_from_b','feeds_from_b_type','is_conditional','scheduling_note']);
     }
 }

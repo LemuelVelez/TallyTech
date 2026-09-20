@@ -84,7 +84,7 @@ final class ReferenceDataRepositoryTest extends CIUnitTestCase
             'result_type' => 'match',
             'created_at' => date('Y-m-d H:i:s'),
         ], $this->adminId);
-        $locationId = $this->repository->createLocation('Main Court', $this->adminId);
+        $locationId = $this->repository->createLocation('Main Gymnasium', $this->adminId);
 
         $scheduleData = [
             'event_id' => $this->eventId,
@@ -116,7 +116,7 @@ final class ReferenceDataRepositoryTest extends CIUnitTestCase
             'result_type' => 'match',
             'created_at' => date('Y-m-d H:i:s'),
         ], $this->adminId);
-        $locationId = $this->repository->createLocation('Covered Court', $this->adminId);
+        $locationId = $this->repository->createLocation('Covered Gymnasium', $this->adminId);
         $scheduleData = [
             'event_id' => $this->eventId,
             'sport_id' => $sportId,
@@ -132,7 +132,7 @@ final class ReferenceDataRepositoryTest extends CIUnitTestCase
         $this->repository->setLocationActive($locationId, false, $this->adminId);
 
         $this->repository->updateSchedule($scheduleId, array_merge($scheduleData, ['round' => 'Semi-final']), $this->adminId);
-        $this->assertSame('Covered Court', $this->repository->schedules($this->eventId)[0]['location_name']);
+        $this->assertSame('Covered Gymnasium', $this->repository->schedules($this->eventId)[0]['location_name']);
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Disable it instead.');
