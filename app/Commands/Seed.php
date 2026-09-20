@@ -11,8 +11,17 @@ class Seed extends BaseCommand
 {
     protected $group = 'Database';
     protected $name = 'seed';
-    protected $description = 'Seeds the TallyTech database with the default application data.';
+    protected $description = 'Seeds the TallyTech database with all normal application seed data.';
     protected $usage = 'seed';
+
+    private const SEEDERS = [
+        'CanonicalTeamsSeeder',
+        'TallyTechSeeder',
+        'BracketSeeder',
+        'FourthPlacePointsSeeder',
+        'OfficialScoreboardSeeder',
+        'UnofficialScoreboardSeeder',
+    ];
 
     public function run(array $params)
     {
@@ -23,7 +32,11 @@ class Seed extends BaseCommand
 
         try {
             $seeder = Database::seeder();
-            $seeder->call('TallyTechSeeder');
+
+            foreach (self::SEEDERS as $seederClass) {
+                $seeder->call($seederClass);
+            }
+
             CLI::newLine();
         } catch (Throwable $e) {
             CLI::error('❌ Seeding failed.', 'white', 'red');

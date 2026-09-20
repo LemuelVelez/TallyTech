@@ -42,7 +42,7 @@ class FourthPlacePointsSeeder extends Seeder
         CLI::write(
             $changes > 0
                 ? sprintf('Updated %d weighted-points row(s) with a 4th-place value of 3.', $changes)
-                : 'No weighted-points rows required a 4th-place seed update.',
+                : 'ℹ️  No pending fourth-place point seed data; weighted points are already synchronized.',
             'green'
         );
     }

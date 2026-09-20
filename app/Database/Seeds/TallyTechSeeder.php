@@ -121,7 +121,6 @@ class TallyTechSeeder extends Seeder
                 $this->ensureWeightedPoints($eventId, $sportId, $ids['manager'], $ids['validator'], $now);
             }
 
-            $this->call(BracketSeeder::class);
 
             $this->ensureNotification($ids['facilitator'], 'result_submitted', 'Submitted unofficial Cheerdance judged result', $now);
             $this->ensureNotification($ids['validator'], 'result_validated', 'Validated Basketball bracket results as official', $now);

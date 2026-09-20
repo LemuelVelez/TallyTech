@@ -86,7 +86,7 @@ class OfficialScoreboardSeeder extends Seeder
         }
 
         if ($this->changes === 0) {
-            CLI::write('ℹ️  Official scoreboard demo data is already seeded.', 'green');
+            CLI::write('ℹ️  No pending official scoreboard seed data; demo data is already seeded.', 'green');
             return;
         }
 
