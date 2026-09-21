@@ -73,6 +73,7 @@ $routes->group('', ['filter' => 'auth'], static function (RouteCollection $route
         $routes->post('schedules/(:num)/delete', 'SchedulesController::delete/$1');
         $routes->get('brackets', 'SchedulesController::brackets');
         $routes->post('brackets/generate', 'SchedulesController::generateBracket');
+        $routes->post('brackets/(:num)/delete', 'SchedulesController::deleteBracket/$1');
 
         $routes->post('weighted-points', 'WeightedPointsController::store');
         $routes->post('weighted-points/(:num)/update', 'WeightedPointsController::update/$1');

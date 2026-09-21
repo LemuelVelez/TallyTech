@@ -31,8 +31,12 @@ class SchedulesController extends BaseController
             $selectedSportId = (int) ($data['sports'][0]['id'] ?? 0);
         }
 
-        $schedules = $this->repository()->resolveBracketSlots($this->repository()->schedules($eventId));
+        $allSchedules = $this->repository()->schedules($eventId);
+        $schedules = $this->repository()->resolveBracketSlots($allSchedules, true);
         $data['schedules'] = array_values(array_filter($schedules, static fn(array $row): bool => (int) $row['sport_id'] === $selectedSportId));
+        $sportScheduleCount = count(array_filter($allSchedules, static fn(array $row): bool => (int) $row['sport_id'] === $selectedSportId));
+        $data['hiddenLegacyMatches'] = max(0, $sportScheduleCount - count($data['schedules']));
+        $data['hasSportSchedules'] = $sportScheduleCount > 0;
 
         $resultBySchedule = [];
         foreach ($this->repository()->results($eventId) as $result) {
@@ -112,6 +116,22 @@ class SchedulesController extends BaseController
         }
 
         return redirect()->to(site_url('brackets') . '?sport=' . $sportId)->with('success', $count . ' bracket matches generated.');
+    }
+
+    public function deleteBracket(int $sportId)
+    {
+        $event = $this->repository()->activeEvent();
+        if (! $event) {
+            return redirect()->back()->with('error', 'Add and activate an event first.');
+        }
+
+        try {
+            $count = $this->repository()->deleteBracket((int) $event['id'], $sportId, (int) session()->get('user_id'));
+        } catch (\Throwable $e) {
+            return redirect()->to(site_url('brackets') . '?sport=' . $sportId)->with('error', $this->safeErrorMessage($e, 'The bracket could not be deleted.'));
+        }
+
+        return redirect()->to(site_url('brackets') . '?sport=' . $sportId)->with('success', 'Bracket deleted (' . $count . ' match' . ($count === 1 ? '' : 'es') . ' removed).');
     }
 
     public function store()

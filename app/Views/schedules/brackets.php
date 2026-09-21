@@ -16,7 +16,21 @@ $bracketFormat = (string) ($schedules[0]['tournament_format'] ?? 'single_elimina
 </section>
 
 <section class="panel bracket-management-panel">
-    <div class="panel-head"><div><h2><?= esc($selectedSport['name'] ?? 'Tournament') ?> Bracket</h2><p><?= $schedules ? esc($formatLabel($bracketFormat)) : 'Generate a bracket to begin.' ?></p></div><a href="<?= site_url('schedules') ?>">Open Master Schedule</a></div>
+    <div class="panel-head">
+        <div><h2><?= esc(trim(($selectedSport['name'] ?? 'Tournament') . ' ' . ($selectedSport['category'] ?? ''))) ?> Bracket</h2><p><?= $schedules ? esc($formatLabel($bracketFormat)) : 'Generate a bracket to begin.' ?></p></div>
+        <div class="row-actions">
+            <a href="<?= site_url('schedules') ?>">Open Master Schedule</a>
+            <?php if (! empty($hasSportSchedules) && $selectedSport): ?>
+                <form method="post" action="<?= site_url('brackets/' . (int) $selectedSport['id'] . '/delete') ?>" data-confirm="Delete the entire <?= esc(trim($selectedSport['name'] . ' ' . ($selectedSport['category'] ?? '')), 'attr') ?> bracket? All of its matches and pending results will be removed. Brackets with official validated results cannot be deleted.">
+                    <?= csrf_field() ?>
+                    <button class="btn tiny danger"><?= ui_icon('trash') ?><span>Delete Bracket</span></button>
+                </form>
+            <?php endif; ?>
+        </div>
+    </div>
+    <?php if (! empty($hiddenLegacyMatches)): ?>
+        <div class="event-banner"><b><?= (int) $hiddenLegacyMatches ?> duplicate match<?= (int) $hiddenLegacyMatches === 1 ? '' : 'es' ?> without a Match ID</b> <?= (int) $hiddenLegacyMatches === 1 ? 'is' : 'are' ?> hidden from this bracket and excluded from team ranking points.</div>
+    <?php endif; ?>
     <?php if ($schedules): ?>
         <?= view('partials/bracket_tree', [
             'bracketSchedules' => $schedules,

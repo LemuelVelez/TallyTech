@@ -26,17 +26,18 @@ $icons = ['trophy', 'medal', 'award', 'target'];
             <div>
                 <h2>Overall Team Ranking</h2>
                 <p><?= esc($subtitle) ?></p>
+                <p class="team-ranking-note">1st, 2nd, 3rd, and 4th show how many sports each team finished in that place.</p>
             </div>
             <?php if ($provisional): ?><span class="badge unofficial">PROVISIONAL</span><?php endif; ?>
         </div>
         <div class="table-wrap">
             <table>
-                <thead><tr><th>Rank</th><th>Team</th><th>1st</th><th>2nd</th><th>3rd</th><th>4th</th><th>Total Points</th></tr></thead>
+                <thead><tr><th class="team-ranking-col-rank">Rank</th><th class="team-ranking-col-team">Team</th><th title="Sports finished in 1st place">1st</th><th title="Sports finished in 2nd place">2nd</th><th title="Sports finished in 3rd place">3rd</th><th title="Sports finished in 4th place">4th</th><th>Total Points</th></tr></thead>
                 <tbody>
                 <?php foreach ($rankingRows as $i => $team): ?>
                     <tr>
-                        <td><span class="rank-no"><?= esc((string) ($i + 1)) ?></span></td>
-                        <td><b><?= esc($team['name'] ?? '') ?></b><small class="muted"><?= esc($team['code'] ?? '') ?></small></td>
+                        <td class="team-ranking-col-rank"><span class="rank-no"><?= esc((string) ($i + 1)) ?></span></td>
+                        <td class="team-ranking-col-team"><b><?= esc($team['name'] ?? '') ?></b><small class="muted"><?= esc($team['code'] ?? '') ?></small></td>
                         <td><?= esc((string) (int) ($team['firsts'] ?? 0)) ?></td>
                         <td><?= esc((string) (int) ($team['seconds'] ?? 0)) ?></td>
                         <td><?= esc((string) (int) ($team['thirds'] ?? 0)) ?></td>

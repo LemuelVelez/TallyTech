@@ -14,7 +14,7 @@ interface ScoringRepositoryInterface
     public function sportCategories(bool $includeInactive = false): array;
     public function sportCategory(int $id): ?array;
     public function schedules(?int $eventId = null, ?string $resultType = null): array;
-    public function resolveBracketSlots(array $schedules): array;
+    public function resolveBracketSlots(array $schedules, bool $excludeLegacyDuplicates = false): array;
     public function usersByRole(string $role): array;
     public function assignedSportIds(int $userId): array;
     public function notifications(int $limit = 30): array;
@@ -55,6 +55,7 @@ interface ScoringRepositoryInterface
     public function updateSchedule(int $id, array $data, int $actorId): void;
     public function deleteSchedule(int $id, int $actorId): void;
     public function generateBracket(array $data, array $teamIds, int $actorId): int;
+    public function deleteBracket(int $eventId, int $sportId, int $actorId): int;
 
     public function createUser(array $data, array $sportIds, int $actorId): int;
     public function updateUser(int $id, array $data, array $sportIds, int $actorId): void;

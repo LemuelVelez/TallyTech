@@ -29,6 +29,8 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
     private WeightedPointModel $weightedPointsModel;
     private ResultModel $resultsModel;
     private NotificationModel $notificationsModel;
+    /** @var array<string, array> Per-request cache for ranking source data. */
+    private array $placementSourceCache = [];
 
     public function __construct(private ?BaseConnection $db = null)
     {
@@ -214,25 +216,8 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         if (! $eventId) {
             return [];
         }
-        $builder = $this->db->table('teams t')
-            ->select('t.id,t.name,t.code,COALESCE(SUM(CASE WHEN r.status="validated" THEN re.allocated_points ELSE 0 END),0) total_points, SUM(CASE WHEN r.status="validated" AND re.placement=1 THEN 1 ELSE 0 END) firsts, SUM(CASE WHEN r.status="validated" AND re.placement=2 THEN 1 ELSE 0 END) seconds, SUM(CASE WHEN r.status="validated" AND re.placement=3 THEN 1 ELSE 0 END) thirds, SUM(CASE WHEN r.status="validated" AND re.placement=4 THEN 1 ELSE 0 END) fourths');
-        if ($officialOnly) {
-            $builder->join('result_entries re', 're.team_id=t.id')
-                ->join('results r', 'r.id=re.result_id AND r.event_id=' . $this->db->escape($eventId))
-                ->having('total_points >', 0);
-        } else {
-            $builder->join('result_entries re', 're.team_id=t.id', 'left')
-                ->join('results r', 'r.id=re.result_id AND r.event_id=' . $this->db->escape($eventId), 'left');
-        }
-        $builder->groupBy('t.id,t.name,t.code');
-        return $builder
-            ->orderBy('total_points', 'DESC')
-            ->orderBy('firsts', 'DESC')
-            ->orderBy('seconds', 'DESC')
-            ->orderBy('thirds', 'DESC')
-            ->orderBy('fourths', 'DESC')
-            ->orderBy('t.name', 'ASC')
-            ->get()->getResultArray();
+
+        return $this->placementRanking($eventId, 'validated', ! $officialOnly, null, $officialOnly);
     }
 
     public function rankingByStatus(int $eventId, string $status, bool $includeAllTeams = true): array
@@ -246,62 +231,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             return $this->ranking($eventId, ! $includeAllTeams);
         }
 
-        $combined = [];
-        if ($includeAllTeams) {
-            foreach ($this->teams() as $team) {
-                $teamId = (int) ($team['id'] ?? 0);
-                if ($teamId < 1) {
-                    continue;
-                }
-                $combined[$teamId] = [
-                    'id' => $teamId,
-                    'name' => (string) ($team['name'] ?? ''),
-                    'code' => (string) ($team['code'] ?? ''),
-                    'total_points' => 0.0,
-                    'firsts' => 0,
-                    'seconds' => 0,
-                    'thirds' => 0,
-                    'fourths' => 0,
-                ];
-            }
-        }
-
-        $sports = $this->db->table('sports')->select('id')->where('event_id', $eventId)->get()->getResultArray();
-        foreach ($sports as $sport) {
-            foreach ($this->provisionalRankingBySport($eventId, (int) $sport['id']) as $row) {
-                $teamId = (int) ($row['id'] ?? 0);
-                if ($teamId < 1) {
-                    continue;
-                }
-                if (! isset($combined[$teamId])) {
-                    $combined[$teamId] = [
-                        'id' => $teamId,
-                        'name' => (string) ($row['name'] ?? ''),
-                        'code' => (string) ($row['code'] ?? ''),
-                        'total_points' => 0.0,
-                        'firsts' => 0,
-                        'seconds' => 0,
-                        'thirds' => 0,
-                        'fourths' => 0,
-                    ];
-                }
-                $combined[$teamId]['total_points'] += (float) ($row['total_points'] ?? 0);
-                $combined[$teamId]['firsts'] += (int) ($row['firsts'] ?? 0);
-                $combined[$teamId]['seconds'] += (int) ($row['seconds'] ?? 0);
-                $combined[$teamId]['thirds'] += (int) ($row['thirds'] ?? 0);
-                $combined[$teamId]['fourths'] += (int) ($row['fourths'] ?? 0);
-            }
-        }
-
-        $rows = array_values($combined);
-        usort($rows, static fn(array $a, array $b): int => ((float) $b['total_points'] <=> (float) $a['total_points'])
-            ?: ((int) $b['firsts'] <=> (int) $a['firsts'])
-            ?: ((int) $b['seconds'] <=> (int) $a['seconds'])
-            ?: ((int) $b['thirds'] <=> (int) $a['thirds'])
-            ?: ((int) $b['fourths'] <=> (int) $a['fourths'])
-            ?: strcasecmp((string) $a['name'], (string) $b['name']));
-
-        return $rows;
+        return $this->placementRanking($eventId, 'pending', $includeAllTeams);
     }
 
     public function rankingBySport(int $eventId, int $sportId, string $status = 'validated'): array
@@ -311,23 +241,8 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         }
 
         $status = $this->scoreboardResultStatus($status);
-        if ($status === 'pending') {
-            return $this->provisionalRankingBySport($eventId, $sportId);
-        }
 
-        return $this->db->table('teams t')
-            ->select('t.id,t.name,t.code,COALESCE(SUM(CASE WHEN r.status="validated" AND sc.sport_id=' . $this->db->escape($sportId) . ' THEN re.allocated_points ELSE 0 END),0) total_points, SUM(CASE WHEN r.status="validated" AND sc.sport_id=' . $this->db->escape($sportId) . ' AND re.placement=1 THEN 1 ELSE 0 END) firsts, SUM(CASE WHEN r.status="validated" AND sc.sport_id=' . $this->db->escape($sportId) . ' AND re.placement=2 THEN 1 ELSE 0 END) seconds, SUM(CASE WHEN r.status="validated" AND sc.sport_id=' . $this->db->escape($sportId) . ' AND re.placement=3 THEN 1 ELSE 0 END) thirds, SUM(CASE WHEN r.status="validated" AND sc.sport_id=' . $this->db->escape($sportId) . ' AND re.placement=4 THEN 1 ELSE 0 END) fourths')
-            ->join('result_entries re', 're.team_id=t.id', 'left')
-            ->join('results r', 'r.id=re.result_id AND r.event_id=' . $this->db->escape($eventId), 'left')
-            ->join('schedules sc', 'sc.id=r.schedule_id', 'left')
-            ->groupBy('t.id,t.name,t.code')
-            ->orderBy('total_points', 'DESC')
-            ->orderBy('firsts', 'DESC')
-            ->orderBy('seconds', 'DESC')
-            ->orderBy('thirds', 'DESC')
-            ->orderBy('fourths', 'DESC')
-            ->orderBy('t.name', 'ASC')
-            ->get()->getResultArray();
+        return $this->placementRanking($eventId, $status, $status === 'validated', [$sportId]);
     }
 
     public function reportSummary(?int $eventId = null): array
@@ -752,10 +667,68 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         if ($this->db->table('results')->where('schedule_id', $id)->countAllResults() > 0) {
             throw new RuntimeException('A schedule with submitted results cannot be deleted.');
         }
+        $matchCode = strtoupper(trim((string) ($schedule['match_code'] ?? '')));
+        if ($matchCode !== '') {
+            $dependents = $this->db->table('schedules')
+                ->where('event_id', (int) $schedule['event_id'])
+                ->where('sport_id', (int) $schedule['sport_id'])
+                ->where('id !=', $id)
+                ->groupStart()
+                    ->where('feeds_from_a', $matchCode)
+                    ->orWhere('feeds_from_b', $matchCode)
+                ->groupEnd()
+                ->countAllResults();
+            if ($dependents > 0) {
+                throw new RuntimeException('This match feeds other bracket matches. Delete the whole bracket from Bracket Management instead.');
+            }
+        }
         $this->db->transStart();
         $this->schedulesModel->delete($id);
         $this->notify($actorId, 'schedule_deleted', 'Removed schedule #' . ($schedule['id'] ?? $id));
         $this->finishTransaction();
+    }
+
+    public function deleteBracket(int $eventId, int $sportId, int $actorId): int
+    {
+        if ($eventId < 1 || $sportId < 1) {
+            throw new RuntimeException('Select a sport from the active event.');
+        }
+        $this->assertActiveEvent($eventId);
+        $sport = $this->requireRow('sports', $sportId, 'Sport');
+        if ((int) ($sport['event_id'] ?? 0) !== $eventId) {
+            throw new RuntimeException('Selected sport does not belong to the active event.');
+        }
+
+        $scheduleIds = array_map('intval', array_column(
+            $this->db->table('schedules')->select('id')->where(['event_id' => $eventId, 'sport_id' => $sportId])->get()->getResultArray(),
+            'id'
+        ));
+        if ($scheduleIds === []) {
+            throw new RuntimeException('This sport has no bracket to delete.');
+        }
+
+        $validatedResults = $this->db->table('results')
+            ->whereIn('schedule_id', $scheduleIds)
+            ->where('status', 'validated')
+            ->countAllResults();
+        if ($validatedResults > 0) {
+            throw new RuntimeException('This bracket already has official validated results and cannot be deleted.');
+        }
+
+        $this->db->transStart();
+        $resultIds = array_map('intval', array_column(
+            $this->db->table('results')->select('id')->whereIn('schedule_id', $scheduleIds)->get()->getResultArray(),
+            'id'
+        ));
+        if ($resultIds !== []) {
+            $this->db->table('result_entries')->whereIn('result_id', $resultIds)->delete();
+            $this->db->table('results')->whereIn('id', $resultIds)->delete();
+        }
+        $this->db->table('schedules')->whereIn('id', $scheduleIds)->delete();
+        $this->notify($actorId, 'bracket_deleted', 'Deleted the bracket for ' . ($sport['name'] ?? 'sport') . ' ' . ($sport['category'] ?? ''));
+        $this->finishTransaction();
+
+        return count($scheduleIds);
     }
 
     public function generateBracket(array $data, array $teamIds, int $actorId): int
@@ -1234,113 +1207,111 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         return $status;
     }
 
-    private function provisionalRankingBySport(int $eventId, int $sportId): array
+    /**
+     * Builds the team ranking from final sport placements.
+     *
+     * Every sport contributes at most one placement per team, so the 1st-4th
+     * columns count how many sports a team finished in that position. Match
+     * results only produce placements for championship, third-place, and
+     * loser-bracket elimination games; earlier bracket wins are not counted.
+     * Legacy schedules without a match ID are ignored when the same sport
+     * already has a generated bracket, which prevents duplicated finals from
+     * awarding points twice.
+     */
+    private function placementRanking(int $eventId, string $status, bool $includeAllTeams, ?array $sportIds = null, bool $positiveOnly = false): array
     {
-        $results = array_values(array_filter(
-            $this->resultsByStatus($eventId, 'pending'),
-            static fn(array $result): bool => (int) ($result['sport_id'] ?? 0) === $sportId
-        ));
-        if ($results === []) {
-            return [];
-        }
-
-        $weightedPoints = $this->db->table('weighted_points')
-            ->where([
-                'event_id' => $eventId,
-                'sport_id' => $sportId,
-                'status' => 'validated',
-            ])
-            ->get()
-            ->getRowArray();
-
+        $status = $this->scoreboardResultStatus($status);
+        $sportFilter = $sportIds === null ? null : array_map('intval', $sportIds);
         $ranking = [];
-        foreach ($results as $result) {
-            $entries = is_array($result['entries'] ?? null) ? $result['entries'] : [];
-            $placements = [];
 
-            if (($result['type'] ?? $result['result_type'] ?? '') === 'match') {
-                $outcome = $this->matchOutcome($entries);
-                if ($outcome !== null) {
-                    $winnerId = (int) ($outcome['winner']['team_id'] ?? 0);
-                    $loserId = (int) ($outcome['loser']['team_id'] ?? 0);
-                    $format = (string) ($result['tournament_format'] ?? 'single_elimination');
-                    $side = (string) ($result['bracket_side'] ?? '');
-                    $phase = (string) ($result['phase'] ?? '');
-                    $round = strtolower((string) ($result['round'] ?? ''));
-                    if ($phase === '' && (str_contains($round, 'final') || str_contains($round, 'championship'))) {
-                        $phase = 'final';
-                    }
-                    if ($side === '' && $phase === 'final') {
-                        $side = 'grand';
-                    }
+        $initialise = static function (array &$ranking, int $teamId, string $name, string $code): void {
+            if (isset($ranking[$teamId])) {
+                return;
+            }
+            $ranking[$teamId] = [
+                'id' => $teamId,
+                'name' => $name,
+                'code' => $code,
+                'total_points' => 0.0,
+                'firsts' => 0,
+                'seconds' => 0,
+                'thirds' => 0,
+                'fourths' => 0,
+            ];
+        };
 
-                    if ($format === 'double_elimination') {
-                        if ($side === 'lower' && $phase === 'lower_r1') {
-                            $placements[$loserId] = 4;
-                        } elseif ($side === 'lower' && $phase === 'final') {
-                            $placements[$loserId] = 3;
-                        } elseif ($side === 'grand' && $phase === 'tiebreaker') {
-                            $placements[$winnerId] = 1;
-                            $placements[$loserId] = 2;
-                        } elseif ($side === 'grand' && $phase === 'final' && $winnerId === (int) ($result['team_a_id'] ?? 0)) {
-                            $placements[$winnerId] = 1;
-                            $placements[$loserId] = 2;
-                        }
-                    } elseif ($phase === 'third_place') {
-                        $placements[$winnerId] = 3;
-                        $placements[$loserId] = 4;
-                    } elseif ($phase === 'final') {
-                        $placements[$winnerId] = 1;
-                        $placements[$loserId] = 2;
-                    }
-                }
-            } else {
-                foreach ($entries as $entry) {
-                    $placement = (int) ($entry['placement'] ?? 0);
-                    if ($placement > 0) {
-                        $placements[(int) ($entry['team_id'] ?? 0)] = $placement;
-                    }
+        if ($includeAllTeams) {
+            foreach ($this->teams() as $team) {
+                $teamId = (int) ($team['id'] ?? 0);
+                if ($teamId > 0) {
+                    $initialise($ranking, $teamId, (string) ($team['name'] ?? ''), (string) ($team['code'] ?? ''));
                 }
             }
+        }
 
+        $source = $this->placementSource($eventId, $status);
+        $orphanScheduleIds = $source['orphanScheduleIds'];
+        $weightedPointsBySport = $source['weightedPoints'];
+
+        $bestPlacements = [];
+        foreach ($source['results'] as $result) {
+            $sportId = (int) ($result['sport_id'] ?? 0);
+            if ($sportId < 1 || ($sportFilter !== null && ! in_array($sportId, $sportFilter, true))) {
+                continue;
+            }
+            if (isset($orphanScheduleIds[(int) ($result['schedule_id'] ?? 0)])) {
+                continue;
+            }
+
+            $entries = is_array($result['entries'] ?? null) ? $result['entries'] : [];
+            $placements = $this->resultPlacements($result, $entries);
             foreach ($entries as $entry) {
                 $teamId = (int) ($entry['team_id'] ?? 0);
                 if ($teamId < 1) {
                     continue;
                 }
-                if (! isset($ranking[$teamId])) {
-                    $ranking[$teamId] = [
-                        'id' => $teamId,
-                        'name' => (string) ($entry['team_name'] ?? 'Team'),
-                        'code' => (string) ($entry['team_code'] ?? ''),
-                        'total_points' => 0.0,
-                        'firsts' => 0,
-                        'seconds' => 0,
-                        'thirds' => 0,
-                        'fourths' => 0,
-                    ];
-                }
+                $initialise($ranking, $teamId, (string) ($entry['team_name'] ?? 'Team'), (string) ($entry['team_code'] ?? ''));
 
                 $placement = $placements[$teamId] ?? null;
-                if ($placement === null) {
+                if ($placement === null || $placement < 1) {
                     continue;
                 }
-                if ($weightedPoints) {
-                    $ranking[$teamId]['total_points'] += $this->pointsForPlacement($weightedPoints, (int) $placement);
+                $current = $bestPlacements[$sportId][$teamId] ?? null;
+                if ($current === null || $placement < $current['placement']) {
+                    $bestPlacements[$sportId][$teamId] = [
+                        'placement' => $placement,
+                        'allocated_points' => (float) ($entry['allocated_points'] ?? 0),
+                    ];
                 }
-                if ((int) $placement === 1) {
+            }
+        }
+
+        foreach ($bestPlacements as $sportId => $teamPlacements) {
+            $weightedPoints = $weightedPointsBySport[$sportId] ?? null;
+            foreach ($teamPlacements as $teamId => $info) {
+                $placement = (int) $info['placement'];
+                if ($weightedPoints) {
+                    $ranking[$teamId]['total_points'] += $this->pointsForPlacement($weightedPoints, $placement);
+                } elseif ($status === 'validated') {
+                    $ranking[$teamId]['total_points'] += (float) $info['allocated_points'];
+                }
+
+                if ($placement === 1) {
                     $ranking[$teamId]['firsts']++;
-                } elseif ((int) $placement === 2) {
+                } elseif ($placement === 2) {
                     $ranking[$teamId]['seconds']++;
-                } elseif ((int) $placement === 3) {
+                } elseif ($placement === 3) {
                     $ranking[$teamId]['thirds']++;
-                } elseif ((int) $placement === 4) {
+                } elseif ($placement === 4) {
                     $ranking[$teamId]['fourths']++;
                 }
             }
         }
 
         $rows = array_values($ranking);
+        if ($positiveOnly) {
+            $rows = array_values(array_filter($rows, static fn(array $row): bool => (float) $row['total_points'] > 0));
+        }
         usort($rows, static fn(array $a, array $b): int => ((float) $b['total_points'] <=> (float) $a['total_points'])
             ?: ((int) $b['firsts'] <=> (int) $a['firsts'])
             ?: ((int) $b['seconds'] <=> (int) $a['seconds'])
@@ -1349,6 +1320,141 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             ?: strcasecmp((string) $a['name'], (string) $b['name']));
 
         return $rows;
+    }
+
+    private function placementSource(int $eventId, string $status): array
+    {
+        $key = $eventId . '|' . $status;
+        if (isset($this->placementSourceCache[$key])) {
+            return $this->placementSourceCache[$key];
+        }
+
+        $weightedPoints = [];
+        foreach ($this->db->table('weighted_points')->where(['event_id' => $eventId, 'status' => 'validated'])->get()->getResultArray() as $row) {
+            $weightedPoints[(int) $row['sport_id']] = $row;
+        }
+
+        return $this->placementSourceCache[$key] = [
+            'results' => $this->resultsByStatus($eventId, $status),
+            'orphanScheduleIds' => $this->orphanScheduleIds($this->schedules($eventId)),
+            'weightedPoints' => $weightedPoints,
+        ];
+    }
+
+    /**
+     * Returns team placements (team id => place) earned by a single result.
+     */
+    private function resultPlacements(array $result, array $entries): array
+    {
+        $placements = [];
+        $resultType = (string) ($result['result_type'] ?? $result['type'] ?? '');
+
+        if ($resultType !== 'match') {
+            foreach ($entries as $entry) {
+                $placement = (int) ($entry['placement'] ?? 0);
+                $teamId = (int) ($entry['team_id'] ?? 0);
+                if ($placement > 0 && $teamId > 0) {
+                    $placements[$teamId] = $placement;
+                }
+            }
+            return $placements;
+        }
+
+        $outcome = $this->matchOutcome($entries);
+        if ($outcome === null) {
+            return [];
+        }
+
+        $winnerId = (int) ($outcome['winner']['team_id'] ?? 0);
+        $loserId = (int) ($outcome['loser']['team_id'] ?? 0);
+        $stage = $this->bracketStage($result);
+        $format = (string) ($result['tournament_format'] ?? 'single_elimination');
+
+        if ($format === 'double_elimination') {
+            if ($stage['side'] === 'lower' && $stage['phase'] === 'lower_r1') {
+                $placements[$loserId] = 4;
+            } elseif ($stage['side'] === 'lower' && $stage['phase'] === 'final') {
+                $placements[$loserId] = 3;
+            } elseif ($stage['side'] === 'grand' && $stage['phase'] === 'tiebreaker') {
+                $placements[$winnerId] = 1;
+                $placements[$loserId] = 2;
+            } elseif ($stage['side'] === 'grand' && $stage['phase'] === 'final' && $winnerId === (int) ($result['team_a_id'] ?? 0)) {
+                $placements[$winnerId] = 1;
+                $placements[$loserId] = 2;
+            }
+        } elseif ($stage['phase'] === 'third_place') {
+            $placements[$winnerId] = 3;
+            $placements[$loserId] = 4;
+        } elseif ($stage['phase'] === 'final' && $stage['side'] === 'grand') {
+            $placements[$winnerId] = 1;
+            $placements[$loserId] = 2;
+        }
+
+        return $placements;
+    }
+
+    /**
+     * Normalises a schedule/result bracket stage, including legacy rows that
+     * only stored a round label.
+     */
+    private function bracketStage(array $row): array
+    {
+        $phase = trim((string) ($row['phase'] ?? ''));
+        $side = trim((string) ($row['bracket_side'] ?? ''));
+        $round = strtolower(trim((string) ($row['round'] ?? '')));
+
+        if ($phase === '') {
+            if (str_contains($round, 'semi')) {
+                $phase = 'semi';
+            } elseif (str_contains($round, 'quarter')) {
+                $phase = 'quarter';
+            } elseif (str_contains($round, '3rd') || str_contains($round, 'third')) {
+                $phase = 'third_place';
+            } elseif (str_contains($round, 'reset')) {
+                $phase = 'tiebreaker';
+            } elseif (str_contains($round, 'lower round')) {
+                $phase = 'lower_r1';
+            } elseif (str_contains($round, 'final') || str_contains($round, 'championship')) {
+                $phase = 'final';
+            }
+        }
+
+        if ($side === '') {
+            if (str_contains($round, 'upper')) {
+                $side = 'upper';
+            } elseif (str_contains($round, 'lower') || $phase === 'third_place' || $phase === 'lower_r1') {
+                $side = 'lower';
+            } elseif ($phase === 'final' || $phase === 'tiebreaker') {
+                $side = 'grand';
+            }
+        }
+
+        return ['phase' => $phase, 'side' => $side];
+    }
+
+    /**
+     * Schedules without a match ID that belong to a sport which already has a
+     * generated bracket (M1, M2, ...) are legacy duplicates.
+     *
+     * @return array<int, true>
+     */
+    private function orphanScheduleIds(array $schedules): array
+    {
+        $bracketSports = [];
+        foreach ($schedules as $schedule) {
+            if (preg_match('/^M\d+$/i', trim((string) ($schedule['match_code'] ?? '')))) {
+                $bracketSports[(int) ($schedule['sport_id'] ?? 0)] = true;
+            }
+        }
+
+        $orphans = [];
+        foreach ($schedules as $schedule) {
+            if (trim((string) ($schedule['match_code'] ?? '')) === '' && isset($bracketSports[(int) ($schedule['sport_id'] ?? 0)])) {
+                $orphans[(int) ($schedule['id'] ?? 0)] = true;
+            }
+        }
+
+        return $orphans;
     }
 
     private function requireRow(string $table, int $id, string $label): array
@@ -1433,6 +1539,22 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             if ($existingScheduleId !== null) { $exists->where('id !=', $existingScheduleId); }
             if ($exists->countAllResults() > 0) { throw new RuntimeException('Match ID already exists for this sport.'); }
         }
+        $stage = $this->bracketStage($data);
+        if (in_array($stage['phase'], ['final', 'tiebreaker'], true) && $stage['side'] === 'grand') {
+            $existingFinals = $this->db->table('schedules')
+                ->where('event_id', $eventId)
+                ->where('sport_id', $sportId)
+                ->where('phase', $stage['phase'])
+                ->where('bracket_side', 'grand');
+            if ($existingScheduleId !== null) {
+                $existingFinals->where('id !=', $existingScheduleId);
+            }
+            if ($existingFinals->countAllResults() > 0) {
+                throw new RuntimeException($stage['phase'] === 'final'
+                    ? 'This sport already has a championship final. Use the existing bracket match instead of adding another final.'
+                    : 'This sport already has a bracket reset final.');
+            }
+        }
         if (! empty($data['scheduling_note']) && mb_strlen($data['scheduling_note']) > 255) throw new RuntimeException('Scheduling note is too long.');
         if ($teamA) {
             $this->requireRow('teams', $teamA, 'Team A');
@@ -1444,15 +1566,23 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
 
 
 
-    public function resolveBracketSlots(array $schedules): array
+    public function resolveBracketSlots(array $schedules, bool $excludeLegacyDuplicates = false): array
     {
+        if ($excludeLegacyDuplicates) {
+            $orphanScheduleIds = $this->orphanScheduleIds($schedules);
+            $schedules = array_values(array_filter(
+                $schedules,
+                static fn(array $row): bool => ! isset($orphanScheduleIds[(int) ($row['id'] ?? 0)])
+            ));
+        }
+
         foreach ($schedules as &$row) {
-            $round = strtolower((string) ($row['round'] ?? ''));
+            $stage = $this->bracketStage($row);
             if (empty($row['phase'])) {
-                $row['phase'] = str_contains($round, 'final') || str_contains($round, 'championship') ? 'final' : (str_contains($round, 'semi') ? 'semi' : (str_contains($round, 'quarter') ? 'quarter' : 'playoff'));
+                $row['phase'] = $stage['phase'] !== '' ? $stage['phase'] : 'playoff';
             }
             if (empty($row['bracket_side'])) {
-                $row['bracket_side'] = str_contains($round, 'final') || str_contains($round, 'championship') ? 'grand' : 'upper';
+                $row['bracket_side'] = $stage['side'] !== '' ? $stage['side'] : 'upper';
             }
             foreach (['a', 'b'] as $slot) {
                 $teamKey = 'team_' . $slot . '_name';
@@ -1899,15 +2029,9 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             $winnerId = (int) $outcome['winner']['team_id'];
             $loserId = (int) $outcome['loser']['team_id'];
             $format = (string) ($result['tournament_format'] ?? 'single_elimination');
-            $side = (string) ($result['bracket_side'] ?? '');
-            $phase = (string) ($result['phase'] ?? '');
-            $round = strtolower((string) ($result['round'] ?? ''));
-            if ($phase === '' && (str_contains($round, 'final') || str_contains($round, 'championship'))) {
-                $phase = 'final';
-            }
-            if ($side === '' && $phase === 'final') {
-                $side = 'grand';
-            }
+            $stage = $this->bracketStage($result);
+            $side = $stage['side'];
+            $phase = $stage['phase'];
             $championshipMatch = false;
             $thirdPlaceMatch = false;
             $thirdPlaceLoser = false;
@@ -1925,7 +2049,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
                 }
             } else {
                 $thirdPlaceMatch = $phase === 'third_place';
-                $championshipMatch = $phase === 'final';
+                $championshipMatch = $phase === 'final' && $side === 'grand';
             }
 
             foreach ($entries as $entry) {
@@ -2154,6 +2278,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
 
     private function finishTransaction(): void
     {
+        $this->placementSourceCache = [];
         $this->db->transComplete();
         if (! $this->db->transStatus()) {
             throw new RuntimeException('The database operation could not be completed.');

@@ -60,8 +60,9 @@ class ScoringService
         $event = $this->repository->activeEvent();
         $eventId = (int) ($event['id'] ?? 0);
         $sports = $this->repository->sports($eventId);
-        $isOverall = $overall || $requestedSportId === null;
         $selection = $this->scoreboardSportSelection($sports, $requestedSportId);
+        // The scoreboard always opens on Overall unless a valid sport was explicitly requested.
+        $isOverall = $overall || $requestedSportId === null || ! $selection['requestedSportFound'];
         $selectedSportIds = $isOverall ? [] : $selection['selectedSportIds'];
         $selectedSport = $isOverall ? null : $selection['selectedSport'];
 
@@ -119,10 +120,12 @@ class ScoringService
         usort($sportGroups, static fn(array $a, array $b): int => strcasecmp($a['name'], $b['name']));
 
         $selectedName = null;
+        $requestedSportFound = false;
         if ($requestedSportId !== null) {
             foreach ($sports as $sport) {
                 if ((int) ($sport['id'] ?? 0) === $requestedSportId) {
                     $selectedName = (string) ($sport['name'] ?? '');
+                    $requestedSportFound = true;
                     break;
                 }
             }
@@ -148,6 +151,7 @@ class ScoringService
             'sportGroups' => $sportGroups,
             'selectedSport' => $selectedSports[0] ?? null,
             'selectedSportIds' => array_map('intval', array_column($selectedSports, 'id')),
+            'requestedSportFound' => $requestedSportFound,
         ];
     }
 
@@ -208,7 +212,7 @@ class ScoringService
         }
 
         $schedules = array_values(array_filter(
-            $this->repository->resolveBracketSlots($this->repository->schedules($eventId)),
+            $this->repository->resolveBracketSlots($this->repository->schedules($eventId), true),
             static fn(array $schedule): bool => in_array((int) ($schedule['sport_id'] ?? 0), $selectedSportIds, true)
                 && ! isset($otherResultScheduleIds[(int) ($schedule['id'] ?? 0)])
         ));

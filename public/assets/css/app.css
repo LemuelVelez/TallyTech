@@ -602,8 +602,8 @@ body.theme-dark .toast-close:hover { background: #2a3d53; color: #ffffff; }
   color: #fff;
   box-shadow: var(--shadow);
 }
-.podium-card.p1 { background: linear-gradient(135deg, #586d7d, #2f475a); }
-.podium-card.p2 { background: linear-gradient(135deg, #f7b219, #f18f08); }
+.podium-card.p1 { background: linear-gradient(135deg, #f7b219, #f18f08); }
+.podium-card.p2 { background: linear-gradient(135deg, #7c3aed, #5b21b6); }
 .podium-card.p3 { background: linear-gradient(135deg, #c36a35, #9a4924); }
 .podium-card.p4 { background: linear-gradient(135deg, #68758a, #445166); }
 .podium-card > span { grid-area: icon; display: inline-flex; align-items: center; }
@@ -2509,6 +2509,31 @@ body.is-scoreboard-presentation {
 .team-ranking--scoreboard .table-wrap { max-height: 340px; overflow: auto; }
 .team-ranking--scoreboard table { min-width: 720px; }
 .team-ranking--scoreboard .muted { display: block; }
+.team-ranking-note { margin: 4px 0 0; font-size: 0.78rem; color: #66768a; }
+.team-ranking-table-panel .team-ranking-col-rank {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  width: 64px;
+  min-width: 64px;
+}
+.team-ranking-table-panel .team-ranking-col-team {
+  position: sticky;
+  left: 64px;
+  z-index: 2;
+  min-width: 170px;
+  box-shadow: 6px 0 8px -8px rgba(16, 35, 60, 0.35);
+}
+.team-ranking-table-panel td.team-ranking-col-rank,
+.team-ranking-table-panel td.team-ranking-col-team { background: var(--panel); }
+.team-ranking-table-panel th.team-ranking-col-rank,
+.team-ranking-table-panel th.team-ranking-col-team { z-index: 3; background: var(--table-head); }
+.team-ranking--scoreboard .team-ranking-table-panel td.team-ranking-col-rank,
+.team-ranking--scoreboard .team-ranking-table-panel td.team-ranking-col-team { background: #ffffff; }
+@media (max-width: 760px) {
+  .team-ranking-table-panel th.team-ranking-col-team,
+  .team-ranking-table-panel td.team-ranking-col-team { min-width: 140px; }
+}
 
 .viewer-page--presentation-frame .scoreboard-overall-ranking { width: min(1380px, 100%); }
 .viewer-page--presentation-frame .team-ranking--scoreboard .team-ranking-podium {
