@@ -406,9 +406,21 @@ class ScoringService
             return $dataset;
         }
 
+        $resolvedSchedules = $this->repository->resolveBracketSlots(
+            $this->repository->schedules($eventId),
+            true
+        );
+        $canonicalScheduleIds = [];
+        foreach ($resolvedSchedules as $schedule) {
+            if (in_array((int) ($schedule['sport_id'] ?? 0), $selectedSportIds, true)) {
+                $canonicalScheduleIds[(int) ($schedule['id'] ?? 0)] = true;
+            }
+        }
+
         $results = array_values(array_filter(
             $this->repository->resultsByStatus($eventId, $status),
             static fn(array $result): bool => in_array((int) ($result['sport_id'] ?? 0), $selectedSportIds, true)
+                && isset($canonicalScheduleIds[(int) ($result['schedule_id'] ?? 0)])
         ));
         $ranking = $this->combinedSportRanking($eventId, $selectedSportIds, $status);
         $resultTeamIds = [];
@@ -428,12 +440,24 @@ class ScoringService
         $dataset['results'] = $results;
         $dataset['standings'] = $ranking;
         $dataset['overallSportPoints'] = $ranking;
-        $dataset['schedules'] = $this->buildScoreboardSchedules($eventId, $selectedSportIds, $results, $status);
+        $dataset['schedules'] = $this->buildScoreboardSchedules(
+            $eventId,
+            $selectedSportIds,
+            $results,
+            $status,
+            $resolvedSchedules
+        );
 
         return $dataset;
     }
 
-    private function buildScoreboardSchedules(int $eventId, array $selectedSportIds, array $results, string $status): array
+    private function buildScoreboardSchedules(
+        int $eventId,
+        array $selectedSportIds,
+        array $results,
+        string $status,
+        ?array $resolvedSchedules = null
+    ): array
     {
         $otherStatus = $status === 'validated' ? 'pending' : 'validated';
         $otherResultScheduleIds = [];
@@ -443,8 +467,12 @@ class ScoringService
             }
         }
 
+        $resolvedSchedules ??= $this->repository->resolveBracketSlots(
+            $this->repository->schedules($eventId),
+            true
+        );
         $schedules = array_values(array_filter(
-            $this->repository->resolveBracketSlots($this->repository->schedules($eventId), true),
+            $resolvedSchedules,
             static fn(array $schedule): bool => in_array((int) ($schedule['sport_id'] ?? 0), $selectedSportIds, true)
                 && ! isset($otherResultScheduleIds[(int) ($schedule['id'] ?? 0)])
         ));

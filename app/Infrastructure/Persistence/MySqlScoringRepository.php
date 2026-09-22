@@ -1432,8 +1432,12 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
     }
 
     /**
-     * Identifies legacy duplicate schedules. Validated judged results are always
-     * preferred, and validated results are never discarded as legacy orphans.
+     * Identifies legacy duplicate schedules.
+     *
+     * Judged sports keep one canonical schedule, preferring a validated result.
+     * For match sports, once a generated M# bracket exists, old schedules that
+     * have no Match ID are legacy duplicates and must not coexist with the
+     * generated bracket, even when the legacy row has a validated result.
      *
      * @return array<int, true>
      */
@@ -1494,8 +1498,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
 
             foreach ($sportSchedules as $schedule) {
                 $scheduleId = (int) ($schedule['id'] ?? 0);
-                $isValidated = ($resultBySchedule[$scheduleId]['status'] ?? '') === 'validated';
-                if (! $isValidated && trim((string) ($schedule['match_code'] ?? '')) === '') {
+                if ($scheduleId > 0 && trim((string) ($schedule['match_code'] ?? '')) === '') {
                     $orphans[$scheduleId] = true;
                 }
             }

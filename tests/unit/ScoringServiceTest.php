@@ -88,6 +88,62 @@ final class ScoringServiceTest extends TestCase
         $this->assertSame([7], $data['selectedSportIds']);
     }
 
+    public function testScoreboardExcludesLegacyResultsOutsideTheCanonicalGeneratedBracket(): void
+    {
+        $event = ['id' => 17, 'name' => 'ISF 2026'];
+        $sports = [
+            ['id' => 7, 'name' => 'Basketball', 'category' => 'Men'],
+        ];
+        $legacyResult = [
+            'id' => 61,
+            'event_id' => 17,
+            'sport_id' => 7,
+            'schedule_id' => 91,
+            'type' => 'match',
+            'status' => 'validated',
+            'entries' => [],
+        ];
+        $canonicalResult = [
+            'id' => 62,
+            'event_id' => 17,
+            'sport_id' => 7,
+            'schedule_id' => 101,
+            'type' => 'match',
+            'status' => 'validated',
+            'entries' => [],
+        ];
+        $canonicalSchedule = [
+            'id' => 101,
+            'event_id' => 17,
+            'sport_id' => 7,
+            'match_code' => 'M1',
+            'bracket_order' => 1,
+            'match_date' => '2026-08-15 09:00:00',
+        ];
+
+        $repository = $this->createMock(ScoringRepositoryInterface::class);
+        $repository->method('activeEvent')->willReturn($event);
+        $repository->method('sports')->with(17)->willReturn($sports);
+        $repository->method('schedules')->with(17)->willReturn([
+            ['id' => 91, 'event_id' => 17, 'sport_id' => 7, 'match_code' => null],
+            $canonicalSchedule,
+        ]);
+        $repository->method('resolveBracketSlots')->willReturn([$canonicalSchedule]);
+        $repository->method('resultsByStatus')->willReturnCallback(
+            static fn(int $eventId, string $status): array => $status === 'validated'
+                ? [$legacyResult, $canonicalResult]
+                : []
+        );
+        $repository->method('rankingBySport')->willReturn([]);
+        $repository->method('ranking')->with(17, false)->willReturn([]);
+        $repository->method('rankingByStatus')->with(17, 'pending', true)->willReturn([]);
+
+        $data = (new ScoringService($repository))->scoreboard(7);
+
+        $this->assertSame([101], array_column($data['officialScoreboard']['results'], 'schedule_id'));
+        $this->assertSame([101], array_column($data['officialScoreboard']['schedules'], 'id'));
+    }
+
     public function testDashboardScopesEveryEventSpecificCollectionToActiveEvent(): void
     {
         $event = ['id' => 17, 'name' => 'ISF 2026'];
