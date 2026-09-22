@@ -606,9 +606,10 @@ body.theme-dark .toast-close:hover { background: #2a3d53; color: #ffffff; }
 .podium-card.p2 { background: linear-gradient(135deg, #7c3aed, #5b21b6); }
 .podium-card.p3 { background: linear-gradient(135deg, #c36a35, #9a4924); }
 .podium-card.p4 { background: linear-gradient(135deg, #68758a, #445166); }
-.podium-card > span { grid-area: icon; display: inline-flex; align-items: center; }
-.podium-card > span .ui-icon { width: 31px; height: 31px; }
+.podium-card > .podium-icon { grid-area: icon; display: inline-flex; align-items: center; }
+.podium-card > .podium-icon .ui-icon { width: 31px; height: 31px; }
 .podium-card small { grid-area: place; font-size: 0.75rem; opacity: 0.86; }
+.podium-team-code { display: none; }
 .podium-card h3 { grid-area: team; margin: 2px 0; font-size: 0.95rem; }
 .podium-card b { grid-area: points; font-size: 2rem; }
 .podium-card em { grid-area: label; font-style: normal; font-size: 0.72rem; opacity: 0.82; text-align: right; }
@@ -2046,6 +2047,13 @@ body.theme-dark input, body.theme-dark select, body.theme-dark textarea { border
 
 @media (max-width: 640px) {
   .score-hero.score-hero--bracket { padding-top: 24px; padding-bottom: 34px; }
+  .score-hero.score-hero--bracket,
+  .score-hero-inner,
+  .score-hero-copy,
+  .scoreboard-mode-tabs,
+  .scoreboard-presentation-launch,
+  .score-hero-rotation,
+  .score-hero-sports { min-width: 0; max-width: 100%; }
   .score-hero-inner { padding-inline: 12px; }
   .score-hero-copy { margin-bottom: 18px; }
   .scoreboard-mode-tabs { width: 100%; }
@@ -2494,6 +2502,16 @@ body.is-scoreboard-presentation {
   min-height: 138px;
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.22);
 }
+.team-ranking--scoreboard .team-ranking-podium .podium-card small {
+  justify-self: start;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(5, 20, 43, 0.76);
+  color: #fff;
+  font-weight: 850;
+  line-height: 1.25;
+  opacity: 1;
+}
 .team-ranking--scoreboard .team-ranking-table-panel {
   margin: 0;
   padding: clamp(16px, 2vw, 24px);
@@ -2551,9 +2569,132 @@ body.is-scoreboard-presentation {
 .viewer-page--presentation-frame .team-ranking--scoreboard th,
 .viewer-page--presentation-frame .team-ranking--scoreboard td { padding-top: 9px; padding-bottom: 9px; }
 
+.team-ranking-mobile-list { display: none; }
+
 @media (max-width: 760px) {
-  .team-ranking--scoreboard .team-ranking-podium { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .scoreboard-overall-ranking { width: 100%; }
+  .team-ranking--scoreboard .team-ranking-podium,
+  .viewer-page--presentation-frame .team-ranking--scoreboard .team-ranking-podium {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .team-ranking--scoreboard .podium-card,
+  .viewer-page--presentation-frame .team-ranking--scoreboard .podium-card {
+    min-height: 0;
+    padding: 14px 16px;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "icon place points"
+      "icon team points"
+      "icon code label";
+    align-items: center;
+    column-gap: 12px;
+    row-gap: 3px;
+  }
+  .team-ranking--scoreboard .podium-card h3 {
+    min-width: 0;
+    margin: 1px 0;
+    line-height: 1.25;
+    word-break: normal;
+    overflow-wrap: anywhere;
+  }
+  .team-ranking--scoreboard .podium-card b {
+    justify-self: end;
+    align-self: center;
+    font-size: 1.65rem;
+    white-space: nowrap;
+  }
+  .team-ranking--scoreboard .podium-card em { align-self: start; }
+  .team-ranking--scoreboard .podium-team-code {
+    grid-area: code;
+    display: block;
+    min-width: 0;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.72rem;
+    font-weight: 800;
+    line-height: 1.2;
+    letter-spacing: 0.035em;
+    overflow-wrap: anywhere;
+  }
+  .team-ranking--scoreboard .team-ranking-desktop-table { display: none; }
+  .team-ranking--scoreboard .team-ranking-mobile-list {
+    display: grid;
+    gap: 10px;
+  }
+  .team-ranking-mobile-card {
+    min-width: 0;
+    padding: 13px 14px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #fff;
+  }
+  .team-ranking-mobile-summary {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+  .team-ranking-mobile-team { min-width: 0; }
+  .team-ranking-mobile-team b {
+    display: block;
+    min-width: 0;
+    color: #172033;
+    font-size: 0.9rem;
+    line-height: 1.3;
+    word-break: normal;
+    overflow-wrap: anywhere;
+  }
+  .team-ranking-mobile-team small {
+    display: block;
+    margin-top: 2px;
+    color: #66768a;
+    font-size: 0.72rem;
+    font-weight: 750;
+    line-height: 1.2;
+  }
+  .team-ranking-mobile-points {
+    min-width: max-content;
+    text-align: right;
+  }
+  .team-ranking-mobile-points strong {
+    display: block;
+    color: #172033;
+    font-size: 1.05rem;
+    line-height: 1.1;
+    white-space: nowrap;
+  }
+  .team-ranking-mobile-points span {
+    display: block;
+    margin-top: 2px;
+    color: #66768a;
+    font-size: 0.64rem;
+    font-weight: 750;
+    white-space: nowrap;
+  }
+  .team-ranking-mobile-finishes {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    margin: 10px 0 0;
+    padding-top: 9px;
+    border-top: 1px solid var(--line);
+  }
+  .team-ranking-mobile-finishes > div {
+    min-width: 0;
+    text-align: center;
+  }
+  .team-ranking-mobile-finishes dt {
+    color: #66768a;
+    font-size: 0.66rem;
+    font-weight: 750;
+  }
+  .team-ranking-mobile-finishes dd {
+    margin: 2px 0 0;
+    color: #172033;
+    font-size: 0.84rem;
+    font-weight: 850;
+  }
 }
 .viewer-page--presentation-frame .team-ranking--scoreboard .podium-card small,
 .viewer-page--presentation-frame .team-ranking--scoreboard td small.muted {
@@ -2638,11 +2779,16 @@ body {
     max-width: 152px;
     padding-inline: 10px;
   }
-  .team-ranking--scoreboard table { min-width: 760px; }
-  .team-ranking--scoreboard .table-wrap { max-width: 100%; }
 }
 
 @media (max-width: 430px) {
+  .score-hero.score-hero--bracket h1 { font-size: clamp(2rem, 11.5vw, 2.9rem); overflow-wrap: break-word; }
+  .scoreboard-mode-tab { padding-inline: 7px; }
+  .scoreboard-mode-tab strong { font-size: 0.73rem; }
+  .scoreboard-mode-tab span { font-size: 0.62rem; }
+  .score-hero-rotation { justify-content: center; }
+  .team-ranking--scoreboard .team-ranking-table-panel { padding-inline: 12px; }
+  .team-ranking-mobile-card { padding-inline: 11px; }
   .viewer-rank,
   .podium-card {
     min-width: 0;
@@ -2675,6 +2821,7 @@ body {
   }
   .podium-card h3 {
     min-width: 0;
+    word-break: normal;
     overflow-wrap: anywhere;
   }
   .podium-card b {

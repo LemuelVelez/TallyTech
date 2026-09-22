@@ -11,9 +11,10 @@ $icons = ['trophy', 'medal', 'award', 'target'];
     <div class="podium team-ranking-podium">
         <?php foreach (array_slice($rankingRows, 0, 4) as $i => $team): ?>
             <article class="podium-card p<?= (int) ($i + 1) ?>">
-                <span><?= ui_icon($icons[$i]) ?></span>
+                <span class="podium-icon"><?= ui_icon($icons[$i]) ?></span>
                 <small><?= esc($placeLabels[$i]) ?></small>
                 <h3><?= esc($team['name'] ?? '') ?></h3>
+                <span class="podium-team-code"><?= esc($team['code'] ?? '') ?></span>
                 <b><?= esc(format_points($team['total_points'] ?? 0)) ?></b>
                 <em>Total Points</em>
             </article>
@@ -30,7 +31,7 @@ $icons = ['trophy', 'medal', 'award', 'target'];
             </div>
             <?php if ($provisional): ?><span class="badge unofficial">PROVISIONAL</span><?php endif; ?>
         </div>
-        <div class="table-wrap" data-scroll-hint="Swipe horizontally to see all ranking columns">
+        <div class="table-wrap team-ranking-desktop-table">
             <table>
                 <thead><tr><th class="team-ranking-col-rank">Rank</th><th class="team-ranking-col-team">Team</th><th title="Sports finished in 1st place">1st</th><th title="Sports finished in 2nd place">2nd</th><th title="Sports finished in 3rd place">3rd</th><th title="Sports finished in 4th place">4th</th><th>Total Points</th></tr></thead>
                 <tbody>
@@ -49,5 +50,32 @@ $icons = ['trophy', 'medal', 'award', 'target'];
                 </tbody>
             </table>
         </div>
+
+        <?php if ($scoreboardTheme): ?>
+            <div class="team-ranking-mobile-list" aria-label="Overall team ranking">
+                <?php foreach ($rankingRows as $i => $team): ?>
+                    <article class="team-ranking-mobile-card">
+                        <div class="team-ranking-mobile-summary">
+                            <span class="rank-no" aria-label="Rank <?= esc((string) ($i + 1)) ?>"><?= esc((string) ($i + 1)) ?></span>
+                            <div class="team-ranking-mobile-team">
+                                <b><?= esc($team['name'] ?? '') ?></b>
+                                <small><?= esc($team['code'] ?? '') ?></small>
+                            </div>
+                            <div class="team-ranking-mobile-points">
+                                <strong><?= esc(format_points($team['total_points'] ?? 0)) ?></strong>
+                                <span>Total Points</span>
+                            </div>
+                        </div>
+                        <dl class="team-ranking-mobile-finishes">
+                            <div><dt>1st</dt><dd><?= esc((string) (int) ($team['firsts'] ?? 0)) ?></dd></div>
+                            <div><dt>2nd</dt><dd><?= esc((string) (int) ($team['seconds'] ?? 0)) ?></dd></div>
+                            <div><dt>3rd</dt><dd><?= esc((string) (int) ($team['thirds'] ?? 0)) ?></dd></div>
+                            <div><dt>4th</dt><dd><?= esc((string) (int) ($team['fourths'] ?? 0)) ?></dd></div>
+                        </dl>
+                    </article>
+                <?php endforeach; ?>
+                <?php if (! $rankingRows): ?><div class="empty"><?= esc($emptyMessage) ?></div><?php endif; ?>
+            </div>
+        <?php endif; ?>
     </section>
 </div>

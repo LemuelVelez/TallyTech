@@ -132,7 +132,7 @@ $jsVersion = $assetVersion('assets/js/app.js');
                 </label>
             </div>
 
-            <nav class="score-hero-sports sport-chip-row" aria-label="Choose scoreboard view" data-scoreboard-sport-nav data-auto-rotate-ms="15000">
+            <nav class="score-hero-sports sport-chip-row" aria-label="Choose scoreboard view" data-scoreboard-sport-nav data-scoreboard-overall="<?= $isOverallView ? 'true' : 'false' ?>" data-auto-rotate-ms="15000">
                 <?php $overallHref = $scoreboardHref($scoreboardMode, null, $presentationFrame, true); ?>
                 <a class="chip sport-chip <?= $isOverallView ? 'active' : '' ?>" data-scoreboard-sport-link href="<?= esc($overallHref, 'attr') ?>" <?= $isOverallView ? 'aria-current="page"' : '' ?>>Overall</a>
                 <?php foreach ($sportGroups as $sportGroup): ?>

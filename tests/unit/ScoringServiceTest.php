@@ -42,6 +42,52 @@ final class ScoringServiceTest extends TestCase
         $this->assertSame([], $data['unofficialScoreboard']['schedules']);
     }
 
+    public function testScoreboardDefaultsToOverallWithoutSelectingTheFirstSport(): void
+    {
+        $event = ['id' => 17, 'name' => 'ISF 2026'];
+        $sports = [
+            ['id' => 7, 'name' => 'Baseball', 'category' => 'Men'],
+            ['id' => 8, 'name' => 'Badminton', 'category' => 'Men'],
+        ];
+        $repository = $this->createMock(ScoringRepositoryInterface::class);
+        $repository->method('activeEvent')->willReturn($event);
+        $repository->method('sports')->with(17)->willReturn($sports);
+        $repository->method('ranking')->with(17, false)->willReturn([]);
+        $repository->method('rankingByStatus')->with(17, 'pending', true)->willReturn([]);
+
+        $data = (new ScoringService($repository))->scoreboard();
+
+        $this->assertTrue($data['isOverall']);
+        $this->assertNull($data['selectedSport']);
+        $this->assertSame([], $data['selectedSportIds']);
+        $this->assertNull($data['sportScoreTable']['selectedSport']);
+        $this->assertSame([], $data['sportScoreTable']['selectedSportIds']);
+    }
+
+    public function testScoreboardHonorsAnExplicitSportId(): void
+    {
+        $event = ['id' => 17, 'name' => 'ISF 2026'];
+        $sports = [
+            ['id' => 7, 'name' => 'Baseball', 'category' => 'Men'],
+            ['id' => 8, 'name' => 'Badminton', 'category' => 'Men'],
+        ];
+        $repository = $this->createMock(ScoringRepositoryInterface::class);
+        $repository->method('activeEvent')->willReturn($event);
+        $repository->method('sports')->with(17)->willReturn($sports);
+        $repository->method('resultsByStatus')->willReturn([]);
+        $repository->method('rankingBySport')->willReturn([]);
+        $repository->method('schedules')->with(17)->willReturn([]);
+        $repository->method('resolveBracketSlots')->willReturn([]);
+        $repository->method('ranking')->with(17, false)->willReturn([]);
+        $repository->method('rankingByStatus')->with(17, 'pending', true)->willReturn([]);
+
+        $data = (new ScoringService($repository))->scoreboard(7);
+
+        $this->assertFalse($data['isOverall']);
+        $this->assertSame('Baseball', $data['selectedSport']['name']);
+        $this->assertSame([7], $data['selectedSportIds']);
+    }
+
     public function testDashboardScopesEveryEventSpecificCollectionToActiveEvent(): void
     {
         $event = ['id' => 17, 'name' => 'ISF 2026'];

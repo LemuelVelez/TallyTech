@@ -261,7 +261,10 @@
   if (scoreboardSportNav) {
     const sportLinks = Array.from(scoreboardSportNav.querySelectorAll('[data-scoreboard-sport-link]'));
     const activeSportLink = sportLinks.find((link) => link.matches('[aria-current="page"], .active')) || sportLinks[0];
-    if (activeSportLink && scoreboardSportNav.scrollWidth > scoreboardSportNav.clientWidth) {
+    const overallSelected = scoreboardSportNav.dataset.scoreboardOverall === 'true';
+    if (overallSelected) {
+      scoreboardSportNav.scrollLeft = 0;
+    } else if (activeSportLink && scoreboardSportNav.scrollWidth > scoreboardSportNav.clientWidth) {
       const navRect = scoreboardSportNav.getBoundingClientRect();
       const linkRect = activeSportLink.getBoundingClientRect();
       const targetLeft = scoreboardSportNav.scrollLeft + (linkRect.left - navRect.left) - Math.max(0, (navRect.width - linkRect.width) / 2);

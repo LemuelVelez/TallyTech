@@ -364,9 +364,7 @@ class ScoringService
                 }
             }
         }
-        $selectedName ??= (string) ($sportGroups[0]['name'] ?? '');
-
-        $selectedSports = array_values(array_filter(
+        $selectedSports = $selectedName === null ? [] : array_values(array_filter(
             $sports,
             static fn(array $sport): bool => (string) ($sport['name'] ?? '') === $selectedName
         ));
