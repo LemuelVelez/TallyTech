@@ -99,6 +99,240 @@ class ScoringService
         return $this->repository->createResult($data, $actorId);
     }
 
+    /**
+     * Choose the canonical schedule when legacy judged duplicates exist.
+     * A validated result always wins over generated/pending legacy rows.
+     *
+     * @param array<int, array> $schedules
+     * @param array<int, array> $resultBySchedule schedule id => result
+     */
+    public static function canonicalJudgedScheduleId(array $schedules, array $resultBySchedule): int
+    {
+        if ($schedules === []) {
+            return 0;
+        }
+
+        $validated = array_values(array_filter($schedules, static function (array $schedule) use ($resultBySchedule): bool {
+            return ($resultBySchedule[(int) ($schedule['id'] ?? 0)]['status'] ?? '') === 'validated';
+        }));
+        if ($validated !== []) {
+            usort($validated, static function (array $a, array $b) use ($resultBySchedule): int {
+                $aResult = $resultBySchedule[(int) ($a['id'] ?? 0)] ?? [];
+                $bResult = $resultBySchedule[(int) ($b['id'] ?? 0)] ?? [];
+                return strcmp((string) ($bResult['validated_at'] ?? ''), (string) ($aResult['validated_at'] ?? ''))
+                    ?: ((int) ($bResult['id'] ?? 0) <=> (int) ($aResult['id'] ?? 0));
+            });
+            return (int) ($validated[0]['id'] ?? 0);
+        }
+
+        usort($schedules, static function (array $a, array $b) use ($resultBySchedule): int {
+            $aHasResult = isset($resultBySchedule[(int) ($a['id'] ?? 0)]) ? 1 : 0;
+            $bHasResult = isset($resultBySchedule[(int) ($b['id'] ?? 0)]) ? 1 : 0;
+            $aM1 = strtoupper(trim((string) ($a['match_code'] ?? ''))) === 'M1' ? 1 : 0;
+            $bM1 = strtoupper(trim((string) ($b['match_code'] ?? ''))) === 'M1' ? 1 : 0;
+            return ($bHasResult <=> $aHasResult)
+                ?: ($bM1 <=> $aM1)
+                ?: ((int) ($a['id'] ?? 0) <=> (int) ($b['id'] ?? 0));
+        });
+
+        return (int) ($schedules[0]['id'] ?? 0);
+    }
+
+    /**
+     * Resolve the placement earned by each result entry without touching storage.
+     *
+     * @param array<int, array> $results
+     * @param array<int, bool>  $thirdPlacePlayoffSports sport id => true
+     * @return array<int, array<int, int>> result id => team id => placement
+     */
+    public static function resolveTournamentPlacements(array $results, array $thirdPlacePlayoffSports = [], bool $throwOnUnresolvedTie = false): array
+    {
+        $placements = [];
+        $matchResultsBySport = [];
+
+        foreach ($results as $result) {
+            $resultId = (int) ($result['id'] ?? 0);
+            $sportId = (int) ($result['sport_id'] ?? 0);
+            $entries = is_array($result['entries'] ?? null) ? $result['entries'] : [];
+            $resultType = (string) ($result['result_type'] ?? $result['type'] ?? '');
+
+            if ($resultId < 1 || $sportId < 1) {
+                continue;
+            }
+
+            if ($resultType !== 'match') {
+                foreach ($entries as $entry) {
+                    $teamId = (int) ($entry['team_id'] ?? 0);
+                    $placement = (int) ($entry['placement'] ?? 0);
+                    if ($teamId > 0 && $placement > 0) {
+                        $placements[$resultId][$teamId] = $placement;
+                    }
+                }
+                continue;
+            }
+
+            $result['entries'] = $entries;
+            $matchResultsBySport[$sportId][] = $result;
+        }
+
+        foreach ($matchResultsBySport as $sportId => $sportResults) {
+            $singleSemifinals = [];
+
+            foreach ($sportResults as $result) {
+                $resultId = (int) $result['id'];
+                $entries = $result['entries'];
+                $outcome = self::placementMatchOutcome($entries);
+                if ($outcome === null) {
+                    continue;
+                }
+
+                $winnerId = (int) ($outcome['winner']['team_id'] ?? 0);
+                $loserId = (int) ($outcome['loser']['team_id'] ?? 0);
+                $stage = self::placementBracketStage($result);
+                $format = (string) ($result['tournament_format'] ?? 'single_elimination');
+
+                if ($format === 'double_elimination') {
+                    if ($stage['side'] === 'lower' && $stage['phase'] === 'lower_r1') {
+                        $placements[$resultId][$loserId] = 4;
+                    } elseif ($stage['side'] === 'lower' && $stage['phase'] === 'final') {
+                        $placements[$resultId][$loserId] = 3;
+                    } elseif ($stage['side'] === 'grand' && $stage['phase'] === 'tiebreaker') {
+                        $placements[$resultId][$winnerId] = 1;
+                        $placements[$resultId][$loserId] = 2;
+                    } elseif ($stage['side'] === 'grand' && $stage['phase'] === 'final' && $winnerId === (int) ($result['team_a_id'] ?? 0)) {
+                        $placements[$resultId][$winnerId] = 1;
+                        $placements[$resultId][$loserId] = 2;
+                    }
+                    continue;
+                }
+
+                if ($stage['phase'] === 'third_place') {
+                    $placements[$resultId][$winnerId] = 3;
+                    $placements[$resultId][$loserId] = 4;
+                } elseif ($stage['phase'] === 'final' && $stage['side'] === 'grand') {
+                    $placements[$resultId][$winnerId] = 1;
+                    $placements[$resultId][$loserId] = 2;
+                } elseif ($stage['phase'] === 'semi') {
+                    $singleSemifinals[] = [
+                        'result_id' => $resultId,
+                        'bracket_order' => (int) ($result['bracket_order'] ?? 0),
+                        'match_code' => (string) ($result['match_code'] ?? ''),
+                        'loser_id' => $loserId,
+                        'loser_sets' => (int) ($outcome['loser_sets'] ?? 0),
+                        'loser_points' => self::scoreEntryTotal($outcome['loser']),
+                        'point_difference' => self::scoreEntryTotal($outcome['loser']) - self::scoreEntryTotal($outcome['winner']),
+                    ];
+                }
+            }
+
+            if (! empty($thirdPlacePlayoffSports[$sportId]) || count($singleSemifinals) !== 2) {
+                continue;
+            }
+
+            usort($singleSemifinals, static function (array $a, array $b): int {
+                return ($b['loser_sets'] <=> $a['loser_sets'])
+                    ?: ($b['loser_points'] <=> $a['loser_points'])
+                    ?: ($b['point_difference'] <=> $a['point_difference']);
+            });
+
+            $first = $singleSemifinals[0];
+            $second = $singleSemifinals[1];
+            $tied = $first['loser_sets'] === $second['loser_sets']
+                && abs((float) $first['loser_points'] - (float) $second['loser_points']) < 0.00001
+                && abs((float) $first['point_difference'] - (float) $second['point_difference']) < 0.00001;
+
+            if ($tied) {
+                if ($throwOnUnresolvedTie) {
+                    throw new RuntimeException('The two semifinal losers are still tied after sets won, total points, and point difference. Add a 3rd place playoff or correct the official semifinal scores before validation.');
+                }
+                continue;
+            }
+
+            $placements[(int) $first['result_id']][(int) $first['loser_id']] = 3;
+            $placements[(int) $second['result_id']][(int) $second['loser_id']] = 4;
+        }
+
+        return $placements;
+    }
+
+    private static function placementBracketStage(array $row): array
+    {
+        $phase = trim((string) ($row['phase'] ?? ''));
+        $side = trim((string) ($row['bracket_side'] ?? ''));
+        $round = strtolower(trim((string) ($row['round'] ?? '')));
+
+        if ($phase === '') {
+            if (str_contains($round, 'semi')) {
+                $phase = 'semi';
+            } elseif (str_contains($round, 'quarter')) {
+                $phase = 'quarter';
+            } elseif (str_contains($round, '3rd') || str_contains($round, 'third')) {
+                $phase = 'third_place';
+            } elseif (str_contains($round, 'reset')) {
+                $phase = 'tiebreaker';
+            } elseif (str_contains($round, 'lower round')) {
+                $phase = 'lower_r1';
+            } elseif (str_contains($round, 'final') || str_contains($round, 'championship')) {
+                $phase = 'final';
+            }
+        }
+
+        if ($side === '') {
+            if (str_contains($round, 'upper')) {
+                $side = 'upper';
+            } elseif (str_contains($round, 'lower') || $phase === 'third_place' || $phase === 'lower_r1') {
+                $side = 'lower';
+            } elseif ($phase === 'final' || $phase === 'tiebreaker') {
+                $side = 'grand';
+            }
+        }
+
+        return ['phase' => $phase, 'side' => $side];
+    }
+
+    private static function placementMatchOutcome(array $entries): ?array
+    {
+        if (count($entries) !== 2) {
+            return null;
+        }
+
+        $setsA = self::scoreEntrySets($entries[0]);
+        $setsB = self::scoreEntrySets($entries[1]);
+        $winsA = 0;
+        $winsB = 0;
+        for ($index = 0, $count = min(count($setsA), count($setsB)); $index < $count; $index++) {
+            if ((float) $setsA[$index] > (float) $setsB[$index]) {
+                $winsA++;
+            } elseif ((float) $setsB[$index] > (float) $setsA[$index]) {
+                $winsB++;
+            }
+        }
+        if ($winsA === $winsB) {
+            return null;
+        }
+
+        return $winsA > $winsB
+            ? ['winner' => $entries[0], 'loser' => $entries[1], 'winner_sets' => $winsA, 'loser_sets' => $winsB]
+            : ['winner' => $entries[1], 'loser' => $entries[0], 'winner_sets' => $winsB, 'loser_sets' => $winsA];
+    }
+
+    private static function scoreEntrySets(array $entry): array
+    {
+        $raw = $entry['set_scores'] ?? null;
+        if (is_string($raw) && trim($raw) !== '') {
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded)) {
+                return array_values(array_map('floatval', $decoded));
+            }
+        }
+        return [(float) ($entry['raw_score'] ?? 0)];
+    }
+
+    private static function scoreEntryTotal(array $entry): float
+    {
+        return array_sum(self::scoreEntrySets($entry));
+    }
+
     private function scoreboardSportSelection(array $sports, ?int $requestedSportId): array
     {
         $groups = [];
@@ -445,37 +679,12 @@ class ScoringService
 
     private function matchOutcome(array $entries): ?array
     {
-        if (count($entries) !== 2) {
-            return null;
-        }
-        $setsA = $this->entrySetScores($entries[0]);
-        $setsB = $this->entrySetScores($entries[1]);
-        $winsA = 0;
-        $winsB = 0;
-        for ($index = 0, $count = min(count($setsA), count($setsB)); $index < $count; $index++) {
-            if ((float) $setsA[$index] > (float) $setsB[$index]) {
-                $winsA++;
-            } elseif ((float) $setsB[$index] > (float) $setsA[$index]) {
-                $winsB++;
-            }
-        }
-        if ($winsA === $winsB) {
-            return null;
-        }
-        return $winsA > $winsB
-            ? ['winner' => $entries[0], 'loser' => $entries[1], 'winner_sets' => $winsA, 'loser_sets' => $winsB]
-            : ['winner' => $entries[1], 'loser' => $entries[0], 'winner_sets' => $winsB, 'loser_sets' => $winsA];
+        return self::placementMatchOutcome($entries);
     }
 
     private function entrySetScores(array $entry): array
     {
-        $raw = $entry['set_scores'] ?? null;
-        if (is_string($raw) && trim($raw) !== '') {
-            $decoded = json_decode($raw, true);
-            if (is_array($decoded)) {
-                return array_values(array_map('floatval', $decoded));
-            }
-        }
-        return [(float) ($entry['raw_score'] ?? 0)];
+        return self::scoreEntrySets($entry);
     }
+
 }

@@ -1453,9 +1453,9 @@ body.theme-dark input, body.theme-dark select, body.theme-dark textarea { border
 .score-thresholds { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
 .score-threshold { display: inline-flex; align-items: center; gap: 4px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel-soft); color: #5f6b7a; font-size: 0.78rem; }
 .sport-score-table { min-width: 760px !important; }
-.sport-score-table th:not(:first-child), .sport-score-table td:not(:first-child) { text-align: center; }
-.sport-score-table td:nth-child(2) { min-width: 190px; text-align: left; }
-.sport-score-table td:nth-child(2) small { display: block; margin-top: 3px; }
+.sport-score-table th:not(.sport-score-team-cell), .sport-score-table td:not(.sport-score-team-cell):not(.sport-category-cell) { text-align: center; }
+.sport-score-table .sport-score-team-cell { min-width: 190px; text-align: left; }
+.sport-score-table .sport-score-team-cell small { display: block; margin-top: 3px; }
 .sport-category-cell { min-width: 105px; vertical-align: middle; background: var(--panel-soft); }
 .bracket-category-block + .bracket-category-block { margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--line); }
 .bracket-category-title { margin-bottom: 8px; }
@@ -2562,4 +2562,123 @@ body.is-scoreboard-presentation {
 .viewer-page--presentation-frame .team-ranking--scoreboard .panel-head p {
   margin: 0;
   font-size: 0.8rem;
+}
+
+/* Mobile data-table and narrow scoreboard safeguards */
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+.results-schedules-table { min-width: 840px !important; }
+.weighted-points-table { min-width: 980px !important; }
+
+/* Rowspans change nth-child positions, so sport score alignment must use semantic cells. */
+.sport-score-table th,
+.sport-score-table td { text-align: center; }
+.sport-score-table .sport-category-cell { text-align: left; }
+.sport-score-table .sport-score-team-cell {
+  min-width: 190px;
+  text-align: left;
+}
+.sport-score-table .sport-score-team-cell small { display: block; margin-top: 3px; }
+.sport-score-table .sport-score-set-cell {
+  min-width: 72px;
+  text-align: center;
+}
+.sport-score-table .sport-score-status-cell { min-width: 105px; text-align: center; }
+.sport-score-table .sport-score-overall-cell { min-width: 120px; text-align: center; }
+
+@media (max-width: 640px) {
+  .table-wrap[data-scroll-hint] {
+    scrollbar-width: auto;
+    scrollbar-gutter: stable;
+  }
+  .table-wrap[data-scroll-hint]::before {
+    content: attr(data-scroll-hint) "  ↔";
+    position: sticky;
+    left: 8px;
+    z-index: 6;
+    display: inline-flex;
+    width: max-content;
+    max-width: calc(100vw - 64px);
+    margin: 8px 8px 6px;
+    padding: 5px 9px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--panel);
+    color: var(--muted);
+    box-shadow: var(--shadow);
+    font-size: 0.7rem;
+    font-weight: 800;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+  .sport-score-table { min-width: 820px !important; }
+  .results-schedules-table { min-width: 840px !important; }
+  .weighted-points-table { min-width: 980px !important; }
+
+  .team-ranking-table-panel .team-ranking-col-rank {
+    left: 0;
+    width: 58px;
+    min-width: 58px;
+    max-width: 58px;
+    padding-inline: 7px;
+    text-align: center;
+  }
+  .team-ranking-table-panel .team-ranking-col-team {
+    left: 58px;
+    min-width: 152px;
+    max-width: 152px;
+    padding-inline: 10px;
+  }
+  .team-ranking--scoreboard table { min-width: 760px; }
+  .team-ranking--scoreboard .table-wrap { max-width: 100%; }
+}
+
+@media (max-width: 430px) {
+  .viewer-rank,
+  .podium-card {
+    min-width: 0;
+    overflow: hidden;
+  }
+  .viewer-rank {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: "icon . rank" "team team team" "points . label";
+    column-gap: 10px;
+  }
+  .viewer-rank h3 {
+    min-width: 0;
+    margin: 18px 0 8px;
+    overflow-wrap: anywhere;
+  }
+  .viewer-rank strong {
+    position: relative;
+    z-index: 2;
+    justify-self: start;
+    min-width: max-content;
+    white-space: nowrap;
+  }
+  .viewer-rank small {
+    justify-self: end;
+    padding-left: 10px;
+    white-space: nowrap;
+  }
+  .podium-card {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .podium-card h3 {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .podium-card b {
+    justify-self: end;
+    white-space: nowrap;
+  }
 }

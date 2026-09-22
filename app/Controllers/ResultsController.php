@@ -62,8 +62,18 @@ class ResultsController extends BaseController
         $repository = $this->repository();
         $event = $repository->activeEvent();
         $eventId = (int) ($event['id'] ?? 0);
-        $schedules = $repository->resolveBracketSlots($repository->schedules($eventId, $type));
+        $schedules = $repository->resolveBracketSlots(
+            $repository->schedules($eventId, $type),
+            $type === 'judged'
+        );
         $results = $repository->results($eventId, $type);
+        if ($type === 'judged') {
+            $scheduleIds = array_map('intval', array_column($schedules, 'id'));
+            $results = array_values(array_filter(
+                $results,
+                static fn(array $result): bool => in_array((int) ($result['schedule_id'] ?? 0), $scheduleIds, true)
+            ));
+        }
 
         if (session()->get('role') === 'facilitator') {
             $allowed = $repository->assignedSportIds((int) session()->get('user_id'));

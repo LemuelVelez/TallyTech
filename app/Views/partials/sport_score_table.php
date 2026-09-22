@@ -41,9 +41,9 @@ $scoreText = static fn(float|int $score): string => rtrim(rtrim(number_format((f
             </span>
         <?php endforeach; ?>
     </div>
-    <div class="table-wrap">
+    <div class="table-wrap" data-scroll-hint="Swipe horizontally to see status and overall points">
         <table class="sport-score-table">
-            <thead><tr><th>Category</th><th>Team</th><?php for ($set = 1; $set <= $maxSetCount; $set++): ?><th><?= esc($ordinal($set)) ?></th><?php endfor; ?><th>Status</th><th>Overall Points</th></tr></thead>
+            <thead><tr><th>Category</th><th class="sport-score-team-cell">Team</th><?php for ($set = 1; $set <= $maxSetCount; $set++): ?><th class="sport-score-set-cell"><?= esc($ordinal($set)) ?></th><?php endfor; ?><th class="sport-score-status-cell">Status</th><th class="sport-score-overall-cell">Overall Points</th></tr></thead>
             <tbody>
             <?php foreach ($table['categories'] ?? [] as $category): ?>
                 <?php $rows = $category['rows'] ?? []; ?>
@@ -51,10 +51,10 @@ $scoreText = static fn(float|int $score): string => rtrim(rtrim(number_format((f
                     <?php foreach ($rows as $index => $row): ?>
                         <tr>
                             <?php if ($index === 0): ?><td rowspan="<?= count($rows) ?>" class="sport-category-cell"><b><?= esc($category['category']) ?></b></td><?php endif; ?>
-                            <td><b><?= esc($row['team_name']) ?></b><?php if (!empty($row['match_code'])): ?><small class="muted"><?= esc($row['match_code']) ?></small><?php endif; ?></td>
-                            <?php for ($set = 0; $set < $maxSetCount; $set++): ?><td><?= array_key_exists($set, $row['set_scores'] ?? []) ? esc($scoreText($row['set_scores'][$set])) : '—' ?></td><?php endfor; ?>
-                            <td><?php if (($row['status'] ?? '') !== ''): ?><span class="badge <?= $row['status'] === 'Win' ? 'official' : 'neutral' ?>"><?= esc($row['status']) ?></span><?php else: ?>—<?php endif; ?></td>
-                            <td><b><?= !empty($row['set_scores']) ? esc($scoreText($row['overall_points'])) : '—' ?></b></td>
+                            <td class="sport-score-team-cell"><b><?= esc($row['team_name']) ?></b><?php if (!empty($row['match_code'])): ?><small class="muted"><?= esc($row['match_code']) ?></small><?php endif; ?></td>
+                            <?php for ($set = 0; $set < $maxSetCount; $set++): ?><td class="sport-score-set-cell"><?= array_key_exists($set, $row['set_scores'] ?? []) ? esc($scoreText($row['set_scores'][$set])) : '—' ?></td><?php endfor; ?>
+                            <td class="sport-score-status-cell"><?php if (($row['status'] ?? '') !== ''): ?><span class="badge <?= $row['status'] === 'Win' ? 'official' : 'neutral' ?>"><?= esc($row['status']) ?></span><?php else: ?>—<?php endif; ?></td>
+                            <td class="sport-score-overall-cell"><b><?= !empty($row['set_scores']) ? esc($scoreText($row['overall_points'])) : '—' ?></b></td>
                         </tr>
                     <?php endforeach; ?>
                 <?php else: ?>

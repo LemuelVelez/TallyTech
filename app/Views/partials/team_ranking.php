@@ -30,7 +30,7 @@ $icons = ['trophy', 'medal', 'award', 'target'];
             </div>
             <?php if ($provisional): ?><span class="badge unofficial">PROVISIONAL</span><?php endif; ?>
         </div>
-        <div class="table-wrap">
+        <div class="table-wrap" data-scroll-hint="Swipe horizontally to see all ranking columns">
             <table>
                 <thead><tr><th class="team-ranking-col-rank">Rank</th><th class="team-ranking-col-team">Team</th><th title="Sports finished in 1st place">1st</th><th title="Sports finished in 2nd place">2nd</th><th title="Sports finished in 3rd place">3rd</th><th title="Sports finished in 4th place">4th</th><th>Total Points</th></tr></thead>
                 <tbody>

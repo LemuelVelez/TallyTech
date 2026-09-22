@@ -2,6 +2,7 @@
 
 namespace App\Infrastructure\Persistence;
 
+use App\Application\Services\ScoringService;
 use App\Domain\Repositories\ScoringRepositoryInterface;
 use App\Models\EventModel;
 use App\Models\LocationModel;
@@ -1252,8 +1253,9 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         $source = $this->placementSource($eventId, $status);
         $orphanScheduleIds = $source['orphanScheduleIds'];
         $weightedPointsBySport = $source['weightedPoints'];
+        $thirdPlacePlayoffSports = $source['thirdPlacePlayoffSports'];
 
-        $bestPlacements = [];
+        $resultsBySport = [];
         foreach ($source['results'] as $result) {
             $sportId = (int) ($result['sport_id'] ?? 0);
             if ($sportId < 1 || ($sportFilter !== null && ! in_array($sportId, $sportFilter, true))) {
@@ -1262,26 +1264,37 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             if (isset($orphanScheduleIds[(int) ($result['schedule_id'] ?? 0)])) {
                 continue;
             }
+            $resultsBySport[$sportId][] = $result;
+        }
 
-            $entries = is_array($result['entries'] ?? null) ? $result['entries'] : [];
-            $placements = $this->resultPlacements($result, $entries);
-            foreach ($entries as $entry) {
-                $teamId = (int) ($entry['team_id'] ?? 0);
-                if ($teamId < 1) {
-                    continue;
-                }
-                $initialise($ranking, $teamId, (string) ($entry['team_name'] ?? 'Team'), (string) ($entry['team_code'] ?? ''));
+        $bestPlacements = [];
+        foreach ($resultsBySport as $sportId => $sportResults) {
+            foreach ($sportResults as $result) {
+                $entries = is_array($result['entries'] ?? null) ? $result['entries'] : [];
+                $placements = $this->resultPlacements(
+                    $result,
+                    $entries,
+                    $sportResults,
+                    ! empty($thirdPlacePlayoffSports[$sportId])
+                );
+                foreach ($entries as $entry) {
+                    $teamId = (int) ($entry['team_id'] ?? 0);
+                    if ($teamId < 1) {
+                        continue;
+                    }
+                    $initialise($ranking, $teamId, (string) ($entry['team_name'] ?? 'Team'), (string) ($entry['team_code'] ?? ''));
 
-                $placement = $placements[$teamId] ?? null;
-                if ($placement === null || $placement < 1) {
-                    continue;
-                }
-                $current = $bestPlacements[$sportId][$teamId] ?? null;
-                if ($current === null || $placement < $current['placement']) {
-                    $bestPlacements[$sportId][$teamId] = [
-                        'placement' => $placement,
-                        'allocated_points' => (float) ($entry['allocated_points'] ?? 0),
-                    ];
+                    $placement = $placements[$teamId] ?? null;
+                    if ($placement === null || $placement < 1) {
+                        continue;
+                    }
+                    $current = $bestPlacements[$sportId][$teamId] ?? null;
+                    if ($current === null || $placement < $current['placement']) {
+                        $bestPlacements[$sportId][$teamId] = [
+                            'placement' => $placement,
+                            'allocated_points' => (float) ($entry['allocated_points'] ?? 0),
+                        ];
+                    }
                 }
             }
         }
@@ -1334,63 +1347,49 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             $weightedPoints[(int) $row['sport_id']] = $row;
         }
 
+        $schedules = $this->schedules($eventId);
+        $thirdPlacePlayoffSports = [];
+        foreach ($schedules as $schedule) {
+            $stage = $this->bracketStage($schedule);
+            if ($stage['phase'] === 'third_place') {
+                $thirdPlacePlayoffSports[(int) ($schedule['sport_id'] ?? 0)] = true;
+            }
+        }
+
         return $this->placementSourceCache[$key] = [
             'results' => $this->resultsByStatus($eventId, $status),
-            'orphanScheduleIds' => $this->orphanScheduleIds($this->schedules($eventId)),
+            'orphanScheduleIds' => $this->orphanScheduleIds($schedules),
             'weightedPoints' => $weightedPoints,
+            'thirdPlacePlayoffSports' => $thirdPlacePlayoffSports,
         ];
     }
 
     /**
-     * Returns team placements (team id => place) earned by a single result.
+     * Returns team placements (team id => place) earned by a result, using
+     * the sport's validated result context for cross-match placement rules.
      */
-    private function resultPlacements(array $result, array $entries): array
+    private function resultPlacements(array $result, array $entries, array $sportResults = [], bool $hasThirdPlacePlayoff = false): array
     {
-        $placements = [];
-        $resultType = (string) ($result['result_type'] ?? $result['type'] ?? '');
-
-        if ($resultType !== 'match') {
-            foreach ($entries as $entry) {
-                $placement = (int) ($entry['placement'] ?? 0);
-                $teamId = (int) ($entry['team_id'] ?? 0);
-                if ($placement > 0 && $teamId > 0) {
-                    $placements[$teamId] = $placement;
+        $result['entries'] = $entries;
+        if ($sportResults === []) {
+            $sportResults = [$result];
+        } else {
+            foreach ($sportResults as &$sportResult) {
+                if ((int) ($sportResult['id'] ?? 0) === (int) ($result['id'] ?? 0)) {
+                    $sportResult['entries'] = $entries;
                 }
             }
-            return $placements;
+            unset($sportResult);
         }
 
-        $outcome = $this->matchOutcome($entries);
-        if ($outcome === null) {
-            return [];
-        }
+        $sportId = (int) ($result['sport_id'] ?? 0);
+        $resolved = ScoringService::resolveTournamentPlacements(
+            $sportResults,
+            $hasThirdPlacePlayoff && $sportId > 0 ? [$sportId => true] : [],
+            false
+        );
 
-        $winnerId = (int) ($outcome['winner']['team_id'] ?? 0);
-        $loserId = (int) ($outcome['loser']['team_id'] ?? 0);
-        $stage = $this->bracketStage($result);
-        $format = (string) ($result['tournament_format'] ?? 'single_elimination');
-
-        if ($format === 'double_elimination') {
-            if ($stage['side'] === 'lower' && $stage['phase'] === 'lower_r1') {
-                $placements[$loserId] = 4;
-            } elseif ($stage['side'] === 'lower' && $stage['phase'] === 'final') {
-                $placements[$loserId] = 3;
-            } elseif ($stage['side'] === 'grand' && $stage['phase'] === 'tiebreaker') {
-                $placements[$winnerId] = 1;
-                $placements[$loserId] = 2;
-            } elseif ($stage['side'] === 'grand' && $stage['phase'] === 'final' && $winnerId === (int) ($result['team_a_id'] ?? 0)) {
-                $placements[$winnerId] = 1;
-                $placements[$loserId] = 2;
-            }
-        } elseif ($stage['phase'] === 'third_place') {
-            $placements[$winnerId] = 3;
-            $placements[$loserId] = 4;
-        } elseif ($stage['phase'] === 'final' && $stage['side'] === 'grand') {
-            $placements[$winnerId] = 1;
-            $placements[$loserId] = 2;
-        }
-
-        return $placements;
+        return $resolved[(int) ($result['id'] ?? 0)] ?? [];
     }
 
     /**
@@ -1433,24 +1432,72 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
     }
 
     /**
-     * Schedules without a match ID that belong to a sport which already has a
-     * generated bracket (M1, M2, ...) are legacy duplicates.
+     * Identifies legacy duplicate schedules. Validated judged results are always
+     * preferred, and validated results are never discarded as legacy orphans.
      *
      * @return array<int, true>
      */
     private function orphanScheduleIds(array $schedules): array
     {
-        $bracketSports = [];
-        foreach ($schedules as $schedule) {
-            if (preg_match('/^M\d+$/i', trim((string) ($schedule['match_code'] ?? '')))) {
-                $bracketSports[(int) ($schedule['sport_id'] ?? 0)] = true;
+        if ($schedules === []) {
+            return [];
+        }
+
+        $scheduleIds = array_values(array_filter(array_map(
+            static fn(array $schedule): int => (int) ($schedule['id'] ?? 0),
+            $schedules
+        )));
+        $resultBySchedule = [];
+        if ($scheduleIds !== []) {
+            foreach ($this->db->table('results')
+                ->select('id,schedule_id,status,validated_at')
+                ->whereIn('schedule_id', $scheduleIds)
+                ->get()->getResultArray() as $result) {
+                $resultBySchedule[(int) $result['schedule_id']] = $result;
             }
         }
 
-        $orphans = [];
+        $bySport = [];
         foreach ($schedules as $schedule) {
-            if (trim((string) ($schedule['match_code'] ?? '')) === '' && isset($bracketSports[(int) ($schedule['sport_id'] ?? 0)])) {
-                $orphans[(int) ($schedule['id'] ?? 0)] = true;
+            $bySport[(int) ($schedule['sport_id'] ?? 0)][] = $schedule;
+        }
+
+        $orphans = [];
+        foreach ($bySport as $sportSchedules) {
+            if ($sportSchedules === []) {
+                continue;
+            }
+
+            $isJudged = (string) ($sportSchedules[0]['result_type'] ?? '') === 'judged';
+            if ($isJudged && count($sportSchedules) > 1) {
+                $keepId = ScoringService::canonicalJudgedScheduleId($sportSchedules, $resultBySchedule);
+
+                foreach ($sportSchedules as $schedule) {
+                    $scheduleId = (int) ($schedule['id'] ?? 0);
+                    if ($scheduleId > 0 && $scheduleId !== $keepId) {
+                        $orphans[$scheduleId] = true;
+                    }
+                }
+                continue;
+            }
+
+            $hasGeneratedBracket = false;
+            foreach ($sportSchedules as $schedule) {
+                if (preg_match('/^M\d+$/i', trim((string) ($schedule['match_code'] ?? '')))) {
+                    $hasGeneratedBracket = true;
+                    break;
+                }
+            }
+            if (! $hasGeneratedBracket) {
+                continue;
+            }
+
+            foreach ($sportSchedules as $schedule) {
+                $scheduleId = (int) ($schedule['id'] ?? 0);
+                $isValidated = ($resultBySchedule[$scheduleId]['status'] ?? '') === 'validated';
+                if (! $isValidated && trim((string) ($schedule['match_code'] ?? '')) === '') {
+                    $orphans[$scheduleId] = true;
+                }
             }
         }
 
@@ -1500,6 +1547,26 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         }
         if (! in_array((string) ($data['tournament_format'] ?? ''), ['single_elimination', 'double_elimination'], true)) {
             throw new RuntimeException('Select a valid tournament format.');
+        }
+
+        if (($sport['result_type'] ?? '') === 'judged') {
+            $existingJudged = $this->db->table('schedules')
+                ->where('event_id', $eventId)
+                ->where('sport_id', $sportId);
+            if ($existingScheduleId !== null) {
+                $existingJudged->where('id !=', $existingScheduleId);
+            }
+            if ($existingJudged->countAllResults() > 0) {
+                throw new RuntimeException('Judged sports can have only one championship schedule per event.');
+            }
+
+            $judgedStage = $this->bracketStage($data);
+            if ($judgedStage['phase'] !== 'final' || $judgedStage['side'] !== 'grand') {
+                throw new RuntimeException('Judged sports use one championship final schedule.');
+            }
+            if (strtoupper(trim((string) ($data['match_code'] ?? ''))) !== 'M1') {
+                throw new RuntimeException('The judged championship schedule must use match ID M1.');
+            }
         }
 
         $teamA = empty($data['team_a_id']) ? 0 : $this->positiveIntValue($data['team_a_id']);
@@ -2012,86 +2079,79 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
 
     private function applyPointsToResult(array $result, array $weightedPoints): void
     {
-        $entries = $this->resultEntries((int) $result['id']);
-        if (! $entries) {
+        $currentEntries = $this->resultEntries((int) $result['id']);
+        if (! $currentEntries) {
             throw new RuntimeException('A result cannot be validated without score entries.');
         }
-
-        if (($result['result_type'] ?? '') === 'match') {
-            if (count($entries) !== 2) {
-                throw new RuntimeException('Match results must contain exactly two team scores.');
-            }
-            $outcome = $this->matchOutcome($entries);
-            if ($outcome === null) {
-                throw new RuntimeException('Elimination matches require a winner by sets won. Enter the official tie-break set before validation.');
-            }
-
-            $winnerId = (int) $outcome['winner']['team_id'];
-            $loserId = (int) $outcome['loser']['team_id'];
-            $format = (string) ($result['tournament_format'] ?? 'single_elimination');
-            $stage = $this->bracketStage($result);
-            $side = $stage['side'];
-            $phase = $stage['phase'];
-            $championshipMatch = false;
-            $thirdPlaceMatch = false;
-            $thirdPlaceLoser = false;
-            $fourthPlaceLoser = false;
-
-            if ($format === 'double_elimination') {
-                if ($side === 'lower' && $phase === 'lower_r1') {
-                    $fourthPlaceLoser = true;
-                } elseif ($side === 'lower' && $phase === 'final') {
-                    $thirdPlaceLoser = true;
-                } elseif ($side === 'grand' && $phase === 'tiebreaker') {
-                    $championshipMatch = true;
-                } elseif ($side === 'grand' && $phase === 'final') {
-                    $championshipMatch = $winnerId === (int) ($result['team_a_id'] ?? 0);
-                }
-            } else {
-                $thirdPlaceMatch = $phase === 'third_place';
-                $championshipMatch = $phase === 'final' && $side === 'grand';
-            }
-
-            foreach ($entries as $entry) {
-                $entryTeamId = (int) $entry['team_id'];
-                $placement = null;
-                $points = 0.0;
-                if ($championshipMatch) {
-                    $placement = $entryTeamId === $winnerId ? 1 : 2;
-                    $points = $this->pointsForPlacement($weightedPoints, $placement);
-                } elseif ($thirdPlaceMatch) {
-                    $placement = $entryTeamId === $winnerId ? 3 : 4;
-                    $points = $this->pointsForPlacement($weightedPoints, $placement);
-                } elseif ($thirdPlaceLoser && $entryTeamId === $loserId) {
-                    $placement = 3;
-                    $points = $this->pointsForPlacement($weightedPoints, 3);
-                } elseif ($fourthPlaceLoser && $entryTeamId === $loserId) {
-                    $placement = 4;
-                    $points = $this->pointsForPlacement($weightedPoints, 4);
-                }
-                $this->db->table('result_entries')->where('id', $entry['id'])->update([
-                    'placement' => $placement,
-                    'allocated_points' => $points,
-                ]);
-            }
-
-            return;
+        if (($result['result_type'] ?? '') === 'match' && count($currentEntries) !== 2) {
+            throw new RuntimeException('Match results must contain exactly two team scores.');
+        }
+        if (($result['result_type'] ?? '') === 'match' && $this->matchOutcome($currentEntries) === null) {
+            throw new RuntimeException('Elimination matches require a winner by sets won. Enter the official tie-break set before validation.');
         }
 
-        $seenScores = [];
-        foreach ($entries as $entry) {
-            $scoreKey = number_format((float) $entry['raw_score'], 2, '.', '');
-            if (isset($seenScores[$scoreKey])) {
-                throw new RuntimeException('This judged result contains tied scores. A tie-ranking business rule is required before it can be validated.');
+        if (($result['result_type'] ?? '') !== 'match') {
+            $seenScores = [];
+            foreach ($currentEntries as $entry) {
+                $scoreKey = number_format((float) $entry['raw_score'], 2, '.', '');
+                if (isset($seenScores[$scoreKey])) {
+                    throw new RuntimeException('This judged result contains tied scores. A tie-ranking business rule is required before it can be validated.');
+                }
+                $seenScores[$scoreKey] = true;
+                if ((int) ($entry['placement'] ?? 0) < 1) {
+                    throw new RuntimeException('Judged result placements are invalid.');
+                }
             }
-            $seenScores[$scoreKey] = true;
-            $placement = (int) $entry['placement'];
-            if ($placement < 1) {
-                throw new RuntimeException('Judged result placements are invalid.');
+        }
+
+        $eventId = (int) ($result['event_id'] ?? 0);
+        $sportId = (int) ($result['sport_id'] ?? 0);
+        $sportResults = [];
+        foreach ($this->resultsByStatus($eventId, 'validated') as $validatedResult) {
+            if ((int) ($validatedResult['sport_id'] ?? 0) === $sportId) {
+                $sportResults[(int) $validatedResult['id']] = $validatedResult;
             }
-            $this->db->table('result_entries')->where('id', $entry['id'])->update([
-                'allocated_points' => $this->pointsForPlacement($weightedPoints, $placement),
-            ]);
+        }
+
+        $result['entries'] = $currentEntries;
+        $sportResults[(int) $result['id']] = $result;
+        $sportResults = array_values($sportResults);
+
+        $schedules = array_values(array_filter(
+            $this->schedules($eventId),
+            static fn(array $schedule): bool => (int) ($schedule['sport_id'] ?? 0) === $sportId
+        ));
+        $orphanScheduleIds = $this->orphanScheduleIds($schedules);
+        $sportResults = array_values(array_filter(
+            $sportResults,
+            static fn(array $sportResult): bool => ! isset($orphanScheduleIds[(int) ($sportResult['schedule_id'] ?? 0)])
+                || (int) ($sportResult['id'] ?? 0) === (int) ($result['id'] ?? 0)
+        ));
+
+        $hasThirdPlacePlayoff = false;
+        foreach ($schedules as $schedule) {
+            if ($this->bracketStage($schedule)['phase'] === 'third_place') {
+                $hasThirdPlacePlayoff = true;
+                break;
+            }
+        }
+
+        $resolved = ScoringService::resolveTournamentPlacements(
+            $sportResults,
+            $hasThirdPlacePlayoff ? [$sportId => true] : [],
+            true
+        );
+
+        foreach ($sportResults as $sportResult) {
+            $resultId = (int) ($sportResult['id'] ?? 0);
+            foreach ($sportResult['entries'] ?? [] as $entry) {
+                $teamId = (int) ($entry['team_id'] ?? 0);
+                $placement = $resolved[$resultId][$teamId] ?? null;
+                $this->db->table('result_entries')->where('id', (int) $entry['id'])->update([
+                    'placement' => $placement,
+                    'allocated_points' => $placement === null ? 0 : $this->pointsForPlacement($weightedPoints, (int) $placement),
+                ]);
+            }
         }
     }
 
