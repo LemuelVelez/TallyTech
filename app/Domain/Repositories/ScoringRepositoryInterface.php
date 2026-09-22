@@ -23,8 +23,9 @@ interface ScoringRepositoryInterface
     public function resultsByStatus(int $eventId, string $status, ?string $type = null): array;
     public function resultEntries(int $resultId): array;
     public function ranking(?int $eventId = null, bool $officialOnly = true): array;
-    public function rankingByStatus(int $eventId, string $status, bool $includeAllTeams = true): array;
-    public function rankingBySport(int $eventId, int $sportId, string $status = 'validated'): array;
+    public function rankingByStatus(int $eventId, string $status, bool $includeAllTeams = true, ?array $sportIds = null, ?string $dateFrom = null, ?string $dateTo = null): array;
+    public function rankingBySport(int $eventId, int $sportId, string $status = 'validated', ?string $dateFrom = null, ?string $dateTo = null): array;
+    public function placementRanking(int $eventId, string $status = 'validated', bool $includeAllTeams = true, ?array $sportIds = null, bool $positiveOnly = false, ?string $dateFrom = null, ?string $dateTo = null): array;
     public function reportSummary(?int $eventId = null): array;
     public function reportRows(string $type, array $filters): array;
 

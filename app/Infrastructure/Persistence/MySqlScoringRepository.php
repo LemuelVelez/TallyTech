@@ -221,21 +221,18 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         return $this->placementRanking($eventId, 'validated', ! $officialOnly, null, $officialOnly);
     }
 
-    public function rankingByStatus(int $eventId, string $status, bool $includeAllTeams = true): array
+    public function rankingByStatus(int $eventId, string $status, bool $includeAllTeams = true, ?array $sportIds = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         if ($eventId < 1) {
             return [];
         }
 
         $status = $this->scoreboardResultStatus($status);
-        if ($status === 'validated') {
-            return $this->ranking($eventId, ! $includeAllTeams);
-        }
 
-        return $this->placementRanking($eventId, 'pending', $includeAllTeams);
+        return $this->placementRanking($eventId, $status, $includeAllTeams, $sportIds, $status === 'validated' && ! $includeAllTeams, $dateFrom, $dateTo);
     }
 
-    public function rankingBySport(int $eventId, int $sportId, string $status = 'validated'): array
+    public function rankingBySport(int $eventId, int $sportId, string $status = 'validated', ?string $dateFrom = null, ?string $dateTo = null): array
     {
         if ($eventId < 1 || $sportId < 1) {
             return [];
@@ -243,7 +240,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
 
         $status = $this->scoreboardResultStatus($status);
 
-        return $this->placementRanking($eventId, $status, $status === 'validated', [$sportId]);
+        return $this->placementRanking($eventId, $status, $status === 'validated', [$sportId], false, $dateFrom, $dateTo);
     }
 
     public function reportSummary(?int $eventId = null): array
@@ -265,38 +262,75 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             return [];
         }
 
+        $status = ($filters['status'] ?? '') === 'pending' ? 'pending' : 'validated';
+        $dateFrom = ($filters['date_from'] ?? '') !== '' ? (string) $filters['date_from'] : null;
+        $dateTo = ($filters['date_to'] ?? '') !== '' ? (string) $filters['date_to'] : null;
+        $sportIds = $this->reportSportIds($eventId, $filters);
+
         if ($type === 'standings' || $type === 'medal_tally') {
-            $builder = $this->db->table('teams t')
-                ->select('t.id,t.name team,t.code,COALESCE(SUM(re.allocated_points),0) points,SUM(CASE WHEN re.placement=1 THEN 1 ELSE 0 END) firsts,SUM(CASE WHEN re.placement=2 THEN 1 ELSE 0 END) seconds,SUM(CASE WHEN re.placement=3 THEN 1 ELSE 0 END) thirds,SUM(CASE WHEN re.placement=4 THEN 1 ELSE 0 END) fourths')
-                ->join('result_entries re', 're.team_id=t.id')
-                ->join('results r', 'r.id=re.result_id')
-                ->join('schedules sc', 'sc.id=r.schedule_id')
-                ->join('sports s', 's.id=sc.sport_id');
-            $this->applyReportFilters($builder, $filters);
-            $builder->groupBy('t.id,t.name,t.code');
-            if (($filters['status'] ?? '') === 'validated' && $type === 'standings') {
-                $builder->having('points >', 0);
-            }
+            $ranking = $this->placementRanking($eventId, $status, true, $sportIds, false, $dateFrom, $dateTo);
+            $rows = array_map(static fn(array $row): array => [
+                'id' => (int) $row['id'],
+                'team' => (string) $row['name'],
+                'code' => (string) $row['code'],
+                'points' => (float) $row['total_points'],
+                'firsts' => (int) $row['firsts'],
+                'seconds' => (int) $row['seconds'],
+                'thirds' => (int) $row['thirds'],
+                'fourths' => (int) $row['fourths'],
+            ], $ranking);
+
             if ($type === 'medal_tally') {
-                return $builder->select('SUM(CASE WHEN re.placement=1 THEN 1 ELSE 0 END) gold,SUM(CASE WHEN re.placement=2 THEN 1 ELSE 0 END) silver,SUM(CASE WHEN re.placement=3 THEN 1 ELSE 0 END) bronze')
-                    ->orderBy('gold', 'DESC')->orderBy('silver', 'DESC')->orderBy('bronze', 'DESC')->orderBy('points', 'DESC')->orderBy('t.name', 'ASC')->get()->getResultArray();
+                foreach ($rows as &$row) {
+                    $row['gold'] = $row['firsts'];
+                    $row['silver'] = $row['seconds'];
+                    $row['bronze'] = $row['thirds'];
+                }
+                unset($row);
+                usort($rows, static fn(array $a, array $b): int => ((int) $b['gold'] <=> (int) $a['gold'])
+                    ?: ((int) $b['silver'] <=> (int) $a['silver'])
+                    ?: ((int) $b['bronze'] <=> (int) $a['bronze'])
+                    ?: ((float) $b['points'] <=> (float) $a['points'])
+                    ?: strcasecmp((string) $a['team'], (string) $b['team']));
             }
-            return $builder->orderBy('points', 'DESC')->orderBy('firsts', 'DESC')->orderBy('seconds', 'DESC')->orderBy('thirds', 'DESC')->orderBy('fourths', 'DESC')->orderBy('t.name', 'ASC')->get()->getResultArray();
+
+            return $rows;
         }
 
         if ($type === 'sport_rankings') {
-            $builder = $this->db->table('teams t')
-                ->select('s.id sport_id,s.name sport,s.category,t.id team_id,t.name team,t.code,COALESCE(SUM(re.allocated_points),0) points,SUM(CASE WHEN re.placement=1 THEN 1 ELSE 0 END) firsts,SUM(CASE WHEN re.placement=2 THEN 1 ELSE 0 END) seconds,SUM(CASE WHEN re.placement=3 THEN 1 ELSE 0 END) thirds,SUM(CASE WHEN re.placement=4 THEN 1 ELSE 0 END) fourths')
-                ->join('result_entries re', 're.team_id=t.id')
-                ->join('results r', 'r.id=re.result_id')
-                ->join('schedules sc', 'sc.id=r.schedule_id')
-                ->join('sports s', 's.id=sc.sport_id');
-            $this->applyReportFilters($builder, $filters);
-            $builder->groupBy('s.id,s.name,s.category,t.id,t.name,t.code');
-            if (($filters['status'] ?? '') === 'validated') {
-                $builder->having('points >', 0);
+            $sports = $this->sports($eventId);
+            if ($sportIds !== null) {
+                $sportIdSet = array_fill_keys($sportIds, true);
+                $sports = array_values(array_filter($sports, static fn(array $sport): bool => isset($sportIdSet[(int) ($sport['id'] ?? 0)])));
             }
-            return $builder->orderBy('s.name', 'ASC')->orderBy('s.category', 'ASC')->orderBy('points', 'DESC')->orderBy('firsts', 'DESC')->orderBy('seconds', 'DESC')->orderBy('thirds', 'DESC')->orderBy('fourths', 'DESC')->orderBy('t.name', 'ASC')->get()->getResultArray();
+
+            usort($sports, static fn(array $a, array $b): int => strcasecmp((string) ($a['name'] ?? ''), (string) ($b['name'] ?? ''))
+                ?: strcasecmp((string) ($a['category'] ?? ''), (string) ($b['category'] ?? '')));
+
+            $rows = [];
+            foreach ($sports as $sport) {
+                $sportId = (int) ($sport['id'] ?? 0);
+                if ($sportId < 1) {
+                    continue;
+                }
+                foreach ($this->rankingBySport($eventId, $sportId, $status, $dateFrom, $dateTo) as $rankingRow) {
+                    $rows[] = [
+                        'sport_id' => $sportId,
+                        'sport' => (string) ($sport['name'] ?? ''),
+                        'category' => (string) ($sport['category'] ?? ''),
+                        'team_id' => (int) $rankingRow['id'],
+                        'team' => (string) $rankingRow['name'],
+                        'code' => (string) $rankingRow['code'],
+                        'points' => (float) $rankingRow['total_points'],
+                        'firsts' => (int) $rankingRow['firsts'],
+                        'seconds' => (int) $rankingRow['seconds'],
+                        'thirds' => (int) $rankingRow['thirds'],
+                        'fourths' => (int) $rankingRow['fourths'],
+                    ];
+                }
+            }
+
+            return $rows;
         }
 
         if ($type === 'validation_log') {
@@ -307,24 +341,15 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
                 ->join('users u', 'u.id=r.submitted_by', 'left')
                 ->join('users v', 'v.id=r.validated_by', 'left');
             $this->applyReportFilters($builder, $filters);
+            $orphanIds = array_keys($this->orphanScheduleIds($this->schedules($eventId)));
+            if ($orphanIds !== []) {
+                $builder->whereNotIn('sc.id', $orphanIds);
+            }
             return $builder->orderBy('COALESCE(r.validated_at,r.submitted_at)', 'DESC', false)->orderBy('r.id', 'DESC')->get()->getResultArray();
         }
 
-        $builder = $this->db->table('results r')
-            ->join('schedules sc', 'sc.id=r.schedule_id')
-            ->join('sports s', 's.id=sc.sport_id')
-            ->join('result_entries re', 're.result_id=r.id')
-            ->join('teams t', 't.id=re.team_id')
-            ->join('users u', 'u.id=r.submitted_by', 'left')
-            ->join('users v', 'v.id=r.validated_by', 'left');
-        $this->applyReportFilters($builder, $filters);
-        if ($type === 'sport_results') {
-            return $builder->select('DATE(sc.match_date) date,s.name sport,s.category,sc.round,t.name team,re.raw_score score,re.placement,re.allocated_points points,r.status')
-                ->orderBy('sc.match_date', 'DESC')->orderBy('s.name', 'ASC')->orderBy('re.placement', 'ASC')->orderBy('t.name', 'ASC')->get()->getResultArray();
-        }
-        if ($type === 'full_event') {
-            return $builder->select('DATE(sc.match_date) date,s.name sport,s.category,sc.round,t.name team,re.raw_score score,re.placement,re.allocated_points points,r.status,u.display_name submitted_by,v.display_name validated_by')
-                ->orderBy('sc.match_date', 'ASC')->orderBy('s.name', 'ASC')->orderBy('re.placement', 'ASC')->orderBy('t.name', 'ASC')->get()->getResultArray();
+        if ($type === 'sport_results' || $type === 'full_event') {
+            return $this->resolvedReportResultRows($type, $filters, $sportIds);
         }
 
         return [];
@@ -1150,6 +1175,121 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         return $settings;
     }
 
+    private function reportSportIds(int $eventId, array $filters): ?array
+    {
+        $sportId = (int) ($filters['sport_id'] ?? 0);
+        $category = trim((string) ($filters['category'] ?? ''));
+        if ($sportId < 1 && $category === '') {
+            return null;
+        }
+
+        $ids = [];
+        foreach ($this->sports($eventId) as $sport) {
+            $id = (int) ($sport['id'] ?? 0);
+            if ($id < 1) {
+                continue;
+            }
+            if ($sportId > 0 && $id !== $sportId) {
+                continue;
+            }
+            if ($category !== '' && (string) ($sport['category'] ?? '') !== $category) {
+                continue;
+            }
+            $ids[] = $id;
+        }
+
+        return $ids;
+    }
+
+    private function resolvedReportResultRows(string $type, array $filters, ?array $sportIds): array
+    {
+        $eventId = (int) ($filters['event_id'] ?? 0);
+        $requestedStatus = trim((string) ($filters['status'] ?? ''));
+        $statuses = in_array($requestedStatus, ['validated', 'pending'], true)
+            ? [$requestedStatus]
+            : ['validated', 'pending'];
+        $dateFrom = ($filters['date_from'] ?? '') !== '' ? (string) $filters['date_from'] : null;
+        $dateTo = ($filters['date_to'] ?? '') !== '' ? (string) $filters['date_to'] : null;
+        $sportIdSet = $sportIds === null ? null : array_fill_keys(array_map('intval', $sportIds), true);
+        $rows = [];
+
+        foreach ($statuses as $status) {
+            $source = $this->placementSource($eventId, $status, $dateFrom, $dateTo);
+            $orphanScheduleIds = $source['orphanScheduleIds'];
+            $weightedPointsBySport = $source['weightedPoints'];
+            $thirdPlacePlayoffSports = $source['thirdPlacePlayoffSports'];
+
+            $resultsBySport = [];
+            foreach ($source['results'] as $result) {
+                $sportId = (int) ($result['sport_id'] ?? 0);
+                if ($sportId < 1 || ($sportIdSet !== null && ! isset($sportIdSet[$sportId]))) {
+                    continue;
+                }
+                if (isset($orphanScheduleIds[(int) ($result['schedule_id'] ?? 0)])) {
+                    continue;
+                }
+                $resultsBySport[$sportId][] = $result;
+            }
+
+            foreach ($resultsBySport as $sportId => $sportResults) {
+                $resolved = ScoringService::resolveTournamentPlacements(
+                    $sportResults,
+                    ! empty($thirdPlacePlayoffSports[$sportId]) ? [$sportId => true] : [],
+                    false
+                );
+                $weightedPoints = $weightedPointsBySport[$sportId] ?? null;
+
+                foreach ($sportResults as $result) {
+                    $resultId = (int) ($result['id'] ?? 0);
+                    foreach ($result['entries'] ?? [] as $entry) {
+                        $teamId = (int) ($entry['team_id'] ?? 0);
+                        $placement = $resolved[$resultId][$teamId] ?? null;
+                        $points = null;
+                        if ($placement !== null) {
+                            if ($weightedPoints) {
+                                $points = $this->pointsForPlacement($weightedPoints, (int) $placement);
+                            } elseif ($status === 'validated') {
+                                $points = (float) ($entry['allocated_points'] ?? 0);
+                            } else {
+                                $points = 0.0;
+                            }
+                        }
+
+                        $row = [
+                            'date' => substr((string) ($result['match_date'] ?? ''), 0, 10),
+                            'sport' => (string) ($result['sport_name'] ?? ''),
+                            'category' => (string) ($result['category'] ?? ''),
+                            'round' => (string) ($result['round'] ?? ''),
+                            'team' => (string) ($entry['team_name'] ?? ''),
+                            'score' => $entry['raw_score'] ?? null,
+                            'placement' => $placement,
+                            'points' => $points,
+                            'status' => $status,
+                        ];
+                        if ($type === 'full_event') {
+                            $row['submitted_by'] = (string) ($result['submitted_by_name'] ?? '');
+                            $row['validated_by'] = (string) ($result['validated_by_name'] ?? '');
+                        }
+                        $rows[] = $row;
+                    }
+                }
+            }
+        }
+
+        usort($rows, static function (array $a, array $b) use ($type): int {
+            $dateCompare = strcmp((string) $a['date'], (string) $b['date']);
+            if ($type === 'sport_results') {
+                $dateCompare = -$dateCompare;
+            }
+            return $dateCompare
+                ?: strcasecmp((string) $a['sport'], (string) $b['sport'])
+                ?: (($a['placement'] ?? PHP_INT_MAX) <=> ($b['placement'] ?? PHP_INT_MAX))
+                ?: strcasecmp((string) $a['team'], (string) $b['team']);
+        });
+
+        return $rows;
+    }
+
     private function applyReportFilters($builder, array $filters): void
     {
         $builder->where('r.event_id', (int) $filters['event_id']);
@@ -1219,7 +1359,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
      * already has a generated bracket, which prevents duplicated finals from
      * awarding points twice.
      */
-    private function placementRanking(int $eventId, string $status, bool $includeAllTeams, ?array $sportIds = null, bool $positiveOnly = false): array
+    public function placementRanking(int $eventId, string $status = 'validated', bool $includeAllTeams = true, ?array $sportIds = null, bool $positiveOnly = false, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $status = $this->scoreboardResultStatus($status);
         $sportFilter = $sportIds === null ? null : array_map('intval', $sportIds);
@@ -1250,7 +1390,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             }
         }
 
-        $source = $this->placementSource($eventId, $status);
+        $source = $this->placementSource($eventId, $status, $dateFrom, $dateTo);
         $orphanScheduleIds = $source['orphanScheduleIds'];
         $weightedPointsBySport = $source['weightedPoints'];
         $thirdPlacePlayoffSports = $source['thirdPlacePlayoffSports'];
@@ -1335,9 +1475,11 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         return $rows;
     }
 
-    private function placementSource(int $eventId, string $status): array
+    private function placementSource(int $eventId, string $status, ?string $dateFrom = null, ?string $dateTo = null): array
     {
-        $key = $eventId . '|' . $status;
+        $dateFrom = $dateFrom !== null && $dateFrom !== '' ? $dateFrom : null;
+        $dateTo = $dateTo !== null && $dateTo !== '' ? $dateTo : null;
+        $key = $eventId . '|' . $status . '|' . ($dateFrom ?? '') . '|' . ($dateTo ?? '');
         if (isset($this->placementSourceCache[$key])) {
             return $this->placementSourceCache[$key];
         }
@@ -1356,8 +1498,20 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             }
         }
 
+        $results = $this->resultsByStatus($eventId, $status);
+        if ($dateFrom !== null || $dateTo !== null) {
+            $results = array_values(array_filter($results, static function (array $result) use ($dateFrom, $dateTo): bool {
+                $matchDate = substr((string) ($result['match_date'] ?? ''), 0, 10);
+                if ($matchDate === '') {
+                    return false;
+                }
+                return ($dateFrom === null || $matchDate >= $dateFrom)
+                    && ($dateTo === null || $matchDate <= $dateTo);
+            }));
+        }
+
         return $this->placementSourceCache[$key] = [
-            'results' => $this->resultsByStatus($eventId, $status),
+            'results' => $results,
             'orphanScheduleIds' => $this->orphanScheduleIds($schedules),
             'weightedPoints' => $weightedPoints,
             'thirdPlacePlayoffSports' => $thirdPlacePlayoffSports,

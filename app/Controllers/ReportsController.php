@@ -121,7 +121,7 @@ class ReportsController extends BaseController
             'columnLabels' => array_combine($reporting->columnsFor($type), array_map([$reporting, 'label'], $reporting->columnsFor($type))) ?: [],
             'filterSummary' => $reporting->filterSummary($filters, $event, $sports),
             'printSettings' => $settings,
-            'teamRanking' => ($settings['include_team_ranking'] ?? '1') === '1' && (int) $filters['event_id'] > 0 ? $repository->ranking((int) $filters['event_id'], true) : [],
+            'teamRanking' => ($settings['include_team_ranking'] ?? '1') === '1' && (int) $filters['event_id'] > 0 ? $repository->ranking((int) $filters['event_id'], false) : [],
         ]);
     }
 

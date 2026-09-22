@@ -210,13 +210,6 @@ class ReportingService
         } elseif ($range === 'custom') {
             $filters['date_from'] = (string) ($filters['from'] ?? '');
             $filters['date_to'] = (string) ($filters['to'] ?? '');
-        } else {
-            $start = (string) ($event['start_date'] ?? '');
-            $end = (string) ($event['end_date'] ?? '');
-            if ($start !== '' && $end !== '') {
-                $filters['date_from'] = $start;
-                $filters['date_to'] = $end;
-            }
         }
 
         return $filters;
