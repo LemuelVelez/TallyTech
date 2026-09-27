@@ -12,19 +12,23 @@ class AuthSession
         foreach ($settingsRows as $row) {
             $settings[(string) $row['setting_key']] = (string) ($row['setting_value'] ?? '');
         }
-        $density = in_array(($settings['result_density'] ?? 'comfortable'), ['comfortable','compact'], true) ? $settings['result_density'] : 'comfortable';
-        $theme = in_array(($settings['theme'] ?? 'system'), ['light','dark','system'], true) ? $settings['theme'] : 'system';
-        $font = in_array(($settings['font_size'] ?? 'medium'), ['small','medium','large'], true) ? $settings['font_size'] : 'medium';
-        $paper = in_array(($settings['paper_size'] ?? 'letter'), ['letter','a4','legal'], true) ? $settings['paper_size'] : 'letter';
-        $orientation = in_array(($settings['orientation'] ?? 'portrait'), ['portrait','landscape'], true) ? $settings['orientation'] : 'portrait';
+        $density = self::pick($settings, 'result_density', ['comfortable','compact'], 'comfortable');
+        $theme = self::pick($settings, 'theme', ['light','dark','system'], 'system');
+        $font = self::pick($settings, 'font_size', ['small','medium','large'], 'medium');
+        $paper = self::pick($settings, 'paper_size', ['letter','a4','legal'], 'letter');
+        $orientation = self::pick($settings, 'orientation', ['portrait','landscape'], 'portrait');
+        $includeTeamRanking = self::pick($settings, 'include_team_ranking', ['1','0'], '1');
+        $includeFilterSummary = self::pick($settings, 'include_filter_summary', ['1','0'], '1');
+        $showTimestamp = self::pick($settings, 'show_timestamp', ['1','0'], '1');
+        $compactSidebar = self::pick($settings, 'compact_sidebar', ['1','0'], '0');
         session()->regenerate(true);
         session()->remove('compact_sidebar');
         session()->set([
             'user_id' => (int) $user['id'], 'username' => (string) $user['username'], 'display_name' => (string) $user['display_name'], 'role' => (string) $user['role'],
             'result_density' => $density, 'theme' => $theme, 'font_size' => $font, 'paper_size' => $paper, 'orientation' => $orientation,
-            'include_team_ranking' => ($settings['include_team_ranking'] ?? '1') === '1' ? '1' : '0', 'include_filter_summary' => ($settings['include_filter_summary'] ?? '1') === '1' ? '1' : '0', 'show_timestamp' => ($settings['show_timestamp'] ?? '1') === '1' ? '1' : '0',
+            'include_team_ranking' => $includeTeamRanking, 'include_filter_summary' => $includeFilterSummary, 'show_timestamp' => $showTimestamp,
         ]);
-        if (($settings['compact_sidebar'] ?? '0') === '1') session()->set('compact_sidebar', true);
+        if ($compactSidebar === '1') session()->set('compact_sidebar', true);
     }
 
     public static function restoreFromRememberCookie(): bool
@@ -72,6 +76,13 @@ class AuthSession
     public static function revokeUser(int $userId): void
     {
         db_connect()->table('auth_remember_tokens')->where('user_id', $userId)->delete();
+    }
+
+    private static function pick(array $settings, string $key, array $allowed, string $default): string
+    {
+        $value = $settings[$key] ?? $default;
+
+        return in_array($value, $allowed, true) ? $value : $default;
     }
 
     private static function setCookie(string $value, int $maxAge): void
