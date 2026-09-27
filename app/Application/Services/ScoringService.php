@@ -437,9 +437,18 @@ class ScoringService
             static fn(array $row): bool => isset($resultTeamIds[(int) ($row['id'] ?? 0)])
         ));
 
+        $podiums=[];
+        $sportsById=[]; foreach($this->repository->sports($eventId) as $sport)$sportsById[(int)$sport['id']]=$sport;
+        foreach($selectedSportIds as $sportId){
+            $sportRanking=$this->repository->rankingBySport($eventId,(int)$sportId,$status);
+            $slots=[1=>null,2=>null,3=>null,4=>null];
+            foreach($sportRanking as $team){$place=(int)($team['placement']??0);if($place>=1&&$place<=4)$slots[$place]=$team;}
+            $podiums[]=['sport'=>$sportsById[(int)$sportId]??['id'=>$sportId,'category'=>''],'slots'=>$slots];
+        }
         $dataset['results'] = $results;
         $dataset['standings'] = $ranking;
-        $dataset['overallSportPoints'] = $ranking;
+        $dataset['podiums'] = $podiums;
+        $dataset['overallSportPoints'] = count($selectedSportIds)===1 ? ($podiums[0]['slots'] ?? []) : $ranking;
         $dataset['schedules'] = $this->buildScoreboardSchedules(
             $eventId,
             $selectedSportIds,

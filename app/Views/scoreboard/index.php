@@ -12,6 +12,7 @@ $results = is_array($activeScoreboard['results'] ?? null) ? $activeScoreboard['r
 $ranking = is_array($activeScoreboard['standings'] ?? null) ? $activeScoreboard['standings'] : [];
 $overallRanking = is_array($activeScoreboard['overallRanking'] ?? null) ? $activeScoreboard['overallRanking'] : [];
 $overallSportPoints = is_array($activeScoreboard['overallSportPoints'] ?? null) ? $activeScoreboard['overallSportPoints'] : [];
+$podiums = is_array($activeScoreboard['podiums'] ?? null) ? $activeScoreboard['podiums'] : [];
 $schedules = is_array($activeScoreboard['schedules'] ?? null) ? $activeScoreboard['schedules'] : [];
 $isOfficialScoreboard = $scoreboardMode === 'official';
 $selectedSportQueryId = (int) ($selectedSportIds[0] ?? 0);
@@ -206,12 +207,15 @@ $jsVersion = $assetVersion('assets/js/app.js');
                         <h2><?= $isOfficialScoreboard ? 'Official Sport Standings' : 'Unofficial Sport Standings' ?></h2>
                         <span><?= $isOfficialScoreboard ? 'Validated results only' : 'Pending results · provisional' ?></span>
                     </div>
-                    <div class="viewer-podium compact-podium">
-                        <?php foreach (array_slice($ranking, 0, 4) as $i => $team): ?>
-                            <article class="viewer-rank r<?= (int) ($i + 1) ?>"><span><?= ui_icon(['trophy', 'medal', 'award', 'target'][$i]) ?></span><b><?= esc((string) ($i + 1)) ?></b><h3><?= esc($team['name']) ?></h3><strong><?= esc(format_points($team['total_points'])) ?></strong><small>points</small></article>
-                        <?php endforeach; ?>
-                    </div>
-                    <?php if (empty($ranking)): ?><div class="empty">No <?= $isOfficialScoreboard ? 'official' : 'provisional' ?> standings are available for this sport.</div><?php endif; ?>
+                    <?php foreach ($podiums as $podium): ?>
+                        <?php if (count($podiums) > 1): ?><h3 class="podium-category"><?= esc((string)($podium['sport']['category'] ?? '')) ?></h3><?php endif; ?>
+                        <div class="viewer-podium compact-podium">
+                            <?php foreach ([1,2,3,4] as $place): $team=$podium['slots'][$place]??null; ?>
+                                <article class="viewer-rank r<?= $place ?>"><span><?= ui_icon(['trophy','medal','award','target'][$place-1]) ?></span><b><?= $place ?></b><h3><?= $team ? esc($team['name']) : 'TBD' ?></h3><?php if($team): ?><strong><?= esc(format_points($team['total_points'])) ?></strong><small>points</small><?php else: ?><small>Placement pending</small><?php endif; ?></article>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endforeach; ?>
+                    <?php if (empty($podiums)): ?><div class="empty">No <?= $isOfficialScoreboard ? 'official' : 'provisional' ?> standings are available for this sport.</div><?php endif; ?>
                 </section>
             </div>
 
@@ -221,7 +225,7 @@ $jsVersion = $assetVersion('assets/js/app.js');
                     <span><?= esc($selectedSport['name']) ?> · <?= $isOfficialScoreboard ? 'validated results' : 'pending results · subject to change' ?></span>
                 </div>
                 <div class="table-wrap"><table><thead><tr><th>Rank</th><th>Team</th><th>Points</th></tr></thead><tbody>
-                    <?php foreach ($overallSportPoints as $i => $team): ?><tr><td><b><?= esc((string) ($i + 1)) ?></b></td><td><?= esc($team['name']) ?></td><td><b><?= esc(format_points($team['total_points'])) ?></b></td></tr><?php endforeach; ?>
+                    <?php if(count($selectedSportIds)===1): ?><?php foreach([1,2,3,4] as $place):$team=$overallSportPoints[$place]??null;?><tr><td><b><?= $place ?></b></td><td><?= $team?esc($team['name']):'TBD' ?></td><td><?= $team?'<b>'.esc(format_points($team['total_points'])).'</b>':'—' ?></td></tr><?php endforeach;?><?php else: ?><?php foreach ($overallSportPoints as $i => $team): ?><tr><td><b><?= esc((string) ($i + 1)) ?></b></td><td><?= esc($team['name']) ?></td><td><b><?= esc(format_points($team['total_points'])) ?></b></td></tr><?php endforeach; ?><?php endif; ?>
                     <?php if (empty($overallSportPoints)): ?><tr><td colspan="3" class="empty">No <?= $isOfficialScoreboard ? 'validated' : 'provisional' ?> sport points yet.</td></tr><?php endif; ?>
                 </tbody></table></div>
             </section>

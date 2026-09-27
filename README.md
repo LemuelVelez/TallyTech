@@ -68,3 +68,13 @@ Additionally, make sure that the following extensions are enabled in your PHP:
 - [mysqlnd](http://php.net/manual/en/mysqlnd.install.php) if you plan to use MySQL
 - [libcurl](http://php.net/manual/en/curl.requirements.php) if you plan to use the HTTP\CURLRequest library
 # TallyTech
+
+## TallyTech security configuration
+
+TallyTech encrypts system-generated account passwords before storing them. Before creating or resetting Tournament Manager or Facilitator accounts, set a unique encryption key in the deployment `.env` file, for example:
+
+```ini
+encryption.key = hex2bin:<64-random-hex-characters>
+```
+
+Generate a different 32-byte key for every deployment and do not commit the real key to source control. The `.env.example` entry is only a configuration template.

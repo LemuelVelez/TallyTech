@@ -34,6 +34,7 @@ $jsVersion = $assetVersion('assets/js/app.js');
                     </button>
                 </span>
             </label>
+            <label class="check remember-me"><input type="checkbox" name="remember_me" value="1"> Remember me</label>
             <button class="btn primary full" type="submit"><?= ui_icon('log-in') ?><span>Sign in</span></button>
         </form>
         <a class="back-link" href="<?= site_url('scoreboard') ?>"><?= ui_icon('arrow-left') ?><span>Back to live scoreboard</span></a>

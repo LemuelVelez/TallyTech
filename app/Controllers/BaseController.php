@@ -42,6 +42,13 @@ abstract class BaseController extends Controller
         return new ScoringService($this->repository());
     }
 
+    protected function managerSportId(): ?int
+    {
+        if ((string) session()->get('role') !== 'manager') return null;
+        $ids = $this->repository()->assignedSportIds((int) session()->get('user_id'));
+        return count($ids) === 1 ? (int) $ids[0] : null;
+    }
+
     /**
      * Return a scalar POST field as a string. Array/object payloads are treated
      * as invalid input instead of being implicitly cast to values such as "1".

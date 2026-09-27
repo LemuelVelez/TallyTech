@@ -27,7 +27,7 @@ class UnofficialScoreboardSeeder extends Seeder
             $now = date('Y-m-d H:i:s');
             $eventId = $this->activeOrDemoEvent($now);
             $facilitatorId = $this->ensureUser('scoreboard.facilitator', 'Scoreboard Facilitator', 'facilitator', 'Facilitator_123', $now);
-            $validatorId = $this->ensureUser('scoreboard.validator', 'Scoreboard Validator', 'validator', 'Validator_123', $now);
+            $adminId = $this->ensureUser('scoreboard.admin', 'Scoreboard Admin', 'admin', 'Admin_123', $now);
             $locationId = $this->ensureLocation('Scoreboard Demo Venue', $now);
             $this->ensureSportCategory('Women', $now);
 
@@ -37,7 +37,7 @@ class UnofficialScoreboardSeeder extends Seeder
             ];
 
             $sportId = $this->ensureSport($eventId, '3x3 Basketball', 'Women', $now);
-            $this->ensureWeightedPoints($eventId, $sportId, $facilitatorId, $validatorId, $now);
+            $this->ensureWeightedPoints($eventId, $sportId, $facilitatorId, $adminId, $now);
             $scheduleId = $this->ensureSchedule([
                 'event_id' => $eventId,
                 'sport_id' => $sportId,
@@ -53,7 +53,7 @@ class UnofficialScoreboardSeeder extends Seeder
                 'feeds_from_b' => null,
                 'feeds_from_b_type' => null,
                 'is_conditional' => 0,
-                'scheduling_note' => 'Unofficial 3x3 Basketball Women championship match awaiting validation.',
+                'scheduling_note' => 'Unofficial 3x3 Basketball Women championship match awaiting Admin validation.',
                 'match_date' => '2026-08-18 19:00:00',
                 'team_a_id' => $teams['COE-CTED'],
                 'team_b_id' => $teams['SCJE-CLAMS'],
@@ -66,7 +66,7 @@ class UnofficialScoreboardSeeder extends Seeder
                 'schedule_id' => $scheduleId,
                 'type' => 'match',
                 'status' => 'pending',
-                'notes' => 'Seeded provisional championship result awaiting validation.',
+                'notes' => 'Seeded provisional championship result awaiting Admin validation.',
                 'submitted_by' => $facilitatorId,
                 'validated_by' => null,
                 'submitted_at' => $now,

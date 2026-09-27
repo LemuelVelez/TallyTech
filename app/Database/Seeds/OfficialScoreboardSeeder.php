@@ -27,7 +27,7 @@ class OfficialScoreboardSeeder extends Seeder
             $now = date('Y-m-d H:i:s');
             $eventId = $this->activeOrDemoEvent($now);
             $facilitatorId = $this->ensureUser('scoreboard.facilitator', 'Scoreboard Facilitator', 'facilitator', 'Facilitator_123', $now);
-            $validatorId = $this->ensureUser('scoreboard.validator', 'Scoreboard Validator', 'validator', 'Validator_123', $now);
+            $adminId = $this->ensureUser('scoreboard.admin', 'Scoreboard Admin', 'admin', 'Admin_123', $now);
             $locationId = $this->ensureLocation('Scoreboard Demo Venue', $now);
             $this->ensureSportCategory('Men', $now);
 
@@ -37,7 +37,7 @@ class OfficialScoreboardSeeder extends Seeder
             ];
 
             $sportId = $this->ensureSport($eventId, '3x3 Basketball', 'Men', $now);
-            $this->ensureWeightedPoints($eventId, $sportId, $facilitatorId, $validatorId, $now);
+            $this->ensureWeightedPoints($eventId, $sportId, $facilitatorId, $adminId, $now);
             $scheduleId = $this->ensureSchedule([
                 'event_id' => $eventId,
                 'sport_id' => $sportId,
@@ -68,7 +68,7 @@ class OfficialScoreboardSeeder extends Seeder
                 'status' => 'validated',
                 'notes' => 'Seeded official championship result.',
                 'submitted_by' => $facilitatorId,
-                'validated_by' => $validatorId,
+                'validated_by' => $adminId,
                 'submitted_at' => $now,
                 'validated_at' => $now,
             ]);

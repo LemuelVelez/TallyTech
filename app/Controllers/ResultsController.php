@@ -21,7 +21,7 @@ class ResultsController extends BaseController
         } catch (\Throwable $e) {
             return redirect()->back()->withInput()->with('error', $this->safeErrorMessage($e, 'The result could not be submitted.'));
         }
-        return redirect()->back()->with('success', 'Unofficial result submitted for validation.');
+        return redirect()->back()->with('success', (string)session()->get('role')==='manager' ? 'Result saved as approved and sent to Admin validation.' : 'Result submitted for Tournament Manager approval.');
     }
 
     public function update(int $id)
@@ -31,7 +31,7 @@ class ResultsController extends BaseController
         } catch (\Throwable $e) {
             return redirect()->back()->with('error', $this->safeErrorMessage($e, 'The result operation could not be completed.'));
         }
-        return redirect()->back()->with('success', 'Unofficial result updated.');
+        return redirect()->back()->with('success', 'Pending result updated.');
     }
 
     public function delete(int $id)
@@ -41,7 +41,7 @@ class ResultsController extends BaseController
         } catch (\Throwable $e) {
             return redirect()->back()->with('error', $this->safeErrorMessage($e, 'The result operation could not be completed.'));
         }
-        return redirect()->back()->with('success', 'Unofficial result removed.');
+        return redirect()->back()->with('success', 'Pending result removed.');
     }
 
     public function validateResult(int $id)
@@ -57,6 +57,18 @@ class ResultsController extends BaseController
         return redirect()->back()->with('success', 'Result validated and published as official.');
     }
 
+
+    public function approve(int $id)
+    {
+        try{$this->repository()->approveResult($id,(int)session()->get('user_id'));}catch(\Throwable $e){return redirect()->back()->with('error',$this->safeErrorMessage($e,'The result could not be approved.'));}
+        return redirect()->back()->with('success','Result approved and sent to Admin validation.');
+    }
+
+    public function returnResult(int $id)
+    {
+        try{$this->repository()->returnResult($id,$this->postString('return_note'),(int)session()->get('user_id'));}catch(\Throwable $e){return redirect()->back()->with('error',$this->safeErrorMessage($e,'The result could not be returned.'));}
+        return redirect()->back()->with('success','Result returned to the facilitator.');
+    }
     private function page(string $type, string $title)
     {
         $repository = $this->repository();
@@ -75,7 +87,7 @@ class ResultsController extends BaseController
             ));
         }
 
-        if (session()->get('role') === 'facilitator') {
+        if (in_array((string)session()->get('role'), ['manager','facilitator'], true)) {
             $allowed = $repository->assignedSportIds((int) session()->get('user_id'));
             $schedules = array_values(array_filter($schedules, static fn(array $schedule): bool => in_array((int) $schedule['sport_id'], $allowed, true)));
             $scheduleIds = array_map('intval', array_column($schedules, 'id'));

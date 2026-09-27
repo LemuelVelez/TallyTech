@@ -1,264 +1,80 @@
 <?php
-
 namespace App\Controllers;
 
 class UsersController extends BaseController
 {
-    private const ADMIN_MANAGED_ROLES = ['admin', 'manager', 'validator', 'facilitator'];
-
     public function index()
     {
-        $users = [];
-        foreach (self::ADMIN_MANAGED_ROLES as $role) {
-            $users = array_merge($users, $this->repository()->usersByRole($role));
-        }
-        usort($users, static fn(array $a, array $b): int => strcasecmp((string) ($a['display_name'] ?? ''), (string) ($b['display_name'] ?? '')));
-
-        $event = $this->repository()->activeEvent();
-
-        return view('users/index', [
-            'title' => 'User Management',
-            'manageMode' => 'admin',
-            'roleType' => null,
-            'roleOptions' => self::ADMIN_MANAGED_ROLES,
-            'users' => $users,
-            'sports' => $this->repository()->sports((int) ($event['id'] ?? 0)),
-            'activeEvent' => $event,
-        ]);
+        $repo=$this->repository(); $event=$repo->activeEvent();
+        $users=[]; foreach(['admin','manager','facilitator'] as $role) $users=array_merge($users,$repo->usersByRole($role));
+        usort($users,static fn($a,$b)=>strcasecmp((string)$a['display_name'],(string)$b['display_name']));
+        return view('users/index',['title'=>'User Management','manageMode'=>'admin','roleType'=>'manager','roleOptions'=>['manager'],'users'=>$users,'sports'=>$repo->sports((int)($event['id']??0)),'activeEvent'=>$event]);
     }
-
-    public function sportsManagers()
-    {
-        return $this->index();
-    }
-
+    public function sportsManagers(){return $this->index();}
     public function facilitators()
     {
-        return $this->userPage('facilitator', 'Facilitators');
+        $repo=$this->repository(); $event=$repo->activeEvent(); $sportId=$this->managerSportId();
+        $users=array_values(array_filter($repo->usersByRole('facilitator'),static fn($u)=>in_array($sportId,array_map('intval',array_column($u['sports']??[],'id')),true)));
+        $sports=array_values(array_filter($repo->sports((int)($event['id']??0)),static fn($s)=>(int)$s['id']===$sportId));
+        return view('users/index',['title'=>'Facilitators','manageMode'=>'facilitator','roleType'=>'facilitator','roleOptions'=>['facilitator'],'users'=>$users,'sports'=>$sports,'activeEvent'=>$event]);
     }
-
-    public function store()
+    public function store(){return $this->storeRole('manager');}
+    public function update(int $id){return $this->updateRole($id,'manager');}
+    public function delete(int $id){return $this->deleteManagedUser($id,'User');}
+    public function storeSportsManager(){return $this->storeRole('manager');}
+    public function storeFacilitator(){return $this->storeRole('facilitator');}
+    public function updateSportsManager(int $id){return $this->updateRole($id,'manager');}
+    public function updateFacilitator(int $id){return $this->updateRole($id,'facilitator');}
+    public function deleteSportsManager(int $id){return $this->deleteRole($id,'manager');}
+    public function deleteFacilitator(int $id){return $this->deleteRole($id,'facilitator');}
+    public function resetPassword(int $id)
     {
-        $role = $this->adminRoleFromRequest();
-        if ($role === null) {
-            return redirect()->back()->withInput()->with('error', 'Select a valid user role.');
-        }
-
-        return $this->storeRole($role);
+        if ((string)session()->get('role')==='manager' && ! $this->managerCanManageFacilitator($id)) return redirect()->back()->with('error','You can only manage facilitators assigned to your sport.');
+        try { $password=$this->repository()->resetGeneratedPassword($id,(int)session()->get('user_id')); }
+        catch(\Throwable $e){return redirect()->back()->with('error',$this->safeErrorMessage($e,'Password could not be reset.'));}
+        return redirect()->back()->with('success','New generated password: '.$password);
     }
-
-    public function update(int $id)
-    {
-        $role = $this->adminRoleFromRequest();
-        if ($role === null) {
-            return redirect()->back()->with('error', 'Select a valid user role.');
-        }
-
-        return $this->updateRole($id, $role);
-    }
-
-    public function delete(int $id)
-    {
-        return $this->deleteManagedUser($id, 'User');
-    }
-
-    public function storeSportsManager()
-    {
-        return $this->storeRole('manager');
-    }
-
-    public function storeFacilitator()
-    {
-        return $this->storeRole('facilitator');
-    }
-
-    public function updateSportsManager(int $id)
-    {
-        return $this->updateRole($id, 'manager');
-    }
-
-    public function updateFacilitator(int $id)
-    {
-        return $this->updateRole($id, 'facilitator');
-    }
-
-    public function deleteSportsManager(int $id)
-    {
-        return $this->deleteRole($id, 'manager');
-    }
-
-    public function deleteFacilitator(int $id)
-    {
-        return $this->deleteRole($id, 'facilitator');
-    }
-
-    private function userPage(string $role, string $title)
-    {
-        $event = $this->repository()->activeEvent();
-
-        return view('users/index', [
-            'title' => $title,
-            'manageMode' => $role,
-            'roleType' => $role,
-            'roleOptions' => [$role],
-            'users' => $this->repository()->usersByRole($role),
-            'sports' => $this->repository()->sports((int) ($event['id'] ?? 0)),
-            'activeEvent' => $event,
-        ]);
-    }
-
     private function storeRole(string $role)
     {
-        $payload = $this->userPayload($role, true);
-        if (isset($payload['error'])) {
-            return redirect()->back()->withInput()->with('error', $payload['error']);
-        }
-
-        try {
-            $this->repository()->createUser($payload['user'], $payload['sport_ids'], (int) session()->get('user_id'));
-        } catch (\RuntimeException $e) {
-            return redirect()->back()->withInput()->with('error', $this->safeErrorMessage($e, 'The account could not be created.'));
-        } catch (\Throwable $e) {
-            return redirect()->back()->withInput()->with('error', 'Username already exists or the account could not be created.');
-        }
-
-        return redirect()->back()->with('success', $this->roleLabel($role) . ' account added.');
+        $payload=$this->userPayload($role,true); if(isset($payload['error'])) return redirect()->back()->withInput()->with('error',$payload['error']);
+        try {$this->repository()->createUser($payload['user'],$payload['sport_ids'],(int)session()->get('user_id'));}
+        catch(\Throwable $e){return redirect()->back()->withInput()->with('error',$this->safeErrorMessage($e,'The account could not be created.'));}
+        return redirect()->back()->with('success',$this->roleLabel($role).' account added. Generated password: '.$payload['generated_password']);
     }
-
-    private function updateRole(int $id, string $role)
+    private function updateRole(int $id,string $role)
     {
-        $payload = $this->userPayload($role, false);
-        if (isset($payload['error'])) {
-            return redirect()->back()->with('error', $payload['error']);
-        }
-
-        try {
-            $this->repository()->updateUser($id, $payload['user'], $payload['sport_ids'], (int) session()->get('user_id'));
-        } catch (\Throwable $e) {
-            return redirect()->back()->with('error', $this->safeErrorMessage($e, 'Username already exists or the account could not be updated.'));
-        }
-
-        return redirect()->back()->with('success', $this->roleLabel($role) . ' account updated.');
+        if($role==='facilitator' && ! $this->managerCanManageFacilitator($id)) return redirect()->back()->with('error','You can only manage facilitators assigned to your sport.');
+        $payload=$this->userPayload($role,false); if(isset($payload['error'])) return redirect()->back()->with('error',$payload['error']);
+        try {$this->repository()->updateUser($id,$payload['user'],$payload['sport_ids'],(int)session()->get('user_id'));}
+        catch(\Throwable $e){return redirect()->back()->with('error',$this->safeErrorMessage($e,'The account could not be updated.'));}
+        return redirect()->back()->with('success',$this->roleLabel($role).' account updated.');
     }
-
-    private function deleteRole(int $id, string $role)
+    private function deleteRole(int $id,string $role){if($role==='facilitator' && ! $this->managerCanManageFacilitator($id)) return redirect()->back()->with('error','You can only manage facilitators assigned to your sport.'); $ids=array_map('intval',array_column($this->repository()->usersByRole($role),'id')); if(!in_array($id,$ids,true)) return redirect()->back()->with('error','Account not found for this role.'); return $this->deleteManagedUser($id,$this->roleLabel($role));}
+    private function deleteManagedUser(int $id,string $label){try{$this->repository()->deleteUser($id,(int)session()->get('user_id'));}catch(\Throwable $e){return redirect()->back()->with('error',$this->safeErrorMessage($e,'The account operation could not be completed.'));}return redirect()->back()->with('success',$label.' account removed.');}
+    private function managerCanManageFacilitator(int $id): bool
     {
-        $allowedIds = array_map('intval', array_column($this->repository()->usersByRole($role), 'id'));
-        if (! in_array($id, $allowedIds, true)) {
-            return redirect()->back()->with('error', 'Account not found for this role.');
+        $sportId=$this->managerSportId(); if(!$sportId)return false;
+        foreach($this->repository()->usersByRole('facilitator') as $user){
+            if((int)($user['id']??0)!==$id)continue;
+            return in_array($sportId,array_map('intval',array_column($user['sports']??[],'id')),true);
         }
-
-        return $this->deleteManagedUser($id, $this->roleLabel($role));
+        return false;
     }
-
-    private function deleteManagedUser(int $id, string $label)
+    private function roleLabel(string $role): string{return $role==='manager'?'Tournament Manager':($role==='facilitator'?'Facilitator':'User');}
+    private function generatedPassword(): string
     {
-        try {
-            $this->repository()->deleteUser($id, (int) session()->get('user_id'));
-        } catch (\Throwable $e) {
-            return redirect()->back()->with('error', $this->safeErrorMessage($e, 'The account operation could not be completed.'));
-        }
-
-        return redirect()->back()->with('success', $label . ' account removed.');
+        $alphabet='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'; $raw=random_bytes(10); $out=''; for($i=0;$i<10;$i++)$out.=$alphabet[ord($raw[$i])%strlen($alphabet)]; return $out.'!7a';
     }
-
-    private function adminRoleFromRequest(): ?string
+    private function userPayload(string $role,bool $creating): array
     {
-        $role = $this->postString('role');
-
-        return in_array($role, self::ADMIN_MANAGED_ROLES, true) ? $role : null;
-    }
-
-    private function roleLabel(string $role): string
-    {
-        return match ($role) {
-            'admin' => 'Administrator',
-            'manager' => 'Tournament Manager',
-            'validator' => 'Validator',
-            'facilitator' => 'Facilitator',
-            default => 'User',
-        };
-    }
-
-    private function defaultPasswordForRole(string $role): string
-    {
-        return match ($role) {
-            'admin' => 'Admin_123',
-            'manager' => 'Manager_123',
-            'validator' => 'Validator_123',
-            'facilitator' => 'Facilitator_123',
-            default => '',
-        };
-    }
-
-    private function userPayload(string $role, bool $passwordRequired): array
-    {
-        if (! in_array($role, self::ADMIN_MANAGED_ROLES, true)) {
-            return ['error' => 'Select a valid user role.'];
-        }
-
-        $username = trim($this->postString('username'));
-        $displayName = trim($this->postString('display_name'));
-        $password = $this->postString('password');
-        $status = $this->postString('status') ?: 'active';
-
-        if (mb_strlen($username) < 3 || mb_strlen($username) > 80 || $displayName === '' || mb_strlen($displayName) > 120) {
-            return ['error' => 'Username must be 3–80 characters and name must be 1–120 characters.'];
-        }
-        if (! preg_match('/^[A-Za-z0-9._-]+$/', $username)) {
-            return ['error' => 'Username may only contain letters, numbers, dots, underscores, and hyphens.'];
-        }
-        if (! in_array($status, ['active', 'inactive'], true)) {
-            return ['error' => 'Select a valid account status.'];
-        }
-        if ($passwordRequired && $password === '') {
-            $password = $this->defaultPasswordForRole($role);
-        }
-        if ($password !== '' && ! preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/', $password)) {
-            return ['error' => 'Password must be 8+ characters with uppercase, lowercase, number, and special character.'];
-        }
-
-        $sportIds = [];
-        if ($role === 'facilitator') {
-            $rawSportIds = $this->request->getPost('sport_ids');
-            if ($rawSportIds !== null && ! is_array($rawSportIds)) {
-                return ['error' => 'One or more assigned sports are invalid.'];
-            }
-
-            foreach (is_array($rawSportIds) ? $rawSportIds : [] as $rawSportId) {
-                if (! is_scalar($rawSportId)) {
-                    return ['error' => 'One or more assigned sports are invalid.'];
-                }
-                $rawSportId = trim((string) $rawSportId);
-                if (! preg_match('/^[1-9]\d*$/', $rawSportId)) {
-                    return ['error' => 'One or more assigned sports are invalid.'];
-                }
-                $sportId = filter_var($rawSportId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-                if ($sportId === false) {
-                    return ['error' => 'One or more assigned sports are invalid.'];
-                }
-                $sportIds[] = (int) $sportId;
-            }
-            $sportIds = array_values(array_unique($sportIds));
-
-            if (! $sportIds && ($passwordRequired || $this->repository()->activeEvent())) {
-                return ['error' => 'Assign at least one sport to the facilitator.'];
-            }
-        }
-
-        $user = [
-            'username' => $username,
-            'display_name' => $displayName,
-            'role' => $role,
-            'status' => $status,
-        ];
-        if ($password !== '') {
-            $user['password_hash'] = password_hash($password, PASSWORD_DEFAULT);
-        }
-        if ($passwordRequired) {
-            $user['created_at'] = date('Y-m-d H:i:s');
-        }
-
-        return ['user' => $user, 'sport_ids' => $sportIds];
+        $actorRole=(string)session()->get('role'); if(($actorRole==='admin'&&$role!=='manager')||($actorRole==='manager'&&$role!=='facilitator')) return ['error'=>'You are not allowed to create this account role.'];
+        $username=trim($this->postString('username')); $display=trim($this->postString('display_name')); $status=$this->postString('status')?:'active';
+        if(mb_strlen($username)<3||mb_strlen($username)>80||$display===''||mb_strlen($display)>120||!preg_match('/^[A-Za-z0-9._-]+$/',$username)) return ['error'=>'Enter a valid username and display name.'];
+        if(!in_array($status,['active','inactive'],true)) return ['error'=>'Select a valid account status.'];
+        if($role==='manager'){ $sportId=$this->postPositiveInt('sport_id'); if(!$sportId)return ['error'=>'Select exactly one sport for the Tournament Manager.']; $sportIds=[$sportId]; }
+        else { $sportId=$this->managerSportId(); if(!$sportId)return ['error'=>'Your Tournament Manager account must have exactly one assigned sport.']; $sportIds=[$sportId]; }
+        $user=['username'=>$username,'display_name'=>$display,'role'=>$role,'status'=>$status]; $generated=null;
+        if($creating){$generated=$this->generatedPassword();$user['password_hash']=password_hash($generated,PASSWORD_DEFAULT);$user['generated_password']=base64_encode(service('encrypter')->encrypt($generated));$user['created_by']=(int)session()->get('user_id');$user['created_at']=date('Y-m-d H:i:s');}
+        return ['user'=>$user,'sport_ids'=>$sportIds,'generated_password'=>$generated];
     }
 }

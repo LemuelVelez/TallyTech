@@ -9,10 +9,13 @@ class SchedulesController extends BaseController
     public function index()
     {
         $data = $this->scoringService()->commonData();
+        $sportId=$this->managerSportId();
+        $data['sports']=array_values(array_filter($data['sports'],static fn(array $sport): bool=>(int)$sport['id']===$sportId));
         $data['title'] = 'Tournament Schedules';
         $data['schedules'] = $this->repository()->resolveBracketSlots(
             $this->repository()->schedules((int) ($data['activeEvent']['id'] ?? 0))
         );
+        $data['schedules']=array_values(array_filter($data['schedules'],static fn(array $row): bool=>(int)$row['sport_id']===$sportId));
         $data['allLocations'] = $this->repository()->allLocations();
         return view('schedules/index', $data);
     }
@@ -21,6 +24,8 @@ class SchedulesController extends BaseController
     {
         $data = $this->scoringService()->commonData();
         $eventId = (int) ($data['activeEvent']['id'] ?? 0);
+        $managerSportId=$this->managerSportId();
+        $data['sports']=array_values(array_filter($data['sports'],static fn(array $sport): bool=>(int)$sport['id']===$managerSportId));
         $requestedSportId = $this->request->getGet('sport');
         $selectedSportId = is_scalar($requestedSportId) && preg_match('/^[1-9]\d*$/', (string) $requestedSportId)
             ? (int) $requestedSportId
@@ -77,13 +82,13 @@ class SchedulesController extends BaseController
             return redirect()->back()->with('error', 'Add and activate an event first.');
         }
 
-        $sportId = $this->postPositiveInt('sport_id');
+        $sportId = $this->managerSportId() ?? $this->postPositiveInt('sport_id');
         $locationId = $this->postPositiveInt('location_id');
         $format = $this->postString('tournament_format');
         $rawStart = trim($this->postString('start_time'));
         $parsedStart = $this->parseDateTime($rawStart);
         $interval = $this->postPositiveInt('interval_minutes') ?: 60;
-        $thirdPlacePlayoff = $this->request->getPost('third_place_playoff') !== null;
+        $thirdPlacePlayoff = $format === 'single_elimination' && $this->request->getPost('third_place_playoff') !== null;
 
         if (! $sportId || ! $locationId || ! in_array($format, self::TOURNAMENT_FORMATS, true) || ! $parsedStart) {
             return redirect()->back()->withInput()->with('error', 'Sport, tournament format, location, and bracket start time are required.');
@@ -100,8 +105,13 @@ class SchedulesController extends BaseController
             }
             $teamIds[] = (int) $rawTeamId;
         }
-
-        try {
+        $rawPairing=$this->request->getPost('pairing');
+        if(is_array($rawPairing) && $rawPairing!==[]){
+            $pairing=[]; foreach($rawPairing as $raw){if(!is_scalar($raw)||!preg_match('/^[1-9]\d*$/',(string)$raw))return redirect()->back()->withInput()->with('error','Bracket pairing is invalid.');$pairing[]=(int)$raw;}
+            if(count($pairing)!==count($teamIds)||array_diff($pairing,$teamIds)||array_diff($teamIds,$pairing)||count(array_unique($pairing))!==count($teamIds)) return redirect()->back()->withInput()->with('error','Bracket pairing must contain each selected team exactly once.');
+            $teamIds=$pairing;
+        }
+        try { $this->repository()->assertActorOwnsSport($sportId,(int)session()->get('user_id'));
             $count = $this->repository()->generateBracket([
                 'event_id' => (int) $event['id'],
                 'sport_id' => $sportId,
@@ -126,6 +136,7 @@ class SchedulesController extends BaseController
         }
 
         try {
+            $this->repository()->assertActorOwnsSport($sportId,(int)session()->get('user_id'));
             $count = $this->repository()->deleteBracket((int) $event['id'], $sportId, (int) session()->get('user_id'));
         } catch (\Throwable $e) {
             return redirect()->to(site_url('brackets') . '?sport=' . $sportId)->with('error', $this->safeErrorMessage($e, 'The bracket could not be deleted.'));
@@ -142,6 +153,7 @@ class SchedulesController extends BaseController
         }
         $payload['created_at'] = date('Y-m-d H:i:s');
         try {
+            $this->repository()->assertActorOwnsSport((int)$payload['sport_id'],(int)session()->get('user_id'));
             $this->repository()->createSchedule($payload, (int) session()->get('user_id'));
         } catch (\Throwable $e) {
             return redirect()->back()->withInput()->with('error', $this->safeErrorMessage($e, 'The schedule could not be created.'));
@@ -156,6 +168,7 @@ class SchedulesController extends BaseController
             return redirect()->back()->with('error', $payload['error']);
         }
         try {
+            $this->repository()->assertActorOwnsSport((int)$payload['sport_id'],(int)session()->get('user_id'));
             $this->repository()->updateSchedule($id, $payload, (int) session()->get('user_id'));
         } catch (\Throwable $e) {
             return redirect()->back()->with('error', $this->safeErrorMessage($e, 'The schedule operation could not be completed.'));
@@ -166,6 +179,8 @@ class SchedulesController extends BaseController
     public function delete(int $id)
     {
         try {
+            $row=null; foreach($this->repository()->schedules((int)($this->repository()->activeEvent()['id']??0)) as $candidate){if((int)$candidate['id']===$id){$row=$candidate;break;}} if(!$row) throw new \RuntimeException('Schedule not found.');
+            $this->repository()->assertActorOwnsSport((int)$row['sport_id'],(int)session()->get('user_id'));
             $this->repository()->deleteSchedule($id, (int) session()->get('user_id'));
         } catch (\Throwable $e) {
             return redirect()->back()->with('error', $this->safeErrorMessage($e, 'The schedule operation could not be completed.'));
@@ -180,7 +195,7 @@ class SchedulesController extends BaseController
             return ['error' => 'Add and activate an event first.'];
         }
 
-        $sportId = $this->postPositiveInt('sport_id');
+        $sportId = $this->managerSportId() ?? $this->postPositiveInt('sport_id');
         $locationId = $this->postPositiveInt('location_id');
         $date = trim($this->postString('match_date'));
         $status = $this->postString('status') ?: 'scheduled';

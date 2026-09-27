@@ -1,7 +1,7 @@
 <?php
 $role = (string) session()->get('role');
-$roleLabel = ['admin' => 'Admin Panel', 'manager' => 'Tournament Manager', 'validator' => 'Validator', 'facilitator' => 'Facilitator'][$role] ?? 'TallyTech';
-$accountRoleLabel = ['admin' => 'Administrator', 'manager' => 'Tournament Manager', 'validator' => 'Validator', 'facilitator' => 'Facilitator'][$role] ?? ucfirst($role);
+$roleLabel = ['admin' => 'Admin Panel', 'manager' => 'Tournament Manager', 'facilitator' => 'Facilitator'][$role] ?? 'TallyTech';
+$accountRoleLabel = ['admin' => 'Administrator', 'manager' => 'Tournament Manager', 'facilitator' => 'Facilitator'][$role] ?? ucfirst($role);
 $compactSidebar = (bool) session()->get('compact_sidebar');
 $resultDensity = (string) (session()->get('result_density') ?: 'comfortable');
 $theme = (string) (session()->get('theme') ?: 'system');
@@ -49,6 +49,7 @@ $jsVersion = $assetVersion('assets/js/app.js');
             </div>
             <a href="<?= site_url('dashboard') ?>" role="menuitem"><?= ui_icon('dashboard') ?><span>Dashboard</span></a>
             <a href="<?= site_url('settings') ?>" role="menuitem"><?= ui_icon('settings') ?><span>Settings</span></a>
+            <a href="<?= site_url('account/password') ?>" role="menuitem"><?= ui_icon('key') ?><span>Change Password</span></a>
             <form method="post" action="<?= site_url('logout') ?>" data-confirm="Log out of TallyTech now? Any unsaved changes on the current page will be lost.">
                 <?= csrf_field() ?>
                 <button type="submit" role="menuitem"><?= ui_icon('log-out') ?><span>Logout</span></button>

@@ -51,14 +51,6 @@ class TallyTechSeeder extends Seeder
                     'status' => 'active',
                     'created_at' => $now,
                 ]),
-                'validator' => $this->ensureUser([
-                    'username' => 'validator',
-                    'password_hash' => password_hash('Validator_123', PASSWORD_DEFAULT),
-                    'display_name' => 'ISF Validator',
-                    'role' => 'validator',
-                    'status' => 'active',
-                    'created_at' => $now,
-                ]),
                 'facilitator' => $this->ensureUser([
                     'username' => 'facilitator',
                     'password_hash' => password_hash('Facilitator_123', PASSWORD_DEFAULT),
@@ -109,21 +101,16 @@ class TallyTechSeeder extends Seeder
                 'Cheerdance' => $this->ensureSport($eventId, 'Cheerdance', 'Mixed', 'judged', 1, null, $now),
             ];
 
-            foreach ($sports as $sportId) {
-                $this->ensureUserSport($ids['manager'], $sportId);
-            }
-
-            foreach ([$sports['Basketball'], $sports['Volleyball Men'], $sports['Volleyball Women'], $sports['Cheerdance']] as $sportId) {
-                $this->ensureUserSport($ids['facilitator'], $sportId);
-            }
+            $this->ensureUserSport($ids['manager'], $sports['Basketball']);
+            $this->ensureUserSport($ids['facilitator'], $sports['Basketball']);
 
             foreach ($sports as $sportId) {
-                $this->ensureWeightedPoints($eventId, $sportId, $ids['manager'], $ids['validator'], $now);
+                $this->ensureWeightedPoints($eventId, $sportId, $ids['admin'], $ids['admin'], $now);
             }
 
 
             $this->ensureNotification($ids['facilitator'], 'result_submitted', 'Submitted unofficial Cheerdance judged result', $now);
-            $this->ensureNotification($ids['validator'], 'result_validated', 'Validated Basketball bracket results as official', $now);
+            $this->ensureNotification($ids['admin'], 'result_validated', 'Validated Basketball bracket results as official', $now);
             $this->ensureNotification($ids['manager'], 'weighted_points_validated', 'Weighted points are ready for scoring', $now);
 
             if (! $this->db->transComplete()) {
@@ -180,7 +167,6 @@ class TallyTechSeeder extends Seeder
         return match ($role) {
             'admin' => 'Admin_123',
             'manager' => 'Manager_123',
-            'validator' => 'Validator_123',
             'facilitator' => 'Facilitator_123',
             default => throw new RuntimeException('Unsupported seeded role: ' . $role),
         };
@@ -292,7 +278,7 @@ class TallyTechSeeder extends Seeder
         $this->changes++;
     }
 
-    private function ensureWeightedPoints(int $eventId, int $sportId, int $managerId, int $validatorId, string $now): void
+    private function ensureWeightedPoints(int $eventId, int $sportId, int $managerId, int $adminId, string $now): void
     {
         $exists = $this->db->table('weighted_points')->where('event_id', $eventId)->where('sport_id', $sportId)->countAllResults() > 0;
         if ($exists) {
@@ -309,7 +295,7 @@ class TallyTechSeeder extends Seeder
             'participation_points' => 2,
             'status' => 'validated',
             'submitted_by' => $managerId,
-            'validated_by' => $validatorId,
+            'validated_by' => $adminId,
             'submitted_at' => $now,
             'validated_at' => $now,
         ]);

@@ -18,6 +18,8 @@ interface ScoringRepositoryInterface
     public function usersByRole(string $role): array;
     public function assignedSportIds(int $userId): array;
     public function notifications(int $limit = 30): array;
+    public function markNotificationsRead(int $userId): void;
+    public function unreadNotificationCount(int $userId): int;
     public function weightedPoints(?int $eventId = null): array;
     public function results(?int $eventId = null, ?string $type = null): array;
     public function resultsByStatus(int $eventId, string $status, ?string $type = null): array;
@@ -71,6 +73,10 @@ interface ScoringRepositoryInterface
     public function updateResult(int $id, array $data, int $actorId): void;
     public function validateResult(int $id, int $actorId): void;
     public function deleteResult(int $id, int $actorId): void;
+    public function approveResult(int $id, int $actorId): void;
+    public function returnResult(int $id, string $note, int $actorId): void;
+    public function assertActorOwnsSport(int $sportId, int $actorId): void;
+    public function resetGeneratedPassword(int $userId, int $actorId): string;
 
     public function updateUserSettings(int $userId, array $settings): void;
     public function getUserSettings(int $userId): array;

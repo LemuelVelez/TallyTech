@@ -32,6 +32,7 @@ class ReportsController extends BaseController
         if (! in_array($sportId, $sportIds, true)) {
             $sportId = 0;
         }
+        if ((string)session()->get('role')==='manager') { $managerSportId=$this->managerSportId(); if(!$managerSportId||!in_array($managerSportId,$sportIds,true)) throw new \RuntimeException('Your assigned sport is not available for this report.'); $sportId=$managerSportId; }
 
         $category = $string($this->request->getGet('category'));
         if (! in_array($category, ['Men', 'Women', 'Mixed'], true)) {

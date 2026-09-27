@@ -124,8 +124,8 @@ $teamMarkStyle = static function (string $name): string {
             <?php if (empty($grouped[$side])) continue; ?>
             <?php
             $laneLabel = match ($side) {
-                'upper' => 'Winner Bracket',
-                'lower' => 'Loser Bracket',
+                'upper' => 'Upper Bracket',
+                'lower' => 'Lower Bracket',
                 'grand' => $bracketFormat === 'double_elimination' ? 'Championship / Grand Final' : 'Championship',
                 default => 'Bracket',
             };

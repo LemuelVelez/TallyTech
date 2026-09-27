@@ -1202,10 +1202,15 @@
         feedMap.set(code, existing);
       });
 
+      const targetLane = target.closest('[data-bracket-lane]')?.dataset.bracketLane || '';
       const feeds = Array.from(feedMap.values()).map((feed) => ({
         ...feed,
         source: graph.matchByCode.get(feed.code),
-      }));
+      })).filter((feed) => {
+        if (!feed.types.has('loser')) return true;
+        const sourceLane = feed.source?.closest('[data-bracket-lane]')?.dataset.bracketLane || '';
+        return !sourceLane || !targetLane || sourceLane === targetLane;
+      });
       if (!feeds.length) return;
 
       const targetPoint = bracketPoint(target, boardRect, 'left', bracketScale);
@@ -1569,4 +1574,17 @@
     }
   }
 
+
+  document.querySelectorAll('#bracket-generator').forEach((dialog) => {
+    const format=dialog.querySelector('select[name="tournament_format"]');
+    const third=dialog.querySelector('input[name="third_place_playoff"]');
+    const teamChecks=Array.from(dialog.querySelectorAll('input[name="team_ids[]"]'));
+    let pairingBox=dialog.querySelector('[data-pairing-builder]');
+    const refreshThird=()=>{if(!format||!third)return;const dbl=format.value==='double_elimination';third.disabled=dbl;if(dbl)third.checked=false;third.closest('label')?.classList.toggle('is-hidden',dbl);};
+    const refreshPairs=()=>{if(!pairingBox)return;const teams=teamChecks.filter(x=>x.checked).map(x=>({id:x.value,name:x.closest('label')?.textContent.trim()||x.value}));pairingBox.replaceChildren();if(![4,8,16].includes(teams.length)&&teams.length!==2)return;const title=document.createElement('span');title.className='field-label';title.textContent='Bracket Pairing';pairingBox.append(title);const used=[];const selects=[];for(let i=0;i<teams.length;i++){const sel=document.createElement('select');sel.name='pairing[]';sel.required=true;sel.dataset.pairingIndex=String(i);sel.innerHTML='<option value="">Select team</option>'+teams.map(t=>`<option value="${t.id}">${t.name}</option>`).join('');pairingBox.append(sel);selects.push(sel);if(i%2===1)pairingBox.append(document.createElement('br'));}const sync=()=>{const chosen=selects.map(x=>x.value).filter(Boolean);selects.forEach((sel,idx)=>{Array.from(sel.options).forEach(opt=>{if(!opt.value)return;opt.disabled=chosen.includes(opt.value)&&opt.value!==sel.value;});});if(selects.length>=2){const lastA=selects[selects.length-2],lastB=selects[selects.length-1];const remaining=teams.filter(t=>!selects.slice(0,-2).some(x=>x.value===t.id));if(remaining.length===2){lastA.value=remaining[0].id;lastB.value=remaining[1].id;lastA.disabled=false;lastB.disabled=false;lastA.classList.remove('pairing-readonly');lastB.classList.remove('pairing-readonly');lastA.removeAttribute('aria-readonly');lastB.removeAttribute('aria-readonly');lastA.classList.add('pairing-readonly');lastB.classList.add('pairing-readonly');lastA.setAttribute('aria-readonly','true');lastB.setAttribute('aria-readonly','true');}else{lastA.disabled=false;lastB.disabled=false;lastA.classList.remove('pairing-readonly');lastB.classList.remove('pairing-readonly');lastA.removeAttribute('aria-readonly');lastB.removeAttribute('aria-readonly');}}};selects.forEach(sel=>sel.addEventListener('change',sync));sync();};
+    format?.addEventListener('change',refreshThird);teamChecks.forEach(c=>c.addEventListener('change',refreshPairs));refreshThird();refreshPairs();
+  });
 })();
+
+// Generated-password copy buttons.
+document.addEventListener('click',async(e)=>{const b=e.target.closest('[data-copy-value]');if(!b)return;try{await navigator.clipboard.writeText(b.dataset.copyValue||'');const old=b.textContent;b.textContent='Copied';setTimeout(()=>b.textContent=old,1200);}catch(_){}});

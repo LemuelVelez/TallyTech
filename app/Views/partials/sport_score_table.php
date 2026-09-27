@@ -19,14 +19,8 @@ $ordinal = static function (int $number): string {
 $scoreText = static fn(float|int $score): string => rtrim(rtrim(number_format((float) $score, 2, '.', ''), '0'), '.');
 ?>
 <section class="<?= esc($panelClass) ?> sport-filter-card">
-    <div class="section-title"><h2>Select Sport</h2><span>Only the selected sport is shown</span></div>
-    <nav class="sport-chip-row" aria-label="Choose sport">
-        <?php foreach ($table['sportGroups'] ?? [] as $sportGroup): ?>
-            <?php $active = in_array((int) $sportGroup['id'], $selectedSportIds, true); ?>
-            <a class="chip sport-chip <?= $active ? 'active' : '' ?>" href="<?= esc(site_url($action) . '?sport=' . (int) $sportGroup['id'], 'attr') ?>" <?= $active ? 'aria-current="page"' : '' ?>><?= esc($sportGroup['name']) ?></a>
-        <?php endforeach; ?>
-        <?php if (empty($table['sportGroups'])): ?><span class="muted">No sports are configured for the active event.</span><?php endif; ?>
-    </nav>
+    <div class="section-title"><h2><?= (string)session()->get('role')==='manager' ? 'Assigned Sport' : 'Select Sport' ?></h2><span>Only the selected sport is shown</span></div>
+    <?php if((string)session()->get('role')==='manager'): ?><div class="form-note"><b><?= esc($selectedSport['name']??'Assigned sport') ?></b><?= !empty($selectedSport['category'])?' · '.esc($selectedSport['category']):'' ?></div><?php else: ?><nav class="sport-chip-row" aria-label="Choose sport"><?php foreach ($table['sportGroups'] ?? [] as $sportGroup): ?><?php $active = in_array((int) $sportGroup['id'], $selectedSportIds, true); ?><a class="chip sport-chip <?= $active ? 'active' : '' ?>" href="<?= esc(site_url($action) . '?sport=' . (int) $sportGroup['id'], 'attr') ?>" <?= $active ? 'aria-current="page"' : '' ?>><?= esc($sportGroup['name']) ?></a><?php endforeach; ?></nav><?php endif; ?>
 </section>
 
 <?php if ($selectedSport): ?>

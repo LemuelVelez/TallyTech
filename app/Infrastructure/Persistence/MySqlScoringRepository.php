@@ -134,6 +134,12 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
     {
         $users = $this->db->table('users')->where('role', $role)->orderBy('display_name')->get()->getResultArray();
         foreach ($users as &$user) {
+            $viewerId = (int) session()->get('user_id');
+            $viewerRole = (string) session()->get('role');
+            $user['generated_password_plain'] = null;
+            if (! empty($user['generated_password']) && ($viewerRole === 'admin' || (int) ($user['created_by'] ?? 0) === $viewerId)) {
+                try { $user['generated_password_plain'] = service('encrypter')->decrypt(base64_decode((string) $user['generated_password'], true) ?: ''); } catch (\Throwable $e) { $user['generated_password_plain'] = null; }
+            }
             $user['sports'] = $this->db->table('user_sports us')
                 ->select('s.id,s.name,s.category')
                 ->join('sports s', 's.id=us.sport_id')
@@ -165,12 +171,22 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
 
     public function notifications(int $limit = 30): array
     {
-        return $this->db->table('notifications n')
-            ->select('n.*, u.display_name actor_name')
-            ->join('users u', 'u.id=n.actor_user_id', 'left')
-            ->orderBy('n.id', 'DESC')
-            ->limit($limit)
-            ->get()->getResultArray();
+        $userId=(int)session()->get('user_id'); $role=(string)session()->get('role'); $sportIds=$this->assignedSportIds($userId);
+        $builder=$this->db->table('notifications n')->select('n.*, u.display_name actor_name')->join('users u','u.id=n.actor_user_id','left');
+        $builder->groupStart()->where('n.recipient_user_id',$userId)->orGroupStart()->where('n.recipient_user_id',null)->where('n.recipient_role',$role);
+        if(in_array($role,['manager','facilitator'],true) && $sportIds!==[]) $builder->groupStart()->where('n.sport_id',null)->orWhereIn('n.sport_id',$sportIds)->groupEnd();
+        $builder->groupEnd()->groupEnd();
+        return $builder->orderBy('n.id','DESC')->limit($limit)->get()->getResultArray();
+    }
+
+    public function markNotificationsRead(int $userId): void
+    {
+        $rows=$this->notifications(500); $ids=array_map('intval',array_column($rows,'id')); if($ids!==[])$this->db->table('notifications')->whereIn('id',$ids)->update(['is_read'=>1]);
+    }
+
+    public function unreadNotificationCount(int $userId): int
+    {
+        return count(array_filter($this->notifications(500),static fn(array $n): bool=>(int)($n['is_read']??0)===0));
     }
 
     public function weightedPoints(?int $eventId = null): array
@@ -592,11 +608,15 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         unset($data['category_id']);
         $data['event_id'] = $eventId;
         $data['category'] = $category['name'];
+        $data['set_count'] = 1;
+        $data['winning_points'] = null;
         $this->assertActiveEvent($eventId);
         $this->db->transStart();
+        $points=$data['weighted_points'] ?? null; unset($data['weighted_points']);
         $this->sportsModel->insert($data);
         $id = (int) $this->sportsModel->getInsertID();
-        $this->notify($actorId, 'sport_created', 'Added sport ' . $data['name'] . ' (' . $data['category'] . ')');
+        if (is_array($points)) $this->upsertValidatedWeightedPoints($eventId,$id,$points,$actorId);
+        $this->notify($actorId, 'sport_created', 'Added sport ' . $data['name'] . ' (' . $data['category'] . ')', ['admin','manager'], null, $id);
         $this->finishTransaction();
         return $id;
     }
@@ -623,9 +643,15 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         if (($sport['result_type'] ?? '') !== $data['result_type'] && $this->db->table('schedules')->where('sport_id', $id)->countAllResults() > 0) {
             throw new RuntimeException('Sport type cannot be changed after schedules have been created.');
         }
+        $points=$data['weighted_points'] ?? null; unset($data['weighted_points']);
+        if (is_array($points)) {
+            $validatedResults=$this->db->table('results r')->join('schedules sc','sc.id=r.schedule_id')->where('sc.sport_id',$id)->where('r.status','validated')->countAllResults();
+            if($validatedResults>0) throw new RuntimeException('Weighted points cannot be changed after official results exist for the sport.');
+        }
         $this->db->transStart();
         $this->sportsModel->update($id, $data);
-        $this->notify($actorId, 'sport_updated', 'Updated sport ' . ($sport['name'] ?? '#'.$id));
+        if (is_array($points)) $this->upsertValidatedWeightedPoints($eventId,$id,$points,$actorId);
+        $this->notify($actorId, 'sport_updated', 'Updated sport ' . ($sport['name'] ?? '#'.$id), ['admin','manager'], null, $id);
         $this->finishTransaction();
     }
 
@@ -662,7 +688,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         $this->db->transStart();
         $this->schedulesModel->insert($data);
         $id = (int) $this->schedulesModel->getInsertID();
-        $this->notify($actorId, 'schedule_created', 'Added a schedule for ' . date('M j, Y g:i A', strtotime($data['match_date'])));
+        $this->notify($actorId, 'schedule_created', 'Added a schedule for ' . date('M j, Y g:i A', strtotime($data['match_date'])), ['admin','facilitator'], null, (int)$data['sport_id']);
         $this->finishTransaction();
         return $id;
     }
@@ -682,7 +708,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         $this->assertSchedulePayload($data, $id);
         $this->db->transStart();
         $this->schedulesModel->update($id, $data);
-        $this->notify($actorId, 'schedule_updated', 'Updated schedule #' . ($schedule['id'] ?? $id));
+        $this->notify($actorId, 'schedule_updated', 'Updated schedule #' . ($schedule['id'] ?? $id), ['admin','facilitator'], null, (int)$schedule['sport_id']);
         $this->finishTransaction();
     }
 
@@ -751,7 +777,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             $this->db->table('results')->whereIn('id', $resultIds)->delete();
         }
         $this->db->table('schedules')->whereIn('id', $scheduleIds)->delete();
-        $this->notify($actorId, 'bracket_deleted', 'Deleted the bracket for ' . ($sport['name'] ?? 'sport') . ' ' . ($sport['category'] ?? ''));
+        $this->notify($actorId, 'bracket_deleted', 'Deleted the bracket for ' . ($sport['name'] ?? 'sport') . ' ' . ($sport['category'] ?? ''), ['admin','facilitator'], null, (int)$sport['id']);
         $this->finishTransaction();
 
         return count($scheduleIds);
@@ -850,7 +876,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             $this->schedulesModel->insert($payload);
         }
 
-        $this->notify($actorId, 'bracket_generated', 'Generated a ' . str_replace('_', ' ', $format) . ' bracket for ' . ($sport['name'] ?? 'sport'));
+        $this->notify($actorId, 'bracket_generated', 'Generated a ' . str_replace('_', ' ', $format) . ' bracket for ' . ($sport['name'] ?? 'sport'), ['admin','facilitator'], null, (int)$sport['id']);
         $this->finishTransaction();
         return count($rows);
     }
@@ -860,7 +886,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         $role = (string) ($data['role'] ?? '');
         $this->assertAccountManagementPermission($role, $actorId);
         $sportIds = $this->normaliseManagedUserSports($role, $sportIds);
-        $payload = array_intersect_key($data, array_flip(['username', 'password_hash', 'display_name', 'role', 'status', 'created_at']));
+        $payload = array_intersect_key($data, array_flip(['username', 'password_hash', 'generated_password', 'display_name', 'role', 'status', 'created_by', 'created_at']));
         if (empty($payload['password_hash'])) {
             throw new RuntimeException('Password is required.');
         }
@@ -869,7 +895,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         $this->db->table('users')->insert($payload);
         $id = (int) $this->db->insertID();
         $this->syncUserSports($id, $sportIds);
-        $this->notify($actorId, 'user_created', 'Added ' . $role . ' account for ' . ($payload['display_name'] ?? 'user'));
+        if($role==='manager'){ $this->notify($actorId,'user_created','Added Tournament Manager account for '.($payload['display_name']??'user'),['admin']); $this->notify($actorId,'account_created','Your Tournament Manager account was created',[],$id,$sportIds[0]??null); } else { $this->notify($actorId,'user_created','Added facilitator account for '.($payload['display_name']??'user'),[],$actorId,$sportIds[0]??null); $this->notify($actorId,'account_created','Your facilitator account was created',[],$id,$sportIds[0]??null); }
         $this->finishTransaction();
         return $id;
     }
@@ -893,13 +919,14 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             // Allow status/profile maintenance while no event is active without erasing historical assignments.
             $syncSports = false;
         } else {
-            $sportIds = $this->normaliseManagedUserSports($role, $sportIds);
+            $sportIds = $this->normaliseManagedUserSports($role, $sportIds, $id);
         }
 
-        $payload = array_intersect_key($data, array_flip(['username', 'password_hash', 'display_name', 'role', 'status']));
+        $payload = array_intersect_key($data, array_flip(['username', 'password_hash', 'generated_password', 'display_name', 'role', 'status', 'created_by']));
 
         $this->db->transStart();
         $this->db->table('users')->where('id', $id)->update($payload);
+        if (($payload['status'] ?? $user['status'] ?? 'active') !== 'active') { $this->db->table('auth_remember_tokens')->where('user_id',$id)->delete(); }
         if ($syncSports) {
             $this->syncUserSports($id, $sportIds);
         }
@@ -915,6 +942,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
 
         $this->db->transStart();
         $this->notify($actorId, 'user_deleted', 'Removed account for ' . ($user['display_name'] ?? '#'.$id));
+        $this->db->table('auth_remember_tokens')->where('user_id',$id)->delete();
         $this->db->table('users')->where('id', $id)->delete();
         $this->finishTransaction();
     }
@@ -951,7 +979,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         $this->db->transStart();
         $this->db->table('weighted_points')->insert($payload);
         $id = (int) $this->db->insertID();
-        $this->notify($actorId, 'weighted_points_submitted', 'Submitted weighted points for validator approval');
+        $this->notify($actorId, 'weighted_points_submitted', 'Submitted weighted points for approval');
         $this->finishTransaction();
         return $id;
     }
@@ -1058,7 +1086,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             'event_id' => $schedule['event_id'],
             'schedule_id' => $schedule['id'],
             'type' => $schedule['result_type'],
-            'status' => 'pending',
+            'status' => ((string) ($this->requireRow('users',$actorId,'User')['role'] ?? '')) === 'manager' ? 'approved' : 'pending',
             'notes' => $notes,
             'submitted_by' => $actorId,
             'submitted_at' => date('Y-m-d H:i:s'),
@@ -1066,7 +1094,9 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         $id = (int) $this->db->insertID();
         $this->replaceResultEntries($id, $entries);
         $this->db->table('schedules')->where('id', $schedule['id'])->update(['status' => 'played']);
-        $this->notify($actorId, 'result_submitted', 'Submitted unofficial ' . $schedule['result_type'] . ' result for ' . $schedule['sport_name']);
+        $actorRole=(string)($this->requireRow('users',$actorId,'User')['role']??'');
+        if($actorRole==='facilitator') $this->notify($actorId,'result_submitted','Submitted result for TM approval',['manager'],null,(int)$schedule['sport_id']);
+        else $this->notify($actorId,'result_approved','Tournament Manager encoded an approved result',['admin'],null,(int)$schedule['sport_id']);
         $this->finishTransaction();
         return $id;
     }
@@ -1076,7 +1106,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         $result = $this->resultWithSchedule($id);
         $this->assertActiveEvent((int) $result['event_id']);
         if (($result['status'] ?? '') !== 'pending') {
-            throw new RuntimeException('Official validated results cannot be edited.');
+            throw new RuntimeException('Only pending results can be edited.');
         }
         $this->assertActorCanManageResult($result, $actorId, (int) ($result['submitted_by'] ?? 0));
         $this->assertWeightedPointsReady($result);
@@ -1091,7 +1121,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         ]);
         $this->db->table('result_entries')->where('result_id', $id)->delete();
         $this->replaceResultEntries($id, $entries);
-        $this->notify($actorId, 'result_updated', 'Updated unofficial result #' . $id);
+        $this->notify($actorId, 'result_updated', 'Updated pending result #' . $id, ['manager'], null, (int)$result['sport_id']);
         $this->finishTransaction();
     }
 
@@ -1099,8 +1129,8 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
     {
         $result = $this->resultWithSchedule($id);
         $this->assertActiveEvent((int) $result['event_id']);
-        if (($result['status'] ?? '') !== 'pending') {
-            throw new RuntimeException('Result has already been validated.');
+        if (($result['status'] ?? '') !== 'approved') {
+            throw new RuntimeException('Only Tournament Manager-approved results can be validated.');
         }
         $weightedPoints = $this->db->table('weighted_points')->where([
             'event_id' => $result['event_id'],
@@ -1119,7 +1149,8 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             'validated_at' => date('Y-m-d H:i:s'),
         ]);
         $this->advanceBracketFromResult($result);
-        $this->notify($actorId, 'result_validated', 'Validated result #' . $id . ' as official');
+        $this->notify($actorId,'result_validated','Admin validated result #'.$id.' as official',['manager'],null,(int)$result['sport_id']);
+        if((int)($result['submitted_by']??0)>0)$this->notify($actorId,'result_validated','Your result #'.$id.' is now official',[],(int)$result['submitted_by'],(int)$result['sport_id']);
         $this->finishTransaction();
     }
 
@@ -1128,7 +1159,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         $result = $this->resultWithSchedule($id);
         $this->assertActiveEvent((int) $result['event_id']);
         if (($result['status'] ?? '') !== 'pending') {
-            throw new RuntimeException('Official validated results cannot be deleted.');
+            throw new RuntimeException('Only pending results can be deleted.');
         }
         $this->assertActorCanManageResult($result, $actorId, (int) ($result['submitted_by'] ?? 0));
         $scheduleId = (int) $result['schedule_id'];
@@ -1137,7 +1168,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         if ($this->db->table('results')->where('schedule_id', $scheduleId)->countAllResults() === 0) {
             $this->db->table('schedules')->where('id', $scheduleId)->update(['status' => 'scheduled']);
         }
-        $this->notify($actorId, 'result_deleted', 'Removed unofficial result #' . $id);
+        $this->notify($actorId, 'result_deleted', 'Removed pending result #' . $id, ['manager'], null, (int)$result['sport_id']);
         $this->finishTransaction();
     }
 
@@ -1326,7 +1357,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             $builder->where('r.type', $type);
         }
         if ($status !== null) {
-            $builder->where('r.status', $status);
+            if($status==='pending') $builder->whereIn('r.status',['pending','approved']); else $builder->where('r.status',$status);
         }
 
         $rows = $builder->orderBy('r.id', 'DESC')->get()->getResultArray();
@@ -1354,7 +1385,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
      * Every sport contributes at most one placement per team, so the 1st-4th
      * columns count how many sports a team finished in that position. Match
      * results only produce placements for championship, third-place, and
-     * loser-bracket elimination games; earlier bracket wins are not counted.
+     * lower-bracket elimination games; earlier bracket wins are not counted.
      * Legacy schedules without a match ID are ignored when the same sport
      * already has a generated bracket, which prevents duplicated finals from
      * awarding points twice.
@@ -1461,6 +1492,10 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             }
         }
 
+        if ($sportFilter !== null && count($sportFilter) === 1) {
+            $singleSportId=(int)$sportFilter[0];
+            foreach($ranking as $teamId=>&$row){$row['placement']=isset($bestPlacements[$singleSportId][$teamId])?(int)$bestPlacements[$singleSportId][$teamId]['placement']:null;} unset($row);
+        }
         $rows = array_values($ranking);
         if ($positiveOnly) {
             $rows = array_values(array_filter($rows, static fn(array $row): bool => (float) $row['total_points'] > 0));
@@ -1848,15 +1883,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
     {
         $rows = [];
         $currentSources = [];
-        $ordered = [];
-        for ($left = 0, $right = count($teamIds) - 1; $left <= $right; $left++, $right--) {
-            if ($left === $right) {
-                $ordered[] = $teamIds[$left];
-                break;
-            }
-            $ordered[] = $teamIds[$left];
-            $ordered[] = $teamIds[$right];
-        }
+        $ordered = array_values($teamIds);
 
         $matchesInRound = count($ordered) / 2;
         for ($i = 0; $i < count($ordered); $i += 2) {
@@ -1903,8 +1930,8 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
     private function fourTeamDoubleEliminationRows(array $teamIds): array
     {
         return [
-            ['round'=>'Upper Semi Final','phase'=>'semi','bracket_side'=>'upper','team_a_id'=>$teamIds[0],'team_b_id'=>$teamIds[3],'feeds_from_a'=>null,'feeds_from_a_type'=>null,'feeds_from_b'=>null,'feeds_from_b_type'=>null,'is_conditional'=>0],
-            ['round'=>'Upper Semi Final','phase'=>'semi','bracket_side'=>'upper','team_a_id'=>$teamIds[1],'team_b_id'=>$teamIds[2],'feeds_from_a'=>null,'feeds_from_a_type'=>null,'feeds_from_b'=>null,'feeds_from_b_type'=>null,'is_conditional'=>0],
+            ['round'=>'Upper Semi Final','phase'=>'semi','bracket_side'=>'upper','team_a_id'=>$teamIds[0],'team_b_id'=>$teamIds[1],'feeds_from_a'=>null,'feeds_from_a_type'=>null,'feeds_from_b'=>null,'feeds_from_b_type'=>null,'is_conditional'=>0],
+            ['round'=>'Upper Semi Final','phase'=>'semi','bracket_side'=>'upper','team_a_id'=>$teamIds[2],'team_b_id'=>$teamIds[3],'feeds_from_a'=>null,'feeds_from_a_type'=>null,'feeds_from_b'=>null,'feeds_from_b_type'=>null,'is_conditional'=>0],
             ['round'=>'Lower Round 1','phase'=>'lower_r1','bracket_side'=>'lower','team_a_id'=>null,'team_b_id'=>null,'feeds_from_a'=>'M1','feeds_from_a_type'=>'loser','feeds_from_b'=>'M2','feeds_from_b_type'=>'loser','is_conditional'=>0],
             ['round'=>'Upper Final','phase'=>'final','bracket_side'=>'upper','team_a_id'=>null,'team_b_id'=>null,'feeds_from_a'=>'M1','feeds_from_a_type'=>'winner','feeds_from_b'=>'M2','feeds_from_b_type'=>'winner','is_conditional'=>0],
             ['round'=>'Lower Final','phase'=>'final','bracket_side'=>'lower','team_a_id'=>null,'team_b_id'=>null,'feeds_from_a'=>'M3','feeds_from_a_type'=>'winner','feeds_from_b'=>'M4','feeds_from_b_type'=>'loser','is_conditional'=>0],
@@ -1985,7 +2012,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         }
 
         $actorRole = (string) ($actor['role'] ?? '');
-        $allowed = ($actorRole === 'admin' && in_array($targetRole, ['admin', 'manager', 'validator', 'facilitator'], true))
+        $allowed = ($actorRole === 'admin' && $targetRole === 'manager')
             || ($actorRole === 'manager' && $targetRole === 'facilitator');
 
         if (! $allowed) {
@@ -2027,24 +2054,16 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         }
     }
 
-    private function normaliseManagedUserSports(string $role, array $sportIds): array
+    private function normaliseManagedUserSports(string $role, array $sportIds, ?int $ignoreUserId = null): array
     {
-        if (! in_array($role, ['admin', 'manager', 'validator', 'facilitator'], true)) {
-            throw new RuntimeException('Invalid managed account role.');
+        if (! in_array($role, ['manager','facilitator'], true)) throw new RuntimeException('Invalid managed account role.');
+        if (! $this->activeEvent()) throw new RuntimeException('Activate an event before assigning a sport.');
+        $sportIds=$this->validateActiveSportIds($sportIds);
+        if(count($sportIds)!==1) throw new RuntimeException('Exactly one active-event sport must be assigned.');
+        if($role==='manager'){
+            $builder=$this->db->table('user_sports us')->join('users u','u.id=us.user_id')->where('us.sport_id',$sportIds[0])->where('u.role','manager')->where('u.status','active'); if($ignoreUserId)$builder->where('u.id !=',$ignoreUserId); $existing=$builder->countAllResults();
+            if($existing>0) throw new RuntimeException('This sport already has an active Tournament Manager.');
         }
-        if ($role !== 'facilitator') {
-            return [];
-        }
-
-        if (! $this->activeEvent()) {
-            throw new RuntimeException('Activate an event before assigning sports to a facilitator.');
-        }
-
-        $sportIds = $this->validateActiveSportIds($sportIds);
-        if (! $sportIds) {
-            throw new RuntimeException('Assign at least one active-event sport to the facilitator.');
-        }
-
         return $sportIds;
     }
 
@@ -2104,6 +2123,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         $actor = $this->requireRow('users', $actorId, 'User');
         $role = (string) ($actor['role'] ?? '');
         if ($role === 'manager') {
+            if (! in_array((int) $scheduleOrResult['sport_id'], $this->assignedSportIds($actorId), true)) throw new RuntimeException('You can only manage results for your assigned sport.');
             return;
         }
         if ($role !== 'facilitator') {
@@ -2483,14 +2503,39 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         };
     }
 
-    private function notify(int $actorId, string $action, string $message): void
+    private function notify(int $actorId, string $action, string $message, array $recipientRoles=['admin'], ?int $recipientUserId=null, ?int $sportId=null): void
     {
-        $this->notificationsModel->insert([
-            'actor_user_id' => $actorId,
-            'action' => $action,
-            'message' => $message,
-            'created_at' => date('Y-m-d H:i:s'),
-        ]);
+        if($recipientUserId!==null){$this->notificationsModel->insert(['actor_user_id'=>$actorId,'recipient_user_id'=>$recipientUserId,'recipient_role'=>null,'sport_id'=>$sportId,'is_read'=>0,'action'=>$action,'message'=>$message,'created_at'=>date('Y-m-d H:i:s')]);return;}
+        foreach(array_values(array_unique($recipientRoles)) as $role)$this->notificationsModel->insert(['actor_user_id'=>$actorId,'recipient_role'=>$role,'recipient_user_id'=>null,'sport_id'=>$sportId,'is_read'=>0,'action'=>$action,'message'=>$message,'created_at'=>date('Y-m-d H:i:s')]);
+    }
+
+    private function upsertValidatedWeightedPoints(int $eventId,int $sportId,array $points,int $actorId): void
+    {
+        $payload=['event_id'=>$eventId,'sport_id'=>$sportId,'first_points'=>$points['first_points'],'second_points'=>$points['second_points'],'third_points'=>$points['third_points'],'fourth_points'=>$points['fourth_points'],'participation_points'=>$points['participation_points'],'status'=>'validated','submitted_by'=>$actorId,'validated_by'=>$actorId,'submitted_at'=>date('Y-m-d H:i:s'),'validated_at'=>date('Y-m-d H:i:s')];
+        $existing=$this->db->table('weighted_points')->where(['event_id'=>$eventId,'sport_id'=>$sportId])->get()->getRowArray(); if($existing)$this->db->table('weighted_points')->where('id',$existing['id'])->update($payload);else $this->db->table('weighted_points')->insert($payload);
+    }
+
+    public function assertActorOwnsSport(int $sportId,int $actorId): void
+    {
+        if(!in_array($sportId,$this->assignedSportIds($actorId),true))throw new RuntimeException('You can only manage your assigned sport.');
+    }
+
+    public function approveResult(int $id,int $actorId): void
+    {
+        $result=$this->resultWithSchedule($id);$this->assertActorOwnsSport((int)$result['sport_id'],$actorId);if(($result['status']??'')!=='pending')throw new RuntimeException('Only pending results can be approved.');
+        $this->db->transStart();$this->db->table('results')->where('id',$id)->update(['status'=>'approved','approved_by'=>$actorId,'approved_at'=>date('Y-m-d H:i:s'),'return_note'=>null]);$this->notify($actorId,'result_approved','Tournament Manager approved result #'.$id,['admin'],null,(int)$result['sport_id']);if((int)($result['submitted_by']??0)>0)$this->notify($actorId,'result_approved','Your result #'.$id.' was approved by the Tournament Manager',[],(int)$result['submitted_by'],(int)$result['sport_id']);$this->finishTransaction();
+    }
+
+    public function returnResult(int $id,string $note,int $actorId): void
+    {
+        $result=$this->resultWithSchedule($id);$this->assertActorOwnsSport((int)$result['sport_id'],$actorId);if(!in_array(($result['status']??''),['pending','approved'],true))throw new RuntimeException('Official results cannot be returned.');if(trim($note)==='')throw new RuntimeException('Enter a return note.');
+        $this->db->transStart();$this->db->table('results')->where('id',$id)->update(['status'=>'pending','approved_by'=>null,'approved_at'=>null,'return_note'=>trim($note)]);if((int)($result['submitted_by']??0)>0)$this->notify($actorId,'result_returned','Result returned: '.trim($note),[],(int)$result['submitted_by'],(int)$result['sport_id']);$this->finishTransaction();
+    }
+
+    public function resetGeneratedPassword(int $userId,int $actorId): string
+    {
+        $user=$this->requireRow('users',$userId,'User');$this->assertAccountManagementPermission((string)$user['role'],$actorId);$alphabet='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';$bytes=random_bytes(10);$password='';for($i=0;$i<10;$i++)$password.=$alphabet[ord($bytes[$i])%strlen($alphabet)];$password.='!7a';
+        $this->db->transStart();$this->db->table('users')->where('id',$userId)->update(['password_hash'=>password_hash($password,PASSWORD_DEFAULT),'generated_password'=>base64_encode(service('encrypter')->encrypt($password))]);$this->db->table('auth_remember_tokens')->where('user_id',$userId)->delete();$actorRole=(string)($this->requireRow('users',$actorId,'User')['role']??'');$sportIds=$this->assignedSportIds($userId);$sportId=$sportIds[0]??null;if($actorRole==='admin')$this->notify($actorId,'password_reset','Reset password for '.$user['display_name'],['admin']);else $this->notify($actorId,'password_reset','Reset facilitator password for '.$user['display_name'],[],$actorId,$sportId);$this->notify($actorId,'password_reset','A new system-generated password was issued for your account',[],$userId,$sportId);$this->finishTransaction();return $password;
     }
 
     private function finishTransaction(): void
