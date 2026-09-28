@@ -1154,6 +1154,7 @@
     }
   };
   const renderDatePickerJump = (state) => {
+    const yearScrollTop = state.jumpYears.scrollTop;
     state.jumpYears.innerHTML = '';
     state.jumpMonths.innerHTML = '';
     const startYear = state.jumpCenterYear - 5;
@@ -1182,6 +1183,7 @@
       button.classList.toggle('is-selected', month === state.viewMonth);
       state.jumpMonths.appendChild(button);
     });
+    state.jumpYears.scrollTop = yearScrollTop;
   };
   const hasAllowedDatePickerMinute = (state, hour24) => {
     for (let minute = 0; minute < 60; minute += 1) {
@@ -1189,77 +1191,146 @@
     }
     return false;
   };
-  const renderDatePickerTime = (state) => {
-    if (!state.timePanel) return;
-    const period = datePickerPeriod(state.draft.hour);
-    const hour12 = datePickerHour12(state.draft.hour);
-    state.hourList.innerHTML = '';
-    state.minuteList.innerHTML = '';
-    state.periodList.innerHTML = '';
+  const ensureDatePickerTimeOptions = (state) => {
+    if (!state.timePanel || state.timeOptionsBuilt) return;
 
     for (let hour = 1; hour <= 12; hour += 1) {
-      const hour24 = datePickerHour24(hour, period);
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'date-picker-time-option';
       button.dataset.datePickerHour = String(hour);
       button.textContent = String(hour);
       button.setAttribute('role', 'option');
-      const hourSelected = hour === hour12 && state.draftHasValue;
-      button.setAttribute('aria-selected', hourSelected ? 'true' : 'false');
-      button.classList.toggle('is-selected', hourSelected);
-      button.disabled = !hasAllowedDatePickerMinute(state, hour24);
-      button.tabIndex = hourSelected && !button.disabled ? 0 : -1;
+      button.setAttribute('aria-selected', 'false');
+      button.tabIndex = -1;
       state.hourList.appendChild(button);
     }
 
-    let renderedMinutes = 0;
     for (let minute = 0; minute < 60; minute += 1) {
-      const candidate = { ...state.draft, minute };
-      if (!datePickerStepMatches(state, candidate)) continue;
-      renderedMinutes += 1;
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'date-picker-time-option';
       button.dataset.datePickerMinute = String(minute);
       button.textContent = padDatePickerNumber(minute);
       button.setAttribute('role', 'option');
-      const minuteSelected = minute === state.draft.minute && state.draftHasValue;
-      button.setAttribute('aria-selected', minuteSelected ? 'true' : 'false');
-      button.classList.toggle('is-selected', minuteSelected);
-      button.disabled = !datePickerWithinBounds(state, candidate);
-      button.tabIndex = minuteSelected && !button.disabled ? 0 : -1;
+      button.setAttribute('aria-selected', 'false');
+      button.tabIndex = -1;
       state.minuteList.appendChild(button);
     }
-    if (!renderedMinutes) {
-      const empty = document.createElement('span');
-      empty.className = 'date-picker-time-empty';
-      empty.textContent = '—';
-      state.minuteList.appendChild(empty);
-    }
+
+    const empty = document.createElement('span');
+    empty.className = 'date-picker-time-empty';
+    empty.textContent = '—';
+    empty.hidden = true;
+    state.minuteList.appendChild(empty);
+    state.minuteEmpty = empty;
 
     ['AM', 'PM'].forEach((itemPeriod) => {
-      const hour24 = datePickerHour24(hour12, itemPeriod);
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'date-picker-time-option';
       button.dataset.datePickerPeriod = itemPeriod;
       button.textContent = itemPeriod;
       button.setAttribute('role', 'option');
+      button.setAttribute('aria-selected', 'false');
+      button.tabIndex = -1;
+      state.periodList.appendChild(button);
+    });
+
+    state.timeOptionsBuilt = true;
+  };
+  const scrollDatePickerListOptionIntoView = (list, option) => {
+    if (!list || !option || option.hidden) return;
+    const listRect = list.getBoundingClientRect();
+    const optionRect = option.getBoundingClientRect();
+    if (!listRect.height || !optionRect.height) return;
+
+    if (optionRect.top < listRect.top) {
+      list.scrollTop -= listRect.top - optionRect.top;
+    } else if (optionRect.bottom > listRect.bottom) {
+      list.scrollTop += optionRect.bottom - listRect.bottom;
+    }
+  };
+  const scrollDatePickerSelectedTimeIntoView = (state) => {
+    if (!state?.open || !state.timePanel || !state.draftHasValue) return;
+    const period = datePickerPeriod(state.draft.hour);
+    const hour12 = datePickerHour12(state.draft.hour);
+    const targets = [
+      [state.hourList, state.hourList.querySelector(`[data-date-picker-hour="${hour12}"]`)],
+      [state.minuteList, state.minuteList.querySelector(`[data-date-picker-minute="${state.draft.minute}"]`)],
+      [state.periodList, state.periodList.querySelector(`[data-date-picker-period="${period}"]`)],
+    ];
+    targets.forEach(([list, option]) => scrollDatePickerListOptionIntoView(list, option));
+  };
+  const queueDatePickerSelectedTimeScroll = (state) => {
+    if (!state?.timePanel) return;
+    requestAnimationFrame(() => scrollDatePickerSelectedTimeIntoView(state));
+  };
+  const renderDatePickerTime = (state) => {
+    if (!state.timePanel) return;
+    ensureDatePickerTimeOptions(state);
+
+    const scrollPositions = {
+      hour: state.hourList.scrollTop,
+      minute: state.minuteList.scrollTop,
+      period: state.periodList.scrollTop,
+    };
+    const period = datePickerPeriod(state.draft.hour);
+    const hour12 = datePickerHour12(state.draft.hour);
+
+    state.hourList.querySelectorAll('[data-date-picker-hour]').forEach((button) => {
+      const hour = Number(button.dataset.datePickerHour);
+      const hour24 = datePickerHour24(hour, period);
+      const hourSelected = hour === hour12 && state.draftHasValue;
+      button.setAttribute('aria-selected', hourSelected ? 'true' : 'false');
+      button.classList.toggle('is-selected', hourSelected);
+      button.disabled = !hasAllowedDatePickerMinute(state, hour24);
+      button.tabIndex = hourSelected && !button.disabled ? 0 : -1;
+    });
+
+    let renderedMinutes = 0;
+    state.minuteList.querySelectorAll('[data-date-picker-minute]').forEach((button) => {
+      const minute = Number(button.dataset.datePickerMinute);
+      const candidate = { ...state.draft, minute };
+      const stepMatches = datePickerStepMatches(state, candidate);
+      button.hidden = !stepMatches;
+      if (!stepMatches) {
+        button.setAttribute('aria-selected', 'false');
+        button.classList.remove('is-selected');
+        button.disabled = true;
+        button.tabIndex = -1;
+        return;
+      }
+
+      renderedMinutes += 1;
+      const minuteSelected = minute === state.draft.minute && state.draftHasValue;
+      button.setAttribute('aria-selected', minuteSelected ? 'true' : 'false');
+      button.classList.toggle('is-selected', minuteSelected);
+      button.disabled = !datePickerWithinBounds(state, candidate);
+      button.tabIndex = minuteSelected && !button.disabled ? 0 : -1;
+    });
+    if (state.minuteEmpty) state.minuteEmpty.hidden = renderedMinutes > 0;
+
+    state.periodList.querySelectorAll('[data-date-picker-period]').forEach((button) => {
+      const itemPeriod = button.dataset.datePickerPeriod;
+      const hour24 = datePickerHour24(hour12, itemPeriod);
       const periodSelected = itemPeriod === period && state.draftHasValue;
       button.setAttribute('aria-selected', periodSelected ? 'true' : 'false');
       button.classList.toggle('is-selected', periodSelected);
       button.disabled = !hasAllowedDatePickerMinute(state, hour24);
       button.tabIndex = periodSelected && !button.disabled ? 0 : -1;
-      state.periodList.appendChild(button);
     });
 
     [state.hourList, state.minuteList, state.periodList].forEach((list) => {
-      if (!list.querySelector('.date-picker-time-option[tabindex="0"]')) {
-        const firstEnabled = list.querySelector('.date-picker-time-option:not(:disabled)');
+      if (!list.querySelector('.date-picker-time-option[tabindex="0"]:not([hidden])')) {
+        const firstEnabled = list.querySelector('.date-picker-time-option:not([hidden]):not(:disabled)');
         if (firstEnabled) firstEnabled.tabIndex = 0;
       }
     });
+
+    state.hourList.scrollTop = scrollPositions.hour;
+    state.minuteList.scrollTop = scrollPositions.minute;
+    state.periodList.scrollTop = scrollPositions.period;
 
     const done = state.panel.querySelector('[data-date-picker-done]');
     if (done) done.disabled = !state.draftHasValue || !datePickerCandidateAllowed(state, state.draft);
@@ -1274,36 +1345,60 @@
     if (!state?.open) return;
     const rect = state.trigger.getBoundingClientRect();
     const viewportGap = 10;
+    const anchorGap = 6;
     const mobile = window.matchMedia('(max-width: 640px)').matches;
-    state.panel.style.position = 'fixed';
-    state.panel.style.maxHeight = '';
-    state.panel.style.top = '';
-    state.panel.style.bottom = '';
-    state.panel.style.left = '';
-    state.panel.style.right = '';
-    state.panel.style.width = '';
+    const hostRect = state.contentHost instanceof HTMLDialogElement && state.contentHost.open
+      ? state.contentHost.getBoundingClientRect()
+      : null;
+    const triggerIsInViewport = rect.bottom > 0 && rect.top < window.innerHeight && rect.right > 0 && rect.left < window.innerWidth;
+    const triggerIsInHost = !hostRect || (rect.bottom > hostRect.top && rect.top < hostRect.bottom && rect.right > hostRect.left && rect.left < hostRect.right);
 
-    if (mobile) {
-      state.panel.style.left = `${viewportGap}px`;
-      state.panel.style.right = `${viewportGap}px`;
-      state.panel.style.bottom = `${viewportGap}px`;
-      state.panel.style.width = 'auto';
-      state.panel.style.maxHeight = `calc(100vh - ${viewportGap * 2}px)`;
+    if (!triggerIsInViewport || !triggerIsInHost) {
+      closeDatePicker(state);
       return;
     }
 
-    const desiredHeight = Math.min(state.panel.scrollHeight || 520, 560);
-    const spaceBelow = window.innerHeight - rect.bottom - viewportGap;
-    const spaceAbove = rect.top - viewportGap;
-    const openAbove = spaceBelow < Math.min(desiredHeight, 260) && spaceAbove > spaceBelow;
-    const available = Math.max(220, Math.min(560, openAbove ? spaceAbove : spaceBelow));
-    state.panel.style.maxHeight = `${available}px`;
-    state.panel.style.top = openAbove ? 'auto' : `${rect.bottom + 6}px`;
-    state.panel.style.bottom = openAbove ? `${window.innerHeight - rect.top + 6}px` : 'auto';
+    state.panel.classList.toggle('is-stacked', state.type === 'datetime-local' && mobile);
 
-    const measuredWidth = Math.min(state.panel.getBoundingClientRect().width || 420, window.innerWidth - (viewportGap * 2));
-    const panelLeft = Math.max(viewportGap, Math.min(rect.left, window.innerWidth - measuredWidth - viewportGap));
-    state.panel.style.left = `${panelLeft}px`;
+    if (mobile) {
+      Object.assign(state.panel.style, {
+        position: 'fixed',
+        top: 'auto',
+        bottom: '0px',
+        left: '0px',
+        right: '0px',
+        width: 'auto',
+        maxHeight: '',
+      });
+      return;
+    }
+
+    const rootFontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const boundaryLeft = hostRect ? Math.max(viewportGap, hostRect.left + viewportGap) : viewportGap;
+    const boundaryRight = hostRect ? Math.min(window.innerWidth - viewportGap, hostRect.right - viewportGap) : window.innerWidth - viewportGap;
+    const availableWidth = Math.max(1, boundaryRight - boundaryLeft);
+    const preferredWidth = (state.type === 'datetime-local' ? 39 : state.type === 'time' ? 24 : 22) * rootFontSize;
+    const panelWidth = Math.min(preferredWidth, availableWidth);
+    const twoColumnMinimum = 36 * rootFontSize;
+    const stacked = state.type === 'datetime-local' && panelWidth < twoColumnMinimum;
+    state.panel.classList.toggle('is-stacked', stacked);
+
+    const desiredHeight = Math.min(state.panel.scrollHeight || 520, 560);
+    const spaceBelow = Math.max(0, window.innerHeight - rect.bottom - anchorGap - viewportGap);
+    const spaceAbove = Math.max(0, rect.top - anchorGap - viewportGap);
+    const openAbove = spaceBelow < Math.min(desiredHeight, 260) && spaceAbove > spaceBelow;
+    const availableHeight = Math.max(1, Math.min(560, openAbove ? spaceAbove : spaceBelow));
+    const panelLeft = Math.max(boundaryLeft, Math.min(rect.left, boundaryRight - panelWidth));
+
+    Object.assign(state.panel.style, {
+      position: 'fixed',
+      top: openAbove ? 'auto' : `${rect.bottom + anchorGap}px`,
+      bottom: openAbove ? `${window.innerHeight - rect.top + anchorGap}px` : 'auto',
+      left: `${panelLeft}px`,
+      right: 'auto',
+      width: `${panelWidth}px`,
+      maxHeight: `${availableHeight}px`,
+    });
   };
   const closeDatePicker = (state, restoreFocus = false) => {
     if (!state || !state.open) return;
@@ -1329,6 +1424,7 @@
     state.panel.hidden = false;
     if (supportsPopover) state.panel.showPopover();
     positionDatePicker(state);
+    queueDatePickerSelectedTimeScroll(state);
     requestAnimationFrame(() => {
       if (focusCalendar && state.type !== 'time') {
         const selected = state.panel.querySelector('.date-picker-day[aria-selected="true"]:not(:disabled)');
@@ -1447,6 +1543,9 @@
       hourList: null,
       minuteList: null,
       periodList: null,
+      minuteEmpty: null,
+      timeOptionsBuilt: false,
+      body: null,
       observer: null,
       form: input.form,
       resetHandler: null,
@@ -1457,6 +1556,11 @@
     };
     datePickerStates.set(input, state);
     setDatePickerDraftFromInput(state);
+
+    const body = document.createElement('div');
+    body.className = 'date-picker-body';
+    state.body = body;
+    panel.appendChild(body);
 
     if (state.type !== 'time') {
       const calendar = document.createElement('section');
@@ -1533,7 +1637,7 @@
       state.jumpMonths = jumpMonths;
       jumpView.append(jumpHead, jumpYears, jumpMonths);
       calendar.append(header, calendarView, jumpView);
-      panel.appendChild(calendar);
+      body.appendChild(calendar);
     }
 
     if (state.type !== 'date') {
@@ -1563,7 +1667,7 @@
       state.minuteList = createColumn('Minute');
       state.periodList = createColumn('AM / PM');
       timePanel.append(timeTitle, columns);
-      panel.appendChild(timePanel);
+      body.appendChild(timePanel);
     }
 
     const footer = document.createElement('div');
@@ -1723,7 +1827,7 @@
           if (event.key === 'End') nextIndex = options.length - 1;
           options.forEach((option, index) => { option.tabIndex = index === nextIndex ? 0 : -1; });
           options[nextIndex]?.focus({ preventScroll: true });
-          options[nextIndex]?.scrollIntoView({ block: 'nearest' });
+          scrollDatePickerListOptionIntoView(list, options[nextIndex]);
         }
         return;
       }
@@ -1759,9 +1863,17 @@
       if (state.open) {
         setDatePickerDraftFromInput(state);
         renderDatePicker(state);
+        queueDatePickerSelectedTimeScroll(state);
       }
     });
-    input.addEventListener('change', () => syncDatePickerTrigger(state));
+    input.addEventListener('change', () => {
+      syncDatePickerTrigger(state);
+      if (state.open) {
+        setDatePickerDraftFromInput(state);
+        renderDatePicker(state);
+        queueDatePickerSelectedTimeScroll(state);
+      }
+    });
     input.addEventListener('focus', () => trigger.focus());
     input.addEventListener('invalid', () => {
       trigger.setAttribute('aria-invalid', 'true');
@@ -1785,7 +1897,10 @@
 
     state.observer = new MutationObserver(() => {
       syncDatePickerTrigger(state);
-      if (state.open) renderDatePicker(state);
+      if (state.open) {
+        renderDatePicker(state);
+        queueDatePickerSelectedTimeScroll(state);
+      }
     });
     state.observer.observe(input, { attributes: true, attributeFilter: ['disabled', 'readonly', 'required', 'min', 'max', 'step', 'value'] });
   };
@@ -1831,15 +1946,29 @@
     }
   });
 
-  window.addEventListener('resize', () => {
-    if (openSelectState) positionSleekSelect(openSelectState);
-    if (openDatePickerState) positionDatePicker(openDatePickerState);
-  });
+  let floatingPositionFrame = 0;
+  const scheduleFloatingPosition = () => {
+    if (floatingPositionFrame) return;
+    floatingPositionFrame = requestAnimationFrame(() => {
+      floatingPositionFrame = 0;
+      if (openSelectState) positionSleekSelect(openSelectState);
+      if (openDatePickerState) positionDatePicker(openDatePickerState);
+    });
+  };
+  const scrollAffectsFloatingControl = (eventTarget, state, floatingContent) => {
+    if (!state?.open) return false;
+    if (eventTarget instanceof Node && floatingContent?.contains(eventTarget)) return false;
+    if (eventTarget === document || eventTarget === document.documentElement || eventTarget === document.body) return true;
+    return eventTarget instanceof Element ? eventTarget.contains(state.trigger) : true;
+  };
 
-  document.addEventListener('scroll', () => {
-    if (openSelectState) positionSleekSelect(openSelectState);
-    if (openDatePickerState) positionDatePicker(openDatePickerState);
-  }, true);
+  window.addEventListener('resize', scheduleFloatingPosition, { passive: true });
+
+  document.addEventListener('scroll', (event) => {
+    const repositionSelect = scrollAffectsFloatingControl(event.target, openSelectState, openSelectState?.content);
+    const repositionDatePicker = scrollAffectsFloatingControl(event.target, openDatePickerState, openDatePickerState?.panel);
+    if (repositionSelect || repositionDatePicker) scheduleFloatingPosition();
+  }, { capture: true, passive: true });
 
   document.querySelectorAll('[data-schedule-team-form]').forEach((form) => {
     const sportSelect = form.querySelector('[data-schedule-sport]');

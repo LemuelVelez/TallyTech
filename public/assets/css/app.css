@@ -858,6 +858,7 @@ input[type="time"]:not([data-native-picker])::-webkit-calendar-picker-indicator 
 .date-picker {
   position: relative;
   width: 100%;
+  min-width: 0;
 }
 .date-picker-native {
   position: absolute !important;
@@ -874,7 +875,8 @@ input[type="time"]:not([data-native-picker])::-webkit-calendar-picker-indicator 
 }
 .date-picker-trigger {
   width: 100%;
-  min-height: 2.875rem;
+  min-width: 0;
+  min-height: 46px;
   display: flex;
   align-items: center;
   gap: .65rem;
@@ -907,6 +909,7 @@ input[type="time"]:not([data-native-picker])::-webkit-calendar-picker-indicator 
 .date-picker-trigger-icon {
   width: 1.1rem;
   height: 1.1rem;
+  flex: 0 0 auto;
   color: var(--muted);
 }
 .date-picker.is-open .date-picker-trigger-icon { color: var(--accent); }
@@ -918,11 +921,15 @@ input[type="time"]:not([data-native-picker])::-webkit-calendar-picker-indicator 
   text-overflow: ellipsis;
 }
 .date-picker-panel {
+  --date-picker-space: .65rem;
   width: min(22rem, calc(100vw - 1.25rem));
   max-width: calc(100vw - 1.25rem);
+  min-width: 0;
   margin: 0;
   padding: .65rem;
-  overflow: auto;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  overflow: hidden;
   overscroll-behavior: contain;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -934,19 +941,25 @@ input[type="time"]:not([data-native-picker])::-webkit-calendar-picker-indicator 
   scrollbar-color: var(--muted) var(--panel-soft);
 }
 .date-picker-panel-datetime-local { width: min(39rem, calc(100vw - 1.25rem)); }
-.date-picker-panel-datetime-local:not([hidden]) {
+.date-picker-panel-time { width: min(24rem, calc(100vw - 1.25rem)); }
+.date-picker-panel[hidden] { display: none !important; }
+.date-picker-panel:popover-open { display: grid; }
+.date-picker-body {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+.date-picker-panel-datetime-local .date-picker-body {
   display: grid;
   grid-template-columns: minmax(19rem, 1fr) minmax(15rem, .72fr);
   align-items: start;
 }
-.date-picker-panel-time { width: min(24rem, calc(100vw - 1.25rem)); }
-.date-picker-panel[hidden] { display: none !important; }
-.date-picker-panel:popover-open { display: grid; }
-.date-picker-panel-datetime-local:popover-open {
-  grid-template-columns: minmax(19rem, 1fr) minmax(15rem, .72fr);
-  align-items: start;
+.date-picker-panel-datetime-local.is-stacked .date-picker-body {
+  grid-template-columns: minmax(0, 1fr);
 }
-.date-picker-panel-time:popover-open { display: block; }
 .date-picker-calendar { min-width: 0; }
 .date-picker-head,
 .date-picker-jump-head {
@@ -1021,7 +1034,7 @@ input[type="time"]:not([data-native-picker])::-webkit-calendar-picker-indicator 
 }
 .date-picker-day {
   position: relative;
-  min-width: max(2.5rem, 40px);
+  min-width: 0;
   min-height: 2.875rem;
   display: inline-flex;
   align-items: center;
@@ -1065,6 +1078,9 @@ input[type="time"]:not([data-native-picker])::-webkit-calendar-picker-indicator 
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: .3rem;
   overflow: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
   padding: .15rem;
   scrollbar-width: thin;
   scrollbar-color: var(--muted) var(--panel-soft);
@@ -1096,12 +1112,18 @@ input[type="time"]:not([data-native-picker])::-webkit-calendar-picker-indicator 
 .date-picker-jump-option:disabled { color: var(--muted); opacity: .48; cursor: not-allowed; }
 .date-picker-time {
   min-width: 0;
-  padding-left: .7rem;
+  padding-left: var(--date-picker-space);
   border-left: 1px solid var(--line);
 }
-.date-picker-panel-time .date-picker-time {
+.date-picker-panel-time .date-picker-time,
+.date-picker-panel-datetime-local.is-stacked .date-picker-time {
   padding-left: 0;
   border-left: 0;
+}
+.date-picker-panel-datetime-local.is-stacked .date-picker-time {
+  margin-top: var(--date-picker-space);
+  padding-top: var(--date-picker-space);
+  border-top: 1px solid var(--line);
 }
 .date-picker-time-title {
   min-height: 2.75rem;
@@ -1115,7 +1137,7 @@ input[type="time"]:not([data-native-picker])::-webkit-calendar-picker-indicator 
 .date-picker-time-columns {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: .35rem;
+  gap: var(--date-picker-space);
 }
 .date-picker-time-group { min-width: 0; }
 .date-picker-time-label {
@@ -1126,10 +1148,14 @@ input[type="time"]:not([data-native-picker])::-webkit-calendar-picker-indicator 
   color: var(--muted);
   font-size: .7rem;
   font-weight: 800;
+  text-align: center;
 }
 .date-picker-time-list {
   max-height: 13.5rem;
   overflow: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
   padding: .2rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -1152,7 +1178,8 @@ input[type="time"]:not([data-native-picker])::-webkit-calendar-picker-indicator 
   font-weight: 700;
   cursor: pointer;
 }
-.date-picker-time-option + .date-picker-time-option { margin-top: .12rem; }
+.date-picker-time-option[hidden] { display: none !important; }
+.date-picker-time-option + .date-picker-time-option:not([hidden]) { margin-top: .12rem; }
 .date-picker-time-option:hover:not(:disabled) { background: var(--surface-hover); }
 .date-picker-time-option.is-selected {
   background: var(--accent);
@@ -1166,14 +1193,19 @@ input[type="time"]:not([data-native-picker])::-webkit-calendar-picker-indicator 
   justify-content: center;
   color: var(--muted);
 }
+.date-picker-time-empty[hidden] { display: none !important; }
 .date-picker-footer {
   grid-column: 1 / -1;
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: .3rem;
-  margin-top: .65rem;
-  padding-top: .65rem;
+  margin-top: var(--date-picker-space);
+  padding-top: var(--date-picker-space);
   border-top: 1px solid var(--line);
+  background: var(--dialog-bg);
 }
 .date-picker-footer-spacer { flex: 1 1 auto; }
 .date-picker-footer-button,
@@ -1206,23 +1238,75 @@ input[type="time"]:not([data-native-picker])::-webkit-calendar-picker-indicator 
   .date-picker-panel-time {
     width: auto;
     max-width: none;
-    border-radius: var(--radius);
+    max-height: 100vh;
+    max-height: 100dvh;
+    border-radius: var(--radius) var(--radius) 0 0;
   }
-  .date-picker-panel-datetime-local:popover-open,
-  .date-picker-panel-datetime-local:not([hidden]) {
-    display: block;
+  .date-picker-panel {
+    --date-picker-space: .55rem;
+    padding: .55rem;
   }
-  .date-picker-panel { padding: .45rem; }
+  .date-picker-body {
+    overflow: hidden;
+    touch-action: auto;
+  }
+  .date-picker-panel-datetime-local .date-picker-body,
+  .date-picker-panel-datetime-local.is-stacked .date-picker-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(8rem, .58fr);
+  }
+  .date-picker-panel-date .date-picker-body,
+  .date-picker-panel-time .date-picker-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .date-picker-calendar {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+  }
   .date-picker-weekdays,
-  .date-picker-grid { gap: 0; }
-  .date-picker-panel-datetime-local .date-picker-time {
-    margin-top: .65rem;
-    padding-top: .65rem;
+  .date-picker-grid { gap: .12rem; }
+  .date-picker-day {
+    min-width: 0;
+    min-height: 2.75rem;
+    padding-inline: .1rem;
+  }
+  .date-picker-panel-datetime-local .date-picker-time,
+  .date-picker-panel-datetime-local.is-stacked .date-picker-time {
+    min-height: 0;
+    margin-top: var(--date-picker-space);
+    padding-top: var(--date-picker-space);
     padding-left: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     border-top: 1px solid var(--line);
     border-left: 0;
   }
-  .date-picker-time-list { max-height: 10.5rem; }
+  .date-picker-time-title { min-height: 2.35rem; }
+  .date-picker-panel-datetime-local .date-picker-time-columns {
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+  .date-picker-panel-datetime-local .date-picker-time-group {
+    min-height: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .date-picker-panel-datetime-local .date-picker-time-list {
+    min-height: 0;
+    max-height: none;
+  }
+  .date-picker-panel-time .date-picker-time-list { max-height: min(13.5rem, 42dvh); }
+  .date-picker-footer {
+    margin-top: var(--date-picker-space);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
