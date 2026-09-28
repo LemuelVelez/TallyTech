@@ -628,6 +628,7 @@
 
   const selectStates = new Map();
   let openSelectState = null;
+  let sleekSelectIdCounter = 0;
 
   const supportsPopover = 'showPopover' in HTMLElement.prototype;
 
@@ -644,7 +645,7 @@
     }
 
     if (openSelectState === state) openSelectState = null;
-    if (restoreFocus) state.trigger.focus();
+    if (restoreFocus && state.trigger.isConnected) state.trigger.focus();
   };
 
   const positionSleekSelect = (state) => {
@@ -656,27 +657,35 @@
     const spaceAbove = rect.top - viewportGap;
     const openAbove = spaceBelow < Math.min(desiredHeight, 180) && spaceAbove > spaceBelow;
     const available = Math.max(120, Math.min(320, openAbove ? spaceAbove : spaceBelow));
+    const maxPanelWidth = Math.min(420, Math.max(1, window.innerWidth - (viewportGap * 2)));
+    const minimumPanelWidth = Math.min(maxPanelWidth, Math.max(180, rect.width));
 
-    const panelWidth = Math.max(180, Math.min(rect.width, window.innerWidth - (viewportGap * 2)));
-    const panelLeft = Math.max(viewportGap, Math.min(rect.left, window.innerWidth - panelWidth - viewportGap));
-    state.content.style.setProperty('--select-width', `${panelWidth}px`);
+    state.content.style.setProperty('--select-width', `${minimumPanelWidth}px`);
     state.content.style.maxHeight = `${available}px`;
     state.content.style.position = 'fixed';
-    state.content.style.left = `${panelLeft}px`;
     state.content.style.top = openAbove ? 'auto' : `${rect.bottom + 6}px`;
     state.content.style.bottom = openAbove ? `${window.innerHeight - rect.top + 6}px` : 'auto';
+
+    const measuredWidth = Math.min(maxPanelWidth, Math.max(minimumPanelWidth, state.content.getBoundingClientRect().width));
+    const panelLeft = Math.max(viewportGap, Math.min(rect.left, window.innerWidth - measuredWidth - viewportGap));
+    state.content.style.left = `${panelLeft}px`;
   };
 
   const refreshSleekSelect = (state) => {
     const { select, trigger, content } = state;
     const selected = select.options[select.selectedIndex];
-    trigger.textContent = selected?.textContent?.trim() || 'Select an option';
+    const triggerText = selected?.textContent?.trim() || 'Select an option';
+    const isPlaceholder = Boolean(selected && selected.value === '');
+    trigger.textContent = triggerText;
+    trigger.title = triggerText;
     trigger.disabled = select.disabled;
+    trigger.classList.toggle('is-placeholder', isPlaceholder);
     trigger.setAttribute('aria-invalid', select.matches(':invalid') ? 'true' : 'false');
     content.innerHTML = '';
 
     Array.from(select.options).forEach((option, index) => {
       const item = document.createElement('button');
+      const optionIsPlaceholder = option.value === '';
       item.type = 'button';
       item.className = 'sleek-select-option';
       item.dataset.selectIndex = String(index);
@@ -685,6 +694,7 @@
       item.disabled = option.disabled;
       item.textContent = option.textContent;
       item.classList.toggle('is-selected', option.selected);
+      item.classList.toggle('is-placeholder', optionIsPlaceholder);
       content.appendChild(item);
     });
 
@@ -727,7 +737,24 @@
     }
   };
 
-  const initSleekSelect = (select, index) => {
+  const destroySleekSelect = (state) => {
+    if (!state) return;
+    if (openSelectState === state) openSelectState = null;
+    state.open = false;
+    state.observer?.disconnect();
+    if (state.form && state.resetHandler) state.form.removeEventListener('reset', state.resetHandler);
+    state.content.remove();
+    state.trigger.remove();
+    state.select.classList.remove('sleek-select-native');
+    delete state.select.dataset.sleekSelectReady;
+    if (state.hadTabIndex) state.select.setAttribute('tabindex', state.originalTabIndex);
+    else state.select.removeAttribute('tabindex');
+    if (state.wrapper.contains(state.select)) state.wrapper.replaceWith(state.select);
+    else state.wrapper.remove();
+    selectStates.delete(state.select);
+  };
+
+  const initSleekSelect = (select) => {
     if (!(select instanceof HTMLSelectElement) || select.multiple || select.dataset.sleekSelectReady === '1') return;
     select.dataset.sleekSelectReady = '1';
 
@@ -735,19 +762,22 @@
     wrapper.className = 'sleek-select';
     select.parentNode.insertBefore(wrapper, select);
     wrapper.appendChild(select);
+    const hadTabIndex = select.hasAttribute('tabindex');
+    const originalTabIndex = select.getAttribute('tabindex') || '';
     select.classList.add('sleek-select-native');
     select.tabIndex = -1;
 
+    const contentId = `sleek-select-content-${++sleekSelectIdCounter}`;
     const trigger = document.createElement('button');
     trigger.type = 'button';
     trigger.className = 'sleek-select-trigger';
     trigger.setAttribute('aria-haspopup', 'listbox');
     trigger.setAttribute('aria-expanded', 'false');
-    trigger.setAttribute('aria-controls', `sleek-select-content-${index + 1}`);
+    trigger.setAttribute('aria-controls', contentId);
     wrapper.appendChild(trigger);
 
     const content = document.createElement('div');
-    content.id = `sleek-select-content-${index + 1}`;
+    content.id = contentId;
     content.className = 'sleek-select-content';
     content.setAttribute('role', 'listbox');
     content.hidden = true;
@@ -755,7 +785,18 @@
     const contentHost = select.closest('dialog') || document.body;
     contentHost.appendChild(content);
 
-    const state = { select, wrapper, trigger, content, open: false };
+    const state = {
+      select,
+      wrapper,
+      trigger,
+      content,
+      open: false,
+      observer: null,
+      form: select.form,
+      resetHandler: null,
+      hadTabIndex,
+      originalTabIndex,
+    };
     selectStates.set(select, state);
     refreshSleekSelect(state);
 
@@ -790,6 +831,7 @@
     content.addEventListener('keydown', (event) => {
       const options = Array.from(content.querySelectorAll('.sleek-select-option:not(:disabled)'));
       const current = options.indexOf(document.activeElement);
+      if (!options.length) return;
 
       if (event.key === 'ArrowDown') {
         event.preventDefault();
@@ -815,13 +857,39 @@
       requestAnimationFrame(() => trigger.focus());
     });
 
-    select.form?.addEventListener('reset', () => requestAnimationFrame(() => refreshSleekSelect(state)));
+    if (state.form) {
+      state.resetHandler = () => requestAnimationFrame(() => refreshSleekSelect(state));
+      state.form.addEventListener('reset', state.resetHandler);
+    }
 
-    const observer = new MutationObserver(() => refreshSleekSelect(state));
-    observer.observe(select, { attributes: true, childList: true, subtree: true });
+    state.observer = new MutationObserver(() => refreshSleekSelect(state));
+    state.observer.observe(select, { attributes: true, childList: true, subtree: true });
+  };
+
+  const upgradeSleekSelects = (root) => {
+    if (root instanceof HTMLSelectElement) initSleekSelect(root);
+    root?.querySelectorAll?.('select').forEach(initSleekSelect);
+  };
+
+  const cleanupDetachedSleekSelects = () => {
+    Array.from(selectStates.values()).forEach((state) => {
+      if (!state.select.isConnected) destroySleekSelect(state);
+    });
   };
 
   document.querySelectorAll('select').forEach(initSleekSelect);
+
+  const sleekSelectDocumentObserver = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      mutation.addedNodes.forEach((node) => {
+        if (node.nodeType === Node.ELEMENT_NODE || node.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
+          upgradeSleekSelects(node);
+        }
+      });
+    });
+    cleanupDetachedSleekSelects();
+  });
+  sleekSelectDocumentObserver.observe(document.body, { childList: true, subtree: true });
 
   document.addEventListener('pointerdown', (event) => {
     if (!openSelectState) return;
@@ -1631,7 +1699,7 @@
         pairingNote.textContent = 'Bracket pairing is ready to generate.';
       }
     };
-    const renderPairs = () => {
+    const renderPairs = (focusSlotIndex = null) => {
       if (!pairingBox) return;
       pairingBox.replaceChildren();
       const ids = selectedIds();
@@ -1684,7 +1752,7 @@
             }
             slots[slotIndex] = next;
             trimEmptyMatches();
-            renderPairs();
+            renderPairs(slotIndex);
           });
           row.append(select);
           if (sideIndex === 0) {
@@ -1698,6 +1766,15 @@
         pairingBox.append(match);
       }
       refreshValidity();
+
+      if (focusSlotIndex !== null) {
+        requestAnimationFrame(() => {
+          const nextSelect = pairingBox.querySelector(`select[data-pairing-index="${focusSlotIndex}"]`);
+          if (!nextSelect) return;
+          initSleekSelect(nextSelect);
+          selectStates.get(nextSelect)?.trigger.focus({ preventScroll: true });
+        });
+      }
     };
 
     teamChecks.forEach((checkbox) => checkbox.addEventListener('change', () => {

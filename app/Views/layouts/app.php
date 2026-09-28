@@ -9,9 +9,11 @@ $fontSize = (string) (session()->get('font_size') ?: 'medium');
 $theme = in_array($theme, ['light', 'dark', 'system'], true) ? $theme : 'system';
 $fontSize = in_array($fontSize, ['small', 'medium', 'large'], true) ? $fontSize : 'medium';
 $displayName = (string) session()->get('display_name');
-$assetVersion = static function (string $relativePath): string {
+$assetRelease = '20260929-1';
+$assetVersion = static function (string $relativePath) use ($assetRelease): string {
     $path = defined('FCPATH') ? FCPATH . ltrim($relativePath, '/\\') : '';
-    return $path !== '' && is_file($path) ? (string) filemtime($path) : '20260908-2';
+    $fileVersion = $path !== '' && is_file($path) ? (string) filemtime($path) : '0';
+    return $assetRelease . '-' . $fileVersion;
 };
 $cssVersion = $assetVersion('assets/css/app.css');
 $jsVersion = $assetVersion('assets/js/app.js');
