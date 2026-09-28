@@ -10,7 +10,7 @@ $bracketFormat = (string) ($schedules[0]['tournament_format'] ?? 'single_elimina
 <?php if ($activeEvent): ?><div class="event-banner"><b>Active event:</b> <?= esc($activeEvent['name']) ?></div><?php endif; ?>
 <section class="panel bracket-filter-panel">
     <form method="get" action="<?= site_url('brackets') ?>" class="inline-filter">
-        <?php if (($role ?? '') === 'manager' && $selectedSport): ?><label>Sport<span class="readonly-field"><?= esc($selectedSport['name'].' · '.$selectedSport['category']) ?></span><input type="hidden" name="sport" value="<?= (int) $selectedSport['id'] ?>"></label><?php else: ?><label>Sport<select name="sport" onchange="this.form.submit()"><?php foreach ($sports as $sport): ?><option value="<?= (int) $sport['id'] ?>" <?= (int) $sport['id'] === (int) $selectedSportId ? 'selected' : '' ?>><?= esc($sport['name'].' · '.$sport['category']) ?></option><?php endforeach; ?></select></label><?php endif; ?>
+        <?php if ((string) session()->get('role') === 'manager' && count($sports) === 1 && $selectedSport): ?><label>Sport<span class="readonly-field"><?= esc($selectedSport['name'].' · '.$selectedSport['category']) ?></span><input type="hidden" name="sport" value="<?= (int) $selectedSport['id'] ?>"></label><?php else: ?><label>Sport<select name="sport" onchange="this.form.submit()"><?php foreach ($sports as $sport): ?><option value="<?= (int) $sport['id'] ?>" <?= (int) $sport['id'] === (int) $selectedSportId ? 'selected' : '' ?>><?= esc($sport['name'].' · '.$sport['category']) ?></option><?php endforeach; ?></select></label><?php endif; ?>
         <noscript><button class="btn">View</button></noscript>
     </form>
 </section>
@@ -46,18 +46,19 @@ $bracketFormat = (string) ($schedules[0]['tournament_format'] ?? 'single_elimina
         <?= csrf_field() ?>
         <div class="modal-head"><h2>Generate Tournament Bracket</h2><button type="button" data-close aria-label="Close"><?= ui_icon('x') ?></button></div>
         <div class="form-grid">
-            <?php if (($role ?? '') === 'manager' && $selectedSport): ?><label>Sport<span class="readonly-field"><?= esc($selectedSport['name'].' · '.$selectedSport['category'].' · '.ucfirst($selectedSport['result_type'])) ?></span><input type="hidden" name="sport_id" value="<?= (int) $selectedSport['id'] ?>"></label><?php else: ?><label>Sport<select name="sport_id" required><option value="">Select sport</option><?php foreach ($sports as $sport): ?><option value="<?= (int) $sport['id'] ?>" <?= (int) $sport['id'] === (int) $selectedSportId ? 'selected' : '' ?>><?= esc($sport['name'].' · '.$sport['category'].' · '.ucfirst($sport['result_type'])) ?></option><?php endforeach; ?></select></label><?php endif; ?>
+            <?php if ((string) session()->get('role') === 'manager' && count($sports) === 1 && $selectedSport): ?><label>Sport<span class="readonly-field"><?= esc($selectedSport['name'].' · '.$selectedSport['category'].' · '.ucfirst($selectedSport['result_type'])) ?></span><input type="hidden" name="sport_id" value="<?= (int) $selectedSport['id'] ?>"></label><?php else: ?><label>Sport<select name="sport_id" required><option value="">Select sport</option><?php foreach ($sports as $sport): ?><option value="<?= (int) $sport['id'] ?>" <?= (int) $sport['id'] === (int) $selectedSportId ? 'selected' : '' ?>><?= esc($sport['name'].' · '.$sport['category'].' · '.ucfirst($sport['result_type'])) ?></option><?php endforeach; ?></select></label><?php endif; ?>
             <label>Tournament Format<select name="tournament_format" required><option value="single_elimination">Single Elimination</option><option value="double_elimination">Double Elimination</option></select></label>
             <label>Location<select name="location_id" required><option value="">Select location</option><?php foreach ($locations as $location): ?><option value="<?= (int) $location['id'] ?>"><?= esc($location['name']) ?></option><?php endforeach; ?></select></label>
             <label>Start Date & Time<input type="datetime-local" name="start_time" required></label>
             <label>Match Interval (minutes)<input type="number" name="interval_minutes" min="15" max="360" step="5" value="60" required></label>
         </div>
         <span class="field-label">Participating Teams</span>
-        <div class="sport-checks bracket-team-checks"><?php foreach ($teams as $team): ?><label class="check"><input type="checkbox" name="team_ids[]" value="<?= (int) $team['id'] ?>" checked> <?= esc($team['name']) ?></label><?php endforeach; ?></div>
+        <div class="sport-checks bracket-team-checks"><?php foreach ($teams as $team): ?><label class="check"><input type="checkbox" name="team_ids[]" value="<?= (int) $team['id'] ?>"> <?= esc($team['name']) ?></label><?php endforeach; ?></div>
         <div data-pairing-builder class="pairing-builder"></div>
+        <p class="form-note pairing-helper" data-bracket-pairing-note>Select 2, 4, 8, or 16 teams for single elimination, or exactly 4 for double elimination.</p>
         <label class="check"><input type="checkbox" name="third_place_playoff" value="1"> Add 3rd-place playoff for single elimination</label>
         <p class="form-note">Single elimination supports 2, 4, 8, or 16 teams; the optional 3rd-place playoff uses the two semifinal losers when available. Double elimination uses a four-team upper/lower bracket with an automatic conditional reset final.</p>
-        <button class="btn primary full"><?= ui_icon('trophy') ?><span>Generate Bracket</span></button>
+        <button class="btn primary full" data-bracket-generate disabled><?= ui_icon('trophy') ?><span>Generate Bracket</span></button>
     </form>
 </dialog>
 <?= $this->endSection() ?>

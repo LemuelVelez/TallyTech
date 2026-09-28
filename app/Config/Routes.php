@@ -5,6 +5,8 @@ $routes->get('/', 'ScoreboardController::index');
 $routes->get('scoreboard', 'ScoreboardController::index');
 $routes->get('login', 'AuthController::login');
 $routes->post('login', 'AuthController::attempt');
+$routes->post('login/continue', 'AuthController::continueRemembered');
+$routes->post('login/forget', 'AuthController::forgetRemembered');
 $routes->post('logout', 'AuthController::logout');
 $routes->group('', ['filter'=>'auth'], static function(RouteCollection $routes): void {
     $routes->get('dashboard','DashboardController::index');

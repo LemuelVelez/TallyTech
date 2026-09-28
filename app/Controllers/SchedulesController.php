@@ -9,13 +9,19 @@ class SchedulesController extends BaseController
     public function index()
     {
         $data = $this->scoringService()->commonData();
-        $sportId=$this->managerSportId();
-        $data['sports']=array_values(array_filter($data['sports'],static fn(array $sport): bool=>(int)$sport['id']===$sportId));
+        $managerSportIds = $this->managerSportIds();
+        $data['sports'] = array_values(array_filter(
+            $data['sports'],
+            static fn(array $sport): bool => in_array((int) $sport['id'], $managerSportIds, true)
+        ));
         $data['title'] = 'Tournament Schedules';
         $data['schedules'] = $this->repository()->resolveBracketSlots(
             $this->repository()->schedules((int) ($data['activeEvent']['id'] ?? 0))
         );
-        $data['schedules']=array_values(array_filter($data['schedules'],static fn(array $row): bool=>(int)$row['sport_id']===$sportId));
+        $data['schedules'] = array_values(array_filter(
+            $data['schedules'],
+            static fn(array $row): bool => in_array((int) $row['sport_id'], $managerSportIds, true)
+        ));
         $data['allLocations'] = $this->repository()->allLocations();
         return view('schedules/index', $data);
     }
@@ -24,16 +30,23 @@ class SchedulesController extends BaseController
     {
         $data = $this->scoringService()->commonData();
         $eventId = (int) ($data['activeEvent']['id'] ?? 0);
-        $managerSportId=$this->managerSportId();
-        $data['sports']=array_values(array_filter($data['sports'],static fn(array $sport): bool=>(int)$sport['id']===$managerSportId));
-        $requestedSportId = $this->request->getGet('sport');
-        $selectedSportId = is_scalar($requestedSportId) && preg_match('/^[1-9]\d*$/', (string) $requestedSportId)
-            ? (int) $requestedSportId
-            : (int) ($data['sports'][0]['id'] ?? 0);
+        $managerSportIds = $this->managerSportIds();
+        $data['sports'] = array_values(array_filter(
+            $data['sports'],
+            static fn(array $sport): bool => in_array((int) $sport['id'], $managerSportIds, true)
+        ));
+        $requestedSport = $this->request->getGet('sport');
+        $hasRequestedSport = is_scalar($requestedSport) && trim((string) $requestedSport) !== '';
+        $requestedSportId = $hasRequestedSport && preg_match('/^[1-9]\d*$/', (string) $requestedSport)
+            ? (int) $requestedSport
+            : 0;
+        $selectedSportId = $requestedSportId ?: (int) ($data['sports'][0]['id'] ?? 0);
 
         $validSportIds = array_map('intval', array_column($data['sports'], 'id'));
-        if (! in_array($selectedSportId, $validSportIds, true)) {
-            $selectedSportId = (int) ($data['sports'][0]['id'] ?? 0);
+        if (($hasRequestedSport && $requestedSportId === 0) || ($requestedSportId > 0 && ! in_array($requestedSportId, $validSportIds, true))) {
+            $fallbackSportId = (int) ($data['sports'][0]['id'] ?? 0);
+            $target = site_url('brackets') . ($fallbackSportId > 0 ? '?sport=' . $fallbackSportId : '');
+            return redirect()->to($target)->with('error', 'You can only manage brackets for your assigned sports.');
         }
 
         $allSchedules = $this->repository()->schedules($eventId);
@@ -82,7 +95,7 @@ class SchedulesController extends BaseController
             return redirect()->back()->with('error', 'Add and activate an event first.');
         }
 
-        $sportId = $this->managerSportId() ?? $this->postPositiveInt('sport_id');
+        $sportId = $this->managerPostedSportId();
         $locationId = $this->postPositiveInt('location_id');
         $format = $this->postString('tournament_format');
         $rawStart = trim($this->postString('start_time'));
@@ -90,7 +103,10 @@ class SchedulesController extends BaseController
         $interval = $this->postPositiveInt('interval_minutes') ?: 60;
         $thirdPlacePlayoff = $format === 'single_elimination' && $this->request->getPost('third_place_playoff') !== null;
 
-        if (! $sportId || ! $locationId || ! in_array($format, self::TOURNAMENT_FORMATS, true) || ! $parsedStart) {
+        if (! $sportId) {
+            return redirect()->back()->withInput()->with('error', 'Select one of your assigned sports.');
+        }
+        if (! $locationId || ! in_array($format, self::TOURNAMENT_FORMATS, true) || ! $parsedStart) {
             return redirect()->back()->withInput()->with('error', 'Sport, tournament format, location, and bracket start time are required.');
         }
 
@@ -195,7 +211,7 @@ class SchedulesController extends BaseController
             return ['error' => 'Add and activate an event first.'];
         }
 
-        $sportId = $this->managerSportId() ?? $this->postPositiveInt('sport_id');
+        $sportId = $this->managerPostedSportId();
         $locationId = $this->postPositiveInt('location_id');
         $date = trim($this->postString('match_date'));
         $status = $this->postString('status') ?: 'scheduled';
@@ -203,7 +219,10 @@ class SchedulesController extends BaseController
         $stage = $this->postString('stage') ?: 'final';
         $stageData = $this->stageData($stage);
 
-        if (! $sportId || ! $locationId || $date === '') {
+        if (! $sportId) {
+            return ['error' => 'Select one of your assigned sports.'];
+        }
+        if (! $locationId || $date === '') {
             return ['error' => 'Sport, location, and match date are required.'];
         }
         if (! in_array($format, self::TOURNAMENT_FORMATS, true)) {
@@ -273,6 +292,18 @@ class SchedulesController extends BaseController
             'is_conditional' => $this->postPositiveInt('is_conditional') ? 1 : 0,
             'scheduling_note' => trim($this->postString('scheduling_note')) ?: null,
         ];
+    }
+
+
+    private function managerPostedSportId(): int
+    {
+        $sportId = $this->postPositiveInt('sport_id');
+        $managerSportIds = $this->managerSportIds();
+        if ($sportId === 0 && count($managerSportIds) === 1) {
+            $sportId = (int) $managerSportIds[0];
+        }
+
+        return $sportId > 0 && in_array($sportId, $managerSportIds, true) ? $sportId : 0;
     }
 
     private function stageData(string $stage): ?array

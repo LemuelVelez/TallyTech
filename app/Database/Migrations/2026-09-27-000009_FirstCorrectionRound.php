@@ -27,14 +27,6 @@ class FirstCorrectionRound extends Migration
 
         $this->db->query("ALTER TABLE users MODIFY role ENUM('admin','manager','facilitator') NOT NULL");
 
-        // Existing Tournament Managers are normalized to one sport assignment.
-        foreach ($this->db->table('users')->select('id')->where('role', 'manager')->get()->getResultArray() as $manager) {
-            $rows = $this->db->table('user_sports')->select('sport_id')->where('user_id', (int) $manager['id'])->orderBy('sport_id')->get()->getResultArray();
-            if (count($rows) > 1) {
-                $keep = (int) $rows[0]['sport_id'];
-                $this->db->table('user_sports')->where('user_id', (int) $manager['id'])->where('sport_id !=', $keep)->delete();
-            }
-        }
         $this->forge->addColumn('users', [
             'generated_password' => ['type' => 'TEXT', 'null' => true, 'after' => 'password_hash'],
             'created_by' => ['type' => 'INT', 'unsigned' => true, 'null' => true, 'after' => 'status'],

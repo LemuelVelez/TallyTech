@@ -38,12 +38,19 @@ class ScoringService
         ];
     }
 
-    public function sportScores(?int $requestedSportId = null): array
+    public function sportScores(?int $requestedSportId = null, ?array $allowedSportIds = null): array
     {
         $event = $this->repository->activeEvent();
         $eventId = (int) ($event['id'] ?? 0);
         $sports = $this->repository->sports($eventId);
-        $table = $this->buildSportScoreTable($eventId, $sports, $requestedSportId);
+        if ($allowedSportIds !== null) {
+            $allowedSportIds = array_values(array_unique(array_map('intval', $allowedSportIds)));
+            $sports = array_values(array_filter(
+                $sports,
+                static fn(array $sport): bool => in_array((int) ($sport['id'] ?? 0), $allowedSportIds, true)
+            ));
+        }
+        $table = $this->buildSportScoreTable($eventId, $sports, $requestedSportId, $allowedSportIds === null);
 
         return [
             'activeEvent' => $event,
@@ -517,7 +524,7 @@ class ScoringService
         return $schedules;
     }
 
-    private function buildSportScoreTable(int $eventId, array $sports, ?int $requestedSportId): array
+    private function buildSportScoreTable(int $eventId, array $sports, ?int $requestedSportId, bool $groupCategories = true): array
     {
         $groups = [];
         foreach ($sports as $sport) {
@@ -525,33 +532,43 @@ class ScoringService
             if ($name === '') {
                 continue;
             }
-            if (! isset($groups[$name])) {
-                $groups[$name] = [
+            $groupKey = $groupCategories ? $name : (string) (int) $sport['id'];
+            if (! isset($groups[$groupKey])) {
+                $groups[$groupKey] = [
                     'id' => (int) $sport['id'],
-                    'name' => $name,
+                    'name' => $groupCategories || empty($sport['category']) ? $name : $name . ' · ' . $sport['category'],
                     'sport_ids' => [],
                 ];
             }
-            $groups[$name]['sport_ids'][] = (int) $sport['id'];
+            $groups[$groupKey]['sport_ids'][] = (int) $sport['id'];
         }
         $sportGroups = array_values($groups);
         usort($sportGroups, static fn(array $a, array $b): int => strcasecmp($a['name'], $b['name']));
 
         $selectedName = null;
+        $selectedExactId = null;
         if ($requestedSportId !== null) {
             foreach ($sports as $sport) {
                 if ((int) $sport['id'] === $requestedSportId) {
                     $selectedName = (string) $sport['name'];
+                    $selectedExactId = (int) $sport['id'];
                     break;
                 }
             }
         }
-        $selectedName ??= (string) ($sportGroups[0]['name'] ?? '');
-
-        $selectedSports = array_values(array_filter(
-            $sports,
-            static fn(array $sport): bool => (string) ($sport['name'] ?? '') === $selectedName
-        ));
+        if ($groupCategories) {
+            $selectedName ??= (string) ($sportGroups[0]['name'] ?? '');
+            $selectedSports = array_values(array_filter(
+                $sports,
+                static fn(array $sport): bool => (string) ($sport['name'] ?? '') === $selectedName
+            ));
+        } else {
+            $selectedExactId ??= (int) ($sportGroups[0]['id'] ?? 0);
+            $selectedSports = array_values(array_filter(
+                $sports,
+                static fn(array $sport): bool => (int) ($sport['id'] ?? 0) === $selectedExactId
+            ));
+        }
         $categoryOrder = static fn(string $category): int => match (strtolower($category)) {
             'men' => 0,
             'women' => 1,

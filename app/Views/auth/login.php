@@ -5,6 +5,13 @@ $assetVersion = static function (string $relativePath): string {
 };
 $cssVersion = $assetVersion('assets/css/app.css');
 $jsVersion = $assetVersion('assets/js/app.js');
+$rememberedAccount = $rememberedAccount ?? null;
+$roleLabel = static fn(string $role): string => match ($role) {
+    'admin' => 'Admin',
+    'manager' => 'Tournament Manager',
+    'facilitator' => 'Facilitator',
+    default => ucfirst($role),
+};
 ?>
 <!doctype html>
 <html lang="en">
@@ -22,21 +29,39 @@ $jsVersion = $assetVersion('assets/js/app.js');
         <a class="login-logo" href="<?= site_url('scoreboard') ?>"><img src="<?= base_url('assets/img/logo.webp') ?>" alt="TallyTech"><strong>TallyTech</strong></a>
         <h1>Welcome back</h1>
         <p>Sign in to manage the ISF scoring system.</p>
-        <form method="post" action="<?= site_url('login') ?>">
-            <?= csrf_field() ?>
-            <label>Username<input name="username" value="<?= esc((string) session()->getFlashdata('login_username')) ?>" required autocomplete="username"></label>
-            <label>Password
-                <span class="password-field">
-                    <input type="password" name="password" required autocomplete="current-password" data-password-input>
-                    <button class="password-toggle" type="button" data-password-toggle aria-label="Show password" aria-pressed="false">
-                        <?= ui_icon('eye', 'password-icon password-icon-show') ?>
-                        <?= ui_icon('eye-off', 'password-icon password-icon-hide') ?>
-                    </button>
-                </span>
-            </label>
-            <label class="check remember-me"><input type="checkbox" name="remember_me" value="1"> Remember me</label>
-            <button class="btn primary full" type="submit"><?= ui_icon('log-in') ?><span>Sign in</span></button>
-        </form>
+
+        <?php if ($rememberedAccount): ?>
+        <section class="continue-card" data-remember-card>
+            <span class="continue-kicker">Continue as</span>
+            <div class="continue-account">
+                <span class="continue-avatar" aria-hidden="true"><?= esc(mb_strtoupper(mb_substr((string) $rememberedAccount['display_name'], 0, 1))) ?></span>
+                <div><strong><?= esc($rememberedAccount['display_name']) ?></strong><span>@<?= esc($rememberedAccount['username']) ?></span><small><?= esc($roleLabel((string) $rememberedAccount['role'])) ?></small></div>
+            </div>
+            <form method="post" action="<?= site_url('login/continue') ?>"><?= csrf_field() ?><button class="btn primary full" type="submit"><?= ui_icon('log-in') ?><span>Continue</span></button></form>
+            <div class="continue-actions">
+                <button class="link-button" type="button" data-use-another-account>Use another account</button>
+                <form method="post" action="<?= site_url('login/forget') ?>"><?= csrf_field() ?><button class="link-button danger-text" type="submit">Forget this device</button></form>
+            </div>
+        </section>
+        <?php endif; ?>
+
+        <section data-login-form <?= $rememberedAccount ? 'hidden' : '' ?>>
+            <form method="post" action="<?= site_url('login') ?>">
+                <?= csrf_field() ?>
+                <label>Username<input name="username" value="<?= esc((string) session()->getFlashdata('login_username')) ?>" required autocomplete="username"></label>
+                <label>Password
+                    <span class="password-field">
+                        <input type="password" name="password" required autocomplete="current-password" data-password-input>
+                        <button class="password-toggle" type="button" data-password-toggle aria-label="Show password" aria-pressed="false">
+                            <?= ui_icon('eye', 'password-icon password-icon-show') ?>
+                            <?= ui_icon('eye-off', 'password-icon password-icon-hide') ?>
+                        </button>
+                    </span>
+                </label>
+                <label class="check remember-me"><input type="checkbox" name="remember_me" value="1"> Remember me</label>
+                <button class="btn primary full" type="submit"><?= ui_icon('log-in') ?><span>Sign in</span></button>
+            </form>
+        </section>
         <a class="back-link" href="<?= site_url('scoreboard') ?>"><?= ui_icon('arrow-left') ?><span>Back to live scoreboard</span></a>
     </main>
     <script src="<?= esc(base_url('assets/js/app.js') . '?v=' . rawurlencode($jsVersion), 'attr') ?>"></script>

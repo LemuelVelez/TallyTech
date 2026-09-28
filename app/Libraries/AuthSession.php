@@ -4,6 +4,9 @@ namespace App\Libraries;
 
 class AuthSession
 {
+    private const REMEMBER_COOKIE = 'tt_remember';
+    private const REMEMBER_TTL = 2592000;
+
     public static function build(array $user): void
     {
         $db = db_connect();
@@ -31,51 +34,124 @@ class AuthSession
         if ($compactSidebar === '1') session()->set('compact_sidebar', true);
     }
 
+    public static function rememberedAccount(): ?array
+    {
+        $row = self::validRememberRow();
+        if (! $row) {
+            return null;
+        }
+
+        return [
+            'id' => (int) $row['user_id'],
+            'username' => (string) $row['username'],
+            'display_name' => (string) $row['display_name'],
+            'role' => (string) $row['role'],
+        ];
+    }
+
     public static function restoreFromRememberCookie(): bool
     {
-        $cookie = (string) service('request')->getCookie('tt_remember');
-        if (! str_contains($cookie, ':')) return false;
-        [$selector, $secret] = array_pad(explode(':', $cookie, 2), 2, '');
-        if (! preg_match('/^[a-f0-9]{24}$/', $selector) || ! preg_match('/^[a-f0-9]{64}$/', $secret)) return false;
-        $db = db_connect();
-        $row = $db->table('auth_remember_tokens t')->select('t.*,u.username,u.display_name,u.role,u.status')->join('users u', 'u.id=t.user_id')->where('t.selector', $selector)->get()->getRowArray();
-        if (! $row || ($row['status'] ?? '') !== 'active' || strtotime((string) $row['expires_at']) <= time() || ! hash_equals((string) $row['token_hash'], hash('sha256', $secret))) {
-            if ($row) $db->table('auth_remember_tokens')->where('id', $row['id'])->delete();
+        $row = self::validRememberRow();
+        if (! $row) {
             return false;
         }
-        self::build($row);
-        self::rotate((int) $row['id'], $selector);
+
+        self::build([
+            'id' => (int) $row['user_id'],
+            'username' => (string) $row['username'],
+            'display_name' => (string) $row['display_name'],
+            'role' => (string) $row['role'],
+        ]);
+        self::rotate((int) $row['token_id'], (string) $row['selector']);
         return true;
     }
 
     public static function issue(int $userId): void
     {
+        self::deleteCurrentTokenRow();
         $selector = bin2hex(random_bytes(12));
         $secret = bin2hex(random_bytes(32));
-        db_connect()->table('auth_remember_tokens')->insert(['user_id'=>$userId,'selector'=>$selector,'token_hash'=>hash('sha256',$secret),'expires_at'=>date('Y-m-d H:i:s', time()+2592000),'created_at'=>date('Y-m-d H:i:s')]);
-        self::setCookie($selector . ':' . $secret, 2592000);
+        db_connect()->table('auth_remember_tokens')->insert([
+            'user_id' => $userId,
+            'selector' => $selector,
+            'token_hash' => hash('sha256', $secret),
+            'expires_at' => date('Y-m-d H:i:s', time() + self::REMEMBER_TTL),
+            'created_at' => date('Y-m-d H:i:s'),
+        ]);
+        self::setCookie($selector . ':' . $secret, self::REMEMBER_TTL);
     }
 
     private static function rotate(int $id, string $selector): void
     {
         $secret = bin2hex(random_bytes(32));
-        db_connect()->table('auth_remember_tokens')->where('id', $id)->update(['token_hash'=>hash('sha256',$secret),'expires_at'=>date('Y-m-d H:i:s', time()+2592000)]);
-        self::setCookie($selector . ':' . $secret, 2592000);
+        db_connect()->table('auth_remember_tokens')->where('id', $id)->update([
+            'token_hash' => hash('sha256', $secret),
+            'expires_at' => date('Y-m-d H:i:s', time() + self::REMEMBER_TTL),
+        ]);
+        self::setCookie($selector . ':' . $secret, self::REMEMBER_TTL);
     }
 
     public static function revokeCurrent(): void
     {
-        $cookie = (string) service('request')->getCookie('tt_remember');
-        if (str_contains($cookie, ':')) {
-            [$selector] = explode(':', $cookie, 2);
-            db_connect()->table('auth_remember_tokens')->where('selector', $selector)->delete();
-        }
+        self::deleteCurrentTokenRow();
         self::setCookie('', -3600);
     }
 
     public static function revokeUser(int $userId): void
     {
         db_connect()->table('auth_remember_tokens')->where('user_id', $userId)->delete();
+    }
+
+    private static function validRememberRow(): ?array
+    {
+        $cookie = (string) service('request')->getCookie(self::REMEMBER_COOKIE);
+        if (! str_contains($cookie, ':')) {
+            if ($cookie !== '') {
+                self::setCookie('', -3600);
+            }
+            return null;
+        }
+
+        [$selector, $secret] = array_pad(explode(':', $cookie, 2), 2, '');
+        if (! preg_match('/^[a-f0-9]{24}$/', $selector) || ! preg_match('/^[a-f0-9]{64}$/', $secret)) {
+            if (preg_match('/^[a-f0-9]{24}$/', $selector)) {
+                db_connect()->table('auth_remember_tokens')->where('selector', $selector)->delete();
+            }
+            self::setCookie('', -3600);
+            return null;
+        }
+
+        $db = db_connect();
+        $row = $db->table('auth_remember_tokens t')
+            ->select('t.id AS token_id,t.user_id,t.selector,t.token_hash,t.expires_at,u.username,u.display_name,u.role,u.status')
+            ->join('users u', 'u.id=t.user_id')
+            ->where('t.selector', $selector)
+            ->get()
+            ->getRowArray();
+
+        if (! $row
+            || ($row['status'] ?? '') !== 'active'
+            || strtotime((string) $row['expires_at']) <= time()
+            || ! hash_equals((string) $row['token_hash'], hash('sha256', $secret))) {
+            $db->table('auth_remember_tokens')->where('selector', $selector)->delete();
+            self::setCookie('', -3600);
+            return null;
+        }
+
+        return $row;
+    }
+
+    private static function deleteCurrentTokenRow(): void
+    {
+        $cookie = (string) service('request')->getCookie(self::REMEMBER_COOKIE);
+        if (! str_contains($cookie, ':')) {
+            return;
+        }
+
+        [$selector] = explode(':', $cookie, 2);
+        if (preg_match('/^[a-f0-9]{24}$/', $selector)) {
+            db_connect()->table('auth_remember_tokens')->where('selector', $selector)->delete();
+        }
     }
 
     private static function pick(array $settings, string $key, array $allowed, string $default): string
@@ -87,6 +163,6 @@ class AuthSession
 
     private static function setCookie(string $value, int $maxAge): void
     {
-        service('response')->setCookie('tt_remember', $value, $maxAge, '', '/', '', service('request')->isSecure(), true, 'Lax');
+        service('response')->setCookie(self::REMEMBER_COOKIE, $value, $maxAge, '', '/', '', service('request')->isSecure(), true, 'Lax');
     }
 }

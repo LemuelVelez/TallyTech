@@ -42,11 +42,25 @@ abstract class BaseController extends Controller
         return new ScoringService($this->repository());
     }
 
+    protected function managerSportIds(): array
+    {
+        if ((string) session()->get('role') !== 'manager') return [];
+        return array_values(array_unique(array_map(
+            'intval',
+            $this->repository()->assignedSportIds((int) session()->get('user_id'))
+        )));
+    }
+
     protected function managerSportId(): ?int
     {
-        if ((string) session()->get('role') !== 'manager') return null;
-        $ids = $this->repository()->assignedSportIds((int) session()->get('user_id'));
+        $ids = $this->managerSportIds();
         return count($ids) === 1 ? (int) $ids[0] : null;
+    }
+
+    protected function managerCanAccessSport(int $sportId): bool
+    {
+        return (string) session()->get('role') !== 'manager'
+            || in_array($sportId, $this->managerSportIds(), true);
     }
 
     /**

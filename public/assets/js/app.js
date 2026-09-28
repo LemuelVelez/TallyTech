@@ -1576,13 +1576,160 @@
 
 
   document.querySelectorAll('#bracket-generator').forEach((dialog) => {
-    const format=dialog.querySelector('select[name="tournament_format"]');
-    const third=dialog.querySelector('input[name="third_place_playoff"]');
-    const teamChecks=Array.from(dialog.querySelectorAll('input[name="team_ids[]"]'));
-    let pairingBox=dialog.querySelector('[data-pairing-builder]');
-    const refreshThird=()=>{if(!format||!third)return;const dbl=format.value==='double_elimination';third.disabled=dbl;if(dbl)third.checked=false;third.closest('label')?.classList.toggle('is-hidden',dbl);};
-    const refreshPairs=()=>{if(!pairingBox)return;const teams=teamChecks.filter(x=>x.checked).map(x=>({id:x.value,name:x.closest('label')?.textContent.trim()||x.value}));pairingBox.replaceChildren();if(![4,8,16].includes(teams.length)&&teams.length!==2)return;const title=document.createElement('span');title.className='field-label';title.textContent='Bracket Pairing';pairingBox.append(title);const used=[];const selects=[];for(let i=0;i<teams.length;i++){const sel=document.createElement('select');sel.name='pairing[]';sel.required=true;sel.dataset.pairingIndex=String(i);sel.innerHTML='<option value="">Select team</option>'+teams.map(t=>`<option value="${t.id}">${t.name}</option>`).join('');pairingBox.append(sel);selects.push(sel);if(i%2===1)pairingBox.append(document.createElement('br'));}const sync=()=>{const chosen=selects.map(x=>x.value).filter(Boolean);selects.forEach((sel,idx)=>{Array.from(sel.options).forEach(opt=>{if(!opt.value)return;opt.disabled=chosen.includes(opt.value)&&opt.value!==sel.value;});});if(selects.length>=2){const lastA=selects[selects.length-2],lastB=selects[selects.length-1];const remaining=teams.filter(t=>!selects.slice(0,-2).some(x=>x.value===t.id));if(remaining.length===2){lastA.value=remaining[0].id;lastB.value=remaining[1].id;lastA.disabled=false;lastB.disabled=false;lastA.classList.remove('pairing-readonly');lastB.classList.remove('pairing-readonly');lastA.removeAttribute('aria-readonly');lastB.removeAttribute('aria-readonly');lastA.classList.add('pairing-readonly');lastB.classList.add('pairing-readonly');lastA.setAttribute('aria-readonly','true');lastB.setAttribute('aria-readonly','true');}else{lastA.disabled=false;lastB.disabled=false;lastA.classList.remove('pairing-readonly');lastB.classList.remove('pairing-readonly');lastA.removeAttribute('aria-readonly');lastB.removeAttribute('aria-readonly');}}};selects.forEach(sel=>sel.addEventListener('change',sync));sync();};
-    format?.addEventListener('change',refreshThird);teamChecks.forEach(c=>c.addEventListener('change',refreshPairs));refreshThird();refreshPairs();
+    const format = dialog.querySelector('select[name="tournament_format"]');
+    const third = dialog.querySelector('input[name="third_place_playoff"]');
+    const teamChecks = Array.from(dialog.querySelectorAll('input[name="team_ids[]"]'));
+    const pairingBox = dialog.querySelector('[data-pairing-builder]');
+    const pairingNote = dialog.querySelector('[data-bracket-pairing-note]');
+    const generateButton = dialog.querySelector('[data-bracket-generate]');
+    const slots = [];
+    let checkOrder = [];
+
+    const teamName = (id) => {
+      const checkbox = teamChecks.find((item) => item.value === id);
+      return checkbox?.closest('label')?.textContent.trim() || id;
+    };
+    const selectedIds = () => checkOrder.filter((id) => teamChecks.some((item) => item.value === id && item.checked));
+    const trimEmptyMatches = () => {
+      while (slots.length >= 2 && !slots[slots.length - 1] && !slots[slots.length - 2]) slots.splice(-2, 2);
+    };
+    const visibleSlotCount = () => {
+      let lastUsed = slots.length - 1;
+      while (lastUsed >= 0 && !slots[lastUsed]) lastUsed--;
+      if (lastUsed < 0) return 0;
+      return Math.ceil((lastUsed + 1) / 2) * 2;
+    };
+    const refreshThird = () => {
+      if (!format || !third) return;
+      const doubleElimination = format.value === 'double_elimination';
+      third.disabled = doubleElimination;
+      if (doubleElimination) third.checked = false;
+      third.closest('label')?.classList.toggle('is-hidden', doubleElimination);
+    };
+    const refreshValidity = () => {
+      const ids = selectedIds();
+      const slotCount = visibleSlotCount();
+      const validCount = format?.value === 'double_elimination'
+        ? ids.length === 4
+        : [2, 4, 8, 16].includes(ids.length);
+      const allSlotsFilled = slotCount === ids.length
+        && slotCount > 0
+        && slots.slice(0, slotCount).every(Boolean)
+        && new Set(slots.slice(0, slotCount)).size === slotCount;
+      const valid = validCount && allSlotsFilled;
+      if (generateButton) generateButton.disabled = !valid;
+      if (!pairingNote) return;
+      if (ids.length === 0) {
+        pairingNote.textContent = 'Select 2, 4, 8, or 16 teams for single elimination, or exactly 4 for double elimination.';
+      } else if (!validCount) {
+        pairingNote.textContent = format?.value === 'double_elimination'
+          ? 'Double elimination requires exactly 4 checked teams.'
+          : 'Single elimination requires 2, 4, 8, or 16 checked teams.';
+      } else if (!allSlotsFilled) {
+        pairingNote.textContent = 'Fill every pairing slot before generating the bracket.';
+      } else {
+        pairingNote.textContent = 'Bracket pairing is ready to generate.';
+      }
+    };
+    const renderPairs = () => {
+      if (!pairingBox) return;
+      pairingBox.replaceChildren();
+      const ids = selectedIds();
+      if (ids.length === 0) {
+        slots.length = 0;
+        refreshValidity();
+        return;
+      }
+
+      const minimumSlots = Math.ceil(ids.length / 2) * 2;
+      while (slots.length < minimumSlots) slots.push(null);
+      const slotCount = Math.max(minimumSlots, visibleSlotCount());
+
+      const title = document.createElement('span');
+      title.className = 'field-label pairing-builder-title';
+      title.textContent = 'Bracket Pairing';
+      pairingBox.append(title);
+
+      for (let matchIndex = 0; matchIndex < slotCount / 2; matchIndex++) {
+        const match = document.createElement('div');
+        match.className = 'pairing-match';
+        const matchLabel = document.createElement('strong');
+        matchLabel.className = 'pairing-match-label';
+        matchLabel.textContent = `M${matchIndex + 1}`;
+        const row = document.createElement('div');
+        row.className = 'pairing-match-row';
+
+        [matchIndex * 2, matchIndex * 2 + 1].forEach((slotIndex, sideIndex) => {
+          const select = document.createElement('select');
+          select.name = 'pairing[]';
+          select.required = true;
+          select.dataset.pairingIndex = String(slotIndex);
+          const blank = document.createElement('option');
+          blank.value = '';
+          blank.textContent = sideIndex === 0 ? 'Team A' : 'Team B';
+          select.append(blank);
+          ids.forEach((id) => {
+            const option = document.createElement('option');
+            option.value = id;
+            option.textContent = teamName(id);
+            option.selected = slots[slotIndex] === id;
+            select.append(option);
+          });
+          select.addEventListener('change', () => {
+            const previous = slots[slotIndex] || null;
+            const next = select.value || null;
+            if (next && next !== previous) {
+              const duplicateIndex = slots.findIndex((value, index) => index !== slotIndex && value === next);
+              if (duplicateIndex >= 0) slots[duplicateIndex] = previous;
+            }
+            slots[slotIndex] = next;
+            trimEmptyMatches();
+            renderPairs();
+          });
+          row.append(select);
+          if (sideIndex === 0) {
+            const versus = document.createElement('span');
+            versus.className = 'pairing-vs';
+            versus.textContent = 'VS';
+            row.append(versus);
+          }
+        });
+        match.append(matchLabel, row);
+        pairingBox.append(match);
+      }
+      refreshValidity();
+    };
+
+    teamChecks.forEach((checkbox) => checkbox.addEventListener('change', () => {
+      const id = checkbox.value;
+      if (checkbox.checked) {
+        if (!checkOrder.includes(id)) checkOrder.push(id);
+        let emptyIndex = slots.findIndex((value) => !value);
+        if (emptyIndex < 0) emptyIndex = slots.length;
+        slots[emptyIndex] = id;
+      } else {
+        checkOrder = checkOrder.filter((value) => value !== id);
+        const slotIndex = slots.findIndex((value) => value === id);
+        if (slotIndex >= 0) slots[slotIndex] = null;
+        trimEmptyMatches();
+      }
+      renderPairs();
+    }));
+    format?.addEventListener('change', () => {
+      refreshThird();
+      refreshValidity();
+    });
+    refreshThird();
+    renderPairs();
+  });
+
+  document.querySelectorAll('[data-use-another-account]').forEach((button) => {
+    button.addEventListener('click', () => {
+      document.querySelector('[data-remember-card]')?.setAttribute('hidden', '');
+      const loginForm = document.querySelector('[data-login-form]');
+      loginForm?.removeAttribute('hidden');
+      loginForm?.querySelector('input[name="username"]')?.focus();
+    });
   });
 })();
 

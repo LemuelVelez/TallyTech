@@ -87,8 +87,10 @@ class ResultsController extends BaseController
             ));
         }
 
-        if (in_array((string)session()->get('role'), ['manager','facilitator'], true)) {
-            $allowed = $repository->assignedSportIds((int) session()->get('user_id'));
+        if (in_array((string) session()->get('role'), ['manager','facilitator'], true)) {
+            $allowed = (string) session()->get('role') === 'manager'
+                ? $this->managerSportIds()
+                : $repository->assignedSportIds((int) session()->get('user_id'));
             $schedules = array_values(array_filter($schedules, static fn(array $schedule): bool => in_array((int) $schedule['sport_id'], $allowed, true)));
             $scheduleIds = array_map('intval', array_column($schedules, 'id'));
             $results = array_values(array_filter($results, static fn(array $result): bool => in_array((int) $result['schedule_id'], $scheduleIds, true)));

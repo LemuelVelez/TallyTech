@@ -20,6 +20,28 @@ final class ScoringServiceTest extends TestCase
         $this->assertSame([], $data['sports']);
     }
 
+    public function testSportScoresCanBeRestrictedToManagerAssignedSports(): void
+    {
+        $event = ['id' => 17, 'name' => 'ISF 2026'];
+        $sports = [
+            ['id' => 7, 'name' => 'Basketball', 'category' => 'Men', 'result_type' => 'match', 'set_count' => 1, 'winning_points' => 21],
+            ['id' => 8, 'name' => 'Basketball', 'category' => 'Women', 'result_type' => 'match', 'set_count' => 1, 'winning_points' => 21],
+            ['id' => 9, 'name' => 'Volleyball', 'category' => 'Mixed', 'result_type' => 'match', 'set_count' => 3, 'winning_points' => 25],
+        ];
+        $repository = $this->createMock(ScoringRepositoryInterface::class);
+        $repository->method('activeEvent')->willReturn($event);
+        $repository->method('sports')->with(17)->willReturn($sports);
+        $repository->method('schedules')->with(17)->willReturn([]);
+        $repository->method('results')->with(17)->willReturn([]);
+        $repository->method('rankingBySport')->willReturn([]);
+
+        $data = (new ScoringService($repository))->sportScores(7, [7, 9]);
+
+        $this->assertSame([7, 9], array_map('intval', array_column($data['sports'], 'id')));
+        $this->assertSame([7], $data['selectedSportIds']);
+        $this->assertSame([7], array_map('intval', array_column($data['sportScoreTable']['categories'], 'sport_id')));
+    }
+
     public function testScoreboardDoesNotFallBackToHistoricalDataWithoutActiveEvent(): void
     {
         $repository = $this->createMock(ScoringRepositoryInterface::class);

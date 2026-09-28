@@ -885,7 +885,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
     {
         $role = (string) ($data['role'] ?? '');
         $this->assertAccountManagementPermission($role, $actorId);
-        $sportIds = $this->normaliseManagedUserSports($role, $sportIds);
+        $sportIds = $this->normaliseManagedUserSports($role, $sportIds, null, $actorId);
         $payload = array_intersect_key($data, array_flip(['username', 'password_hash', 'generated_password', 'display_name', 'role', 'status', 'created_by', 'created_at']));
         if (empty($payload['password_hash'])) {
             throw new RuntimeException('Password is required.');
@@ -919,7 +919,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             // Allow status/profile maintenance while no event is active without erasing historical assignments.
             $syncSports = false;
         } else {
-            $sportIds = $this->normaliseManagedUserSports($role, $sportIds, $id);
+            $sportIds = $this->normaliseManagedUserSports($role, $sportIds, $id, $actorId);
         }
 
         $payload = array_intersect_key($data, array_flip(['username', 'password_hash', 'generated_password', 'display_name', 'role', 'status', 'created_by']));
@@ -2054,16 +2054,34 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         }
     }
 
-    private function normaliseManagedUserSports(string $role, array $sportIds, ?int $ignoreUserId = null): array
+    private function normaliseManagedUserSports(string $role, array $sportIds, ?int $ignoreUserId = null, ?int $actorId = null): array
     {
         if (! in_array($role, ['manager','facilitator'], true)) throw new RuntimeException('Invalid managed account role.');
-        if (! $this->activeEvent()) throw new RuntimeException('Activate an event before assigning a sport.');
-        $sportIds=$this->validateActiveSportIds($sportIds);
-        if(count($sportIds)!==1) throw new RuntimeException('Exactly one active-event sport must be assigned.');
-        if($role==='manager'){
-            $builder=$this->db->table('user_sports us')->join('users u','u.id=us.user_id')->where('us.sport_id',$sportIds[0])->where('u.role','manager')->where('u.status','active'); if($ignoreUserId)$builder->where('u.id !=',$ignoreUserId); $existing=$builder->countAllResults();
-            if($existing>0) throw new RuntimeException('This sport already has an active Tournament Manager.');
+        if (! $this->activeEvent()) throw new RuntimeException('Activate an event before assigning sports.');
+        $sportIds = $this->validateActiveSportIds($sportIds);
+        if ($sportIds === []) throw new RuntimeException('At least one active-event sport must be assigned.');
+
+        if ($role === 'manager') {
+            foreach ($sportIds as $sportId) {
+                $builder = $this->db->table('user_sports us')
+                    ->join('users u', 'u.id=us.user_id')
+                    ->where('us.sport_id', $sportId)
+                    ->where('u.role', 'manager')
+                    ->where('u.status', 'active');
+                if ($ignoreUserId) $builder->where('u.id !=', $ignoreUserId);
+                if ($builder->countAllResults() > 0) {
+                    $sport = $this->requireRow('sports', $sportId, 'Sport');
+                    $sportLabel = trim((string) ($sport['name'] ?? 'Sport') . (! empty($sport['category']) ? ' · ' . $sport['category'] : ''));
+                    throw new RuntimeException($sportLabel . ' already has an active Tournament Manager.');
+                }
+            }
+        } elseif ($actorId !== null) {
+            $managerSportIds = $this->assignedSportIds($actorId);
+            if ($managerSportIds === [] || array_diff($sportIds, $managerSportIds) !== []) {
+                throw new RuntimeException('Facilitator sports must be a non-empty subset of the Tournament Manager assigned sports.');
+            }
         }
+
         return $sportIds;
     }
 

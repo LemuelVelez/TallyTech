@@ -5,6 +5,7 @@ $table = $sportScoreTable ?? [];
 $selectedSport = $table['selectedSport'] ?? null;
 $selectedSportIds = array_map('intval', $table['selectedSportIds'] ?? []);
 $maxSetCount = max(1, (int) ($table['maxSetCount'] ?? 1));
+$sportGroups = $table['sportGroups'] ?? [];
 $ordinal = static function (int $number): string {
     if ($number % 100 >= 11 && $number % 100 <= 13) {
         return $number . 'th';
@@ -19,8 +20,8 @@ $ordinal = static function (int $number): string {
 $scoreText = static fn(float|int $score): string => rtrim(rtrim(number_format((float) $score, 2, '.', ''), '0'), '.');
 ?>
 <section class="<?= esc($panelClass) ?> sport-filter-card">
-    <div class="section-title"><h2><?= (string)session()->get('role')==='manager' ? 'Assigned Sport' : 'Select Sport' ?></h2><span>Only the selected sport is shown</span></div>
-    <?php if((string)session()->get('role')==='manager'): ?><div class="form-note"><b><?= esc($selectedSport['name']??'Assigned sport') ?></b><?= !empty($selectedSport['category'])?' · '.esc($selectedSport['category']):'' ?></div><?php else: ?><nav class="sport-chip-row" aria-label="Choose sport"><?php foreach ($table['sportGroups'] ?? [] as $sportGroup): ?><?php $active = in_array((int) $sportGroup['id'], $selectedSportIds, true); ?><a class="chip sport-chip <?= $active ? 'active' : '' ?>" href="<?= esc(site_url($action) . '?sport=' . (int) $sportGroup['id'], 'attr') ?>" <?= $active ? 'aria-current="page"' : '' ?>><?= esc($sportGroup['name']) ?></a><?php endforeach; ?></nav><?php endif; ?>
+    <div class="section-title"><h2><?= (string)session()->get('role')==='manager' ? (count($sportGroups) > 1 ? 'Assigned Sports' : 'Assigned Sport') : 'Select Sport' ?></h2><span>Only the selected sport is shown</span></div>
+    <?php if ((string) session()->get('role') === 'manager' && count($sportGroups) === 1): ?><div class="form-note"><b><?= esc($selectedSport['name']??'Assigned sport') ?></b><?= !empty($selectedSport['category'])?' · '.esc($selectedSport['category']):'' ?></div><?php elseif ((string) session()->get('role') === 'manager'): ?><form method="get" action="<?= site_url($action) ?>" class="inline-filter manager-sport-filter"><label>Sport<select name="sport" onchange="this.form.submit()"><?php foreach ($sportGroups as $sportGroup): ?><?php $active = in_array((int) $sportGroup['id'], $selectedSportIds, true); ?><option value="<?= (int) $sportGroup['id'] ?>" <?= $active ? 'selected' : '' ?>><?= esc($sportGroup['name']) ?></option><?php endforeach; ?></select></label><noscript><button class="btn">View</button></noscript></form><?php else: ?><nav class="sport-chip-row" aria-label="Choose sport"><?php foreach ($sportGroups as $sportGroup): ?><?php $active = in_array((int) $sportGroup['id'], $selectedSportIds, true); ?><a class="chip sport-chip <?= $active ? 'active' : '' ?>" href="<?= esc(site_url($action) . '?sport=' . (int) $sportGroup['id'], 'attr') ?>" <?= $active ? 'aria-current="page"' : '' ?>><?= esc($sportGroup['name']) ?></a><?php endforeach; ?></nav><?php endif; ?>
 </section>
 
 <?php if ($selectedSport): ?>

@@ -8,12 +8,12 @@ class RoleFilter implements FilterInterface
 {
     public function before(RequestInterface $request, $arguments = null)
     {
-        if (! session()->get('user_id') && ! AuthSession::restoreFromRememberCookie()) return redirect()->to('/login')->with('error','Please sign in to continue.');
+        if (! session()->get('user_id') && ! AuthSession::restoreFromRememberCookie()) return redirect()->to('/login')->withCookies()->with('error','Please sign in to continue.');
         try { $user=db_connect()->table('users')->select('role,status')->where('id',(int)session()->get('user_id'))->get()->getRowArray(); }
-        catch (\Throwable $e) { session()->destroy(); return redirect()->to('/login')->with('error','Your session could not be verified. Please sign in again.'); }
-        if (! $user || ($user['status']??'')!=='active') { AuthSession::revokeCurrent(); session()->destroy(); return redirect()->to('/login')->with('error','Your account is inactive or no longer available.'); }
+        catch (\Throwable $e) { session()->destroy(); return redirect()->to('/login')->withCookies()->with('error','Your session could not be verified. Please sign in again.'); }
+        if (! $user || ($user['status']??'')!=='active') { AuthSession::revokeCurrent(); session()->destroy(); return redirect()->to('/login')->withCookies()->with('error','Your account is inactive or no longer available.'); }
         $role=(string)($user['role']??''); session()->set('role',$role);
-        if (! $role || ! in_array($role,$arguments??[],true)) return redirect()->to('/dashboard')->with('error','You do not have access to that page.');
+        if (! $role || ! in_array($role,$arguments??[],true)) return redirect()->to('/dashboard')->withCookies()->with('error','You do not have access to that page.');
     }
-    public function after(RequestInterface $request, ResponseInterface $response, $arguments = null){}
+    public function after(RequestInterface $request, ResponseInterface $response, $arguments = null){if(method_exists($response,'withCookies'))$response->withCookies();}
 }

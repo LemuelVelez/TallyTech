@@ -25,14 +25,25 @@ class ReportsController extends BaseController
             $eventId = in_array($activeEventId, $eventIds, true) ? $activeEventId : (int) ($eventIds[0] ?? 0);
         }
 
-        $sports = $eventId > 0 ? $repository->sports($eventId) : [];
+        $sports = $this->actorSports($eventId > 0 ? $repository->sports($eventId) : []);
         $sportIds = array_map('intval', array_column($sports, 'id'));
         $rawSportId = $this->request->getGet('sport_id');
         $sportId = is_scalar($rawSportId) && preg_match('/^[1-9]\d*$/', (string) $rawSportId) ? (int) $rawSportId : 0;
-        if (! in_array($sportId, $sportIds, true)) {
+        $inputError = null;
+        if ((string) session()->get('role') === 'manager') {
+            $hasRequestedSport = is_scalar($rawSportId) && trim((string) $rawSportId) !== '';
+            if ($sportIds === []) {
+                $inputError = 'Your assigned sports are not available for the selected event.';
+                $sportId = 0;
+            } elseif (($hasRequestedSport && $sportId === 0) || ($sportId > 0 && ! in_array($sportId, $sportIds, true))) {
+                $inputError = 'You can only run reports for your assigned sports.';
+                $sportId = (int) $sportIds[0];
+            } elseif ($sportId === 0) {
+                $sportId = (int) $sportIds[0];
+            }
+        } elseif (! in_array($sportId, $sportIds, true)) {
             $sportId = 0;
         }
-        if ((string)session()->get('role')==='manager') { $managerSportId=$this->managerSportId(); if(!$managerSportId||!in_array($managerSportId,$sportIds,true)) throw new \RuntimeException('Your assigned sport is not available for this report.'); $sportId=$managerSportId; }
 
         $category = $string($this->request->getGet('category'));
         if (! in_array($category, ['Men', 'Women', 'Mixed'], true)) {
@@ -69,16 +80,20 @@ class ReportsController extends BaseController
             'date_range' => $dateRange,
             'from' => $from,
             'to' => $to,
-        ]];
+        ], $inputError];
     }
 
     public function index()
     {
-        [$type, $filters] = $this->input();
+        [$type, $filters, $inputError] = $this->input();
+        if ($inputError !== null) {
+            $target = (string) session()->get('role') === 'manager' && (int) $filters['sport_id'] === 0 ? '/dashboard' : '/reports';
+            return redirect()->to($target)->with('error', $inputError);
+        }
         $repository = $this->repository();
         $events = $repository->events();
         $event = $this->selectedEvent($events, (int) $filters['event_id']);
-        $sports = (int) $filters['event_id'] > 0 ? $repository->sports((int) $filters['event_id']) : [];
+        $sports = $this->actorSports((int) $filters['event_id'] > 0 ? $repository->sports((int) $filters['event_id']) : []);
         $categories = array_values(array_unique(array_filter(array_map(static fn(array $sport): string => (string) ($sport['category'] ?? ''), $sports))));
         $reporting = new ReportingService($repository);
 
@@ -102,10 +117,14 @@ class ReportsController extends BaseController
 
     public function print()
     {
-        [$type, $filters] = $this->input();
+        [$type, $filters, $inputError] = $this->input();
+        if ($inputError !== null) {
+            $target = (string) session()->get('role') === 'manager' && (int) $filters['sport_id'] === 0 ? '/dashboard' : '/reports';
+            return redirect()->to($target)->with('error', $inputError);
+        }
         $repository = $this->repository();
         $event = $this->selectedEvent($repository->events(), (int) $filters['event_id']);
-        $sports = (int) $filters['event_id'] > 0 ? $repository->sports((int) $filters['event_id']) : [];
+        $sports = $this->actorSports((int) $filters['event_id'] > 0 ? $repository->sports((int) $filters['event_id']) : []);
         $reporting = new ReportingService($repository);
         $settings = $repository->getUserSettings((int) session()->get('user_id'));
 
@@ -128,10 +147,14 @@ class ReportsController extends BaseController
 
     public function xlsx()
     {
-        [$type, $filters] = $this->input();
+        [$type, $filters, $inputError] = $this->input();
+        if ($inputError !== null) {
+            $target = (string) session()->get('role') === 'manager' && (int) $filters['sport_id'] === 0 ? '/dashboard' : '/reports';
+            return redirect()->to($target)->with('error', $inputError);
+        }
         $repository = $this->repository();
         $event = $this->selectedEvent($repository->events(), (int) $filters['event_id']);
-        $sports = (int) $filters['event_id'] > 0 ? $repository->sports((int) $filters['event_id']) : [];
+        $sports = $this->actorSports((int) $filters['event_id'] > 0 ? $repository->sports((int) $filters['event_id']) : []);
         $reporting = new ReportingService($repository);
         try {
             $rows = $reporting->report($type, $filters, $event);
@@ -149,6 +172,16 @@ class ReportsController extends BaseController
             $query = http_build_query(array_merge(['type' => $type], $filters));
             return redirect()->to('/reports?' . $query)->with('error', $this->safeErrorMessage($e, 'Excel report could not be generated.'));
         }
+    }
+
+    private function actorSports(array $sports): array
+    {
+        if ((string) session()->get('role') !== 'manager') return $sports;
+        $managerSportIds = $this->managerSportIds();
+        return array_values(array_filter(
+            $sports,
+            static fn(array $sport): bool => in_array((int) ($sport['id'] ?? 0), $managerSportIds, true)
+        ));
     }
 
     private function selectedEvent(array $events, int $eventId): ?array

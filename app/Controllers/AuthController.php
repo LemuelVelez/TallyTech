@@ -14,7 +14,12 @@ class AuthController extends BaseController
             session()->setFlashdata('success', 'Logged out successfully.');
             return redirect()->to('/login');
         }
-        return view('auth/login', ['title' => 'Sign in']);
+
+        $rememberedAccount = AuthSession::rememberedAccount();
+        return $this->response->setBody(view('auth/login', [
+            'title' => 'Sign in',
+            'rememberedAccount' => $rememberedAccount,
+        ]));
     }
 
     public function attempt()
@@ -27,14 +32,34 @@ class AuthController extends BaseController
             return redirect()->back()->with('error', 'Sign-in is temporarily unavailable. Please try again.')->with('login_username', $username);
         }
         if (! $user) return redirect()->back()->with('error', 'Invalid username or password.')->with('login_username', $username);
+
         AuthSession::build($user);
-        if ($this->postString('remember_me') === '1') AuthSession::issue((int) $user['id']);
-        return redirect()->to('/dashboard')->with('success', 'Signed in successfully.');
+        if ($this->postString('remember_me') === '1') {
+            AuthSession::issue((int) $user['id']);
+        } else {
+            AuthSession::revokeCurrent();
+        }
+
+        return redirect()->to('/dashboard')->withCookies()->with('success', 'Signed in successfully.');
+    }
+
+    public function continueRemembered()
+    {
+        if (! AuthSession::restoreFromRememberCookie()) {
+            return redirect()->to('/login')->withCookies()->with('error', 'This remembered sign-in is no longer available. Please sign in again.');
+        }
+
+        return redirect()->to('/dashboard')->withCookies()->with('success', 'Signed in successfully.');
+    }
+
+    public function forgetRemembered()
+    {
+        AuthSession::revokeCurrent();
+        return redirect()->to('/login')->withCookies()->with('success', 'This device is no longer remembered.');
     }
 
     public function logout()
     {
-        AuthSession::revokeCurrent();
         session()->destroy();
         return redirect()->to('/login?logged_out=1');
     }
