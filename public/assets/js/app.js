@@ -619,7 +619,15 @@
       if (event.target === dialog) dialog.close();
     });
 
+    dialog.addEventListener('cancel', (event) => {
+      if (openDatePickerState?.contentHost === dialog) {
+        event.preventDefault();
+        closeDatePicker(openDatePickerState, true);
+      }
+    });
+
     dialog.addEventListener('close', () => {
+      if (openDatePickerState?.contentHost === dialog) closeDatePicker(openDatePickerState);
       if (dialog === confirmDialog) return;
       if (lastDialogTrigger?.isConnected) lastDialogTrigger.focus();
       lastDialogTrigger = null;
@@ -628,6 +636,7 @@
 
   const selectStates = new Map();
   let openSelectState = null;
+  let openDatePickerState = null;
   let sleekSelectIdCounter = 0;
 
   const supportsPopover = 'showPopover' in HTMLElement.prototype;
@@ -713,6 +722,7 @@
 
   const openSleekSelect = (state, focusSelected = false) => {
     if (!state || state.select.disabled) return;
+    if (openDatePickerState) closeDatePicker(openDatePickerState);
     if (openSelectState && openSelectState !== state) closeSleekSelect(openSelectState);
 
     refreshSleekSelect(state);
@@ -871,6 +881,924 @@
     root?.querySelectorAll?.('select').forEach(initSleekSelect);
   };
 
+
+  const datePickerStates = new Map();
+  let datePickerIdCounter = 0;
+
+  const datePickerSelector = 'input[type="date"]:not([data-native-picker]), input[type="datetime-local"]:not([data-native-picker]), input[type="time"]:not([data-native-picker])';
+  const datePickerMonthFormatter = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
+  const datePickerDateFormatter = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  const datePickerFullDateFormatter = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  const datePickerMonthNames = Array.from({ length: 12 }, (_, month) => new Intl.DateTimeFormat(undefined, { month: 'short' }).format(new Date(2024, month, 1)));
+  const datePickerWeekdays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+  const padDatePickerNumber = (value) => String(value).padStart(2, '0');
+  const datePickerPartsToDate = (parts) => new Date(parts.year, parts.month - 1, parts.day);
+  const datePickerDateKey = (parts) => `${String(parts.year).padStart(4, '0')}-${padDatePickerNumber(parts.month)}-${padDatePickerNumber(parts.day)}`;
+  const datePickerTimeKey = (parts) => `${padDatePickerNumber(parts.hour)}:${padDatePickerNumber(parts.minute)}`;
+  const datePickerDateTimeKey = (parts) => `${datePickerDateKey(parts)}T${datePickerTimeKey(parts)}`;
+  const datePickerTodayParts = () => {
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate(), hour: now.getHours(), minute: now.getMinutes() };
+  };
+  const parseDatePickerValue = (type, value) => {
+    const source = String(value || '').trim();
+    if (!source) return null;
+    if (type === 'date') {
+      const match = /^(\d{4,})-(\d{2})-(\d{2})$/.exec(source);
+      if (!match) return null;
+      return { year: Number(match[1]), month: Number(match[2]), day: Number(match[3]), hour: 0, minute: 0 };
+    }
+    if (type === 'time') {
+      const match = /^(\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?$/.exec(source);
+      if (!match) return null;
+      const today = datePickerTodayParts();
+      return { ...today, hour: Number(match[1]), minute: Number(match[2]) };
+    }
+    const match = /^(\d{4,})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?$/.exec(source);
+    if (!match) return null;
+    return { year: Number(match[1]), month: Number(match[2]), day: Number(match[3]), hour: Number(match[4]), minute: Number(match[5]) };
+  };
+  const serializeDatePickerValue = (type, parts) => {
+    if (!parts) return '';
+    if (type === 'date') return datePickerDateKey(parts);
+    if (type === 'time') return datePickerTimeKey(parts);
+    return datePickerDateTimeKey(parts);
+  };
+  const compareDatePickerParts = (a, b) => datePickerDateKey(a).localeCompare(datePickerDateKey(b));
+  const addDatePickerDays = (parts, amount) => {
+    const date = datePickerPartsToDate(parts);
+    date.setDate(date.getDate() + amount);
+    return { ...parts, year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate() };
+  };
+  const addDatePickerMonths = (parts, amount) => {
+    const day = parts.day;
+    const date = new Date(parts.year, parts.month - 1 + amount, 1);
+    const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+    return { ...parts, year: date.getFullYear(), month: date.getMonth() + 1, day: Math.min(day, lastDay) };
+  };
+  const getDatePickerIconBase = () => document.querySelector('.ui-icon use[href*="#"]')?.getAttribute('href')?.split('#')[0] || 'assets/icons/ui.svg';
+  const makeDatePickerIcon = (name, className = 'ui-icon') => {
+    const namespace = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(namespace, 'svg');
+    const use = document.createElementNS(namespace, 'use');
+    svg.setAttribute('class', className);
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+    use.setAttribute('href', `${getDatePickerIconBase()}#${name}`);
+    svg.appendChild(use);
+    return svg;
+  };
+  const getDatePickerLabel = (input) => {
+    const explicit = input.labels?.[0];
+    const wrapperLabel = input.closest('label');
+    const label = explicit || wrapperLabel;
+    if (!label) return input.getAttribute('aria-label') || input.name || 'Date';
+    const clone = label.cloneNode(true);
+    clone.querySelectorAll('input, select, textarea, button, .sleek-select, .date-picker').forEach((node) => node.remove());
+    return clone.textContent.replace(/\s+/g, ' ').trim() || input.getAttribute('aria-label') || input.name || 'Date';
+  };
+  const getLinkedDatePickerStart = (input) => {
+    if (!input.form) return null;
+    if (input.type === 'date' && input.name === 'end_date') return input.form.elements.namedItem('start_date');
+    if (input.type === 'date' && input.name === 'to') return input.form.elements.namedItem('from');
+    return null;
+  };
+  const effectiveDatePickerMin = (state) => {
+    const ownMin = state.input.min || '';
+    const linkedMin = state.linkedStart?.value || '';
+    if (!linkedMin) return ownMin;
+    if (!ownMin) return linkedMin;
+    return ownMin.localeCompare(linkedMin) >= 0 ? ownMin : linkedMin;
+  };
+  const datePickerConstraintParts = (state, kind) => parseDatePickerValue(state.type, kind === 'min' ? effectiveDatePickerMin(state) : state.input.max);
+  const datePickerStepSeconds = (state) => {
+    if (state.input.step === 'any') return null;
+    const raw = Number(state.input.step || (state.type === 'date' ? 1 : 60));
+    return Number.isFinite(raw) && raw > 0 ? raw : (state.type === 'date' ? 1 : 60);
+  };
+  const datePickerStepMatches = (state, parts) => {
+    const step = datePickerStepSeconds(state);
+    if (step === null) return true;
+    if (state.type === 'date') {
+      const base = datePickerConstraintParts(state, 'min') || { year: 1970, month: 1, day: 1, hour: 0, minute: 0 };
+      const candidateDays = Math.trunc(Date.UTC(parts.year, parts.month - 1, parts.day) / 86400000);
+      const baseDays = Math.trunc(Date.UTC(base.year, base.month - 1, base.day) / 86400000);
+      return Math.abs((candidateDays - baseDays) % step) < 1e-9;
+    }
+    if (state.type === 'time') {
+      const base = datePickerConstraintParts(state, 'min') || { hour: 0, minute: 0 };
+      const candidateSeconds = (parts.hour * 3600) + (parts.minute * 60);
+      const baseSeconds = (base.hour * 3600) + (base.minute * 60);
+      return Math.abs((candidateSeconds - baseSeconds) % step) < 1e-9;
+    }
+    const base = datePickerConstraintParts(state, 'min') || { year: 1970, month: 1, day: 1, hour: 0, minute: 0 };
+    const candidateSeconds = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute) / 1000;
+    const baseSeconds = Date.UTC(base.year, base.month - 1, base.day, base.hour, base.minute) / 1000;
+    return Math.abs((candidateSeconds - baseSeconds) % step) < 1e-9;
+  };
+  const datePickerWithinBounds = (state, parts) => {
+    const value = serializeDatePickerValue(state.type, parts);
+    const min = effectiveDatePickerMin(state);
+    const max = state.input.max || '';
+    if (state.type === 'time' && min && max && min > max) {
+      if (!(value >= min || value <= max)) return false;
+    } else {
+      if (min && value < min) return false;
+      if (max && value > max) return false;
+    }
+    return true;
+  };
+  const datePickerCandidateAllowed = (state, parts) => datePickerWithinBounds(state, parts) && datePickerStepMatches(state, parts);
+  const datePickerDayAllowed = (state, parts) => {
+    if (state.type === 'time') return false;
+    const dayKey = datePickerDateKey(parts);
+    const min = effectiveDatePickerMin(state);
+    const max = state.input.max || '';
+    const minDay = min ? min.slice(0, 10) : '';
+    const maxDay = max ? max.slice(0, 10) : '';
+    if (minDay && dayKey < minDay) return false;
+    if (maxDay && dayKey > maxDay) return false;
+    if (state.type === 'date') return datePickerStepMatches(state, parts);
+    for (let hour = 0; hour < 24; hour += 1) {
+      for (let minute = 0; minute < 60; minute += 1) {
+        if (datePickerCandidateAllowed(state, { ...parts, hour, minute })) return true;
+      }
+    }
+    return false;
+  };
+  const datePickerMonthHasAllowedDay = (state, year, month) => {
+    const days = new Date(year, month, 0).getDate();
+    for (let day = 1; day <= days; day += 1) {
+      if (datePickerDayAllowed(state, { year, month, day, hour: state.draft.hour, minute: state.draft.minute })) return true;
+    }
+    return false;
+  };
+  const datePickerHour12 = (hour24) => {
+    const hour = hour24 % 12;
+    return hour === 0 ? 12 : hour;
+  };
+  const datePickerPeriod = (hour24) => hour24 >= 12 ? 'PM' : 'AM';
+  const datePickerHour24 = (hour12, period) => {
+    const normalized = hour12 % 12;
+    return period === 'PM' ? normalized + 12 : normalized;
+  };
+  const formatDatePickerTrigger = (state) => {
+    const parsed = parseDatePickerValue(state.type, state.input.value);
+    if (!parsed) return state.type === 'date' ? 'Select date' : state.type === 'time' ? 'Select time' : 'Select date & time';
+    if (state.type === 'time') {
+      return `${datePickerHour12(parsed.hour)}:${padDatePickerNumber(parsed.minute)} ${datePickerPeriod(parsed.hour)}`;
+    }
+    const dateText = datePickerDateFormatter.format(datePickerPartsToDate(parsed));
+    if (state.type === 'date') return dateText;
+    return `${dateText} · ${datePickerHour12(parsed.hour)}:${padDatePickerNumber(parsed.minute)} ${datePickerPeriod(parsed.hour)}`;
+  };
+  const syncDatePickerTrigger = (state) => {
+    const text = formatDatePickerTrigger(state);
+    state.valueNode.textContent = text;
+    state.trigger.title = text;
+    state.trigger.disabled = state.input.disabled;
+    state.trigger.classList.toggle('is-placeholder', !state.input.value);
+    state.trigger.classList.toggle('is-readonly', state.input.readOnly);
+    state.trigger.setAttribute('aria-readonly', state.input.readOnly ? 'true' : 'false');
+    state.trigger.setAttribute('aria-disabled', state.input.disabled || state.input.readOnly ? 'true' : 'false');
+    state.trigger.setAttribute('aria-invalid', state.input.matches(':invalid') ? 'true' : 'false');
+  };
+  const commitDatePickerValue = (state, value, closeAfter = false) => {
+    if (state.input.readOnly || state.input.disabled) return;
+    state.input.value = value;
+    state.input.dispatchEvent(new Event('input', { bubbles: true }));
+    state.input.dispatchEvent(new Event('change', { bubbles: true }));
+    syncDatePickerTrigger(state);
+    if (closeAfter) closeDatePicker(state, true);
+  };
+  const setDatePickerDraftFromInput = (state) => {
+    const parsed = parseDatePickerValue(state.type, state.input.value);
+    const fallback = datePickerTodayParts();
+    state.draft = parsed || fallback;
+    state.draftHasValue = Boolean(parsed);
+    state.viewYear = state.draft.year;
+    state.viewMonth = state.draft.month;
+    state.focusDate = { ...state.draft };
+    state.jumpCenterYear = state.viewYear;
+  };
+  const clampDatePickerFocus = (state, parts) => {
+    let candidate = { ...parts };
+    const min = datePickerConstraintParts(state, 'min');
+    const max = datePickerConstraintParts(state, 'max');
+    if (min && compareDatePickerParts(candidate, min) < 0) candidate = { ...candidate, year: min.year, month: min.month, day: min.day };
+    if (max && compareDatePickerParts(candidate, max) > 0) candidate = { ...candidate, year: max.year, month: max.month, day: max.day };
+    return candidate;
+  };
+  const findAllowedDatePickerDay = (state, start, direction) => {
+    let candidate = clampDatePickerFocus(state, start);
+    for (let attempts = 0; attempts < 3700; attempts += 1) {
+      if (datePickerDayAllowed(state, candidate)) return candidate;
+      candidate = addDatePickerDays(candidate, direction);
+      const clamped = clampDatePickerFocus(state, candidate);
+      if (datePickerDateKey(clamped) !== datePickerDateKey(candidate)) return null;
+    }
+    return null;
+  };
+  const focusDatePickerDay = (state, parts) => {
+    const target = findAllowedDatePickerDay(state, parts, 1) || findAllowedDatePickerDay(state, parts, -1) || parts;
+    state.focusDate = target;
+    state.viewYear = target.year;
+    state.viewMonth = target.month;
+    state.showJump = false;
+    renderDatePicker(state);
+    requestAnimationFrame(() => state.panel.querySelector(`[data-date-picker-day="${datePickerDateKey(target)}"]`)?.focus({ preventScroll: true }));
+  };
+  const renderDatePickerCalendar = (state) => {
+    const calendar = state.calendar;
+    if (!calendar) return;
+    state.monthLabel.textContent = datePickerMonthFormatter.format(new Date(state.viewYear, state.viewMonth - 1, 1));
+    state.calendarView.hidden = state.showJump;
+    state.jumpView.hidden = !state.showJump;
+    if (state.showJump) {
+      renderDatePickerJump(state);
+      return;
+    }
+
+    state.dayGrid.innerHTML = '';
+    const first = new Date(state.viewYear, state.viewMonth - 1, 1);
+    const gridStart = new Date(state.viewYear, state.viewMonth - 1, 1 - first.getDay());
+    const todayKey = datePickerDateKey(datePickerTodayParts());
+    const selectedKey = state.draftHasValue ? datePickerDateKey(state.draft) : '';
+    const focusKey = datePickerDateKey(state.focusDate || state.draft);
+
+    for (let index = 0; index < 42; index += 1) {
+      const date = new Date(gridStart);
+      date.setDate(gridStart.getDate() + index);
+      const parts = { year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate(), hour: state.draft.hour, minute: state.draft.minute };
+      const key = datePickerDateKey(parts);
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'date-picker-day';
+      button.dataset.datePickerDay = key;
+      button.setAttribute('role', 'gridcell');
+      button.setAttribute('aria-label', datePickerFullDateFormatter.format(date));
+      button.setAttribute('aria-selected', key === selectedKey ? 'true' : 'false');
+      button.textContent = String(parts.day);
+      button.disabled = !datePickerDayAllowed(state, parts);
+      button.tabIndex = key === focusKey && !button.disabled ? 0 : -1;
+      button.classList.toggle('is-outside', parts.month !== state.viewMonth);
+      button.classList.toggle('is-today', key === todayKey);
+      button.classList.toggle('is-selected', key === selectedKey);
+      state.dayGrid.appendChild(button);
+    }
+
+    if (!state.dayGrid.querySelector('[tabindex="0"]')) {
+      const firstEnabled = state.dayGrid.querySelector('.date-picker-day:not(:disabled)');
+      if (firstEnabled) firstEnabled.tabIndex = 0;
+    }
+  };
+  const renderDatePickerJump = (state) => {
+    state.jumpYears.innerHTML = '';
+    state.jumpMonths.innerHTML = '';
+    const startYear = state.jumpCenterYear - 5;
+    for (let offset = 0; offset < 11; offset += 1) {
+      const year = startYear + offset;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'date-picker-jump-option';
+      button.dataset.datePickerYear = String(year);
+      button.textContent = String(year);
+      button.classList.toggle('is-selected', year === state.viewYear);
+      const min = datePickerConstraintParts(state, 'min');
+      const max = datePickerConstraintParts(state, 'max');
+      button.disabled = Boolean((min && year < min.year) || (max && year > max.year));
+      state.jumpYears.appendChild(button);
+    }
+    state.jumpYearRange.textContent = `${startYear}–${startYear + 10}`;
+    datePickerMonthNames.forEach((name, monthIndex) => {
+      const month = monthIndex + 1;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'date-picker-jump-option';
+      button.dataset.datePickerMonth = String(month);
+      button.textContent = name;
+      button.disabled = !datePickerMonthHasAllowedDay(state, state.viewYear, month);
+      button.classList.toggle('is-selected', month === state.viewMonth);
+      state.jumpMonths.appendChild(button);
+    });
+  };
+  const hasAllowedDatePickerMinute = (state, hour24) => {
+    for (let minute = 0; minute < 60; minute += 1) {
+      if (datePickerCandidateAllowed(state, { ...state.draft, hour: hour24, minute })) return true;
+    }
+    return false;
+  };
+  const renderDatePickerTime = (state) => {
+    if (!state.timePanel) return;
+    const period = datePickerPeriod(state.draft.hour);
+    const hour12 = datePickerHour12(state.draft.hour);
+    state.hourList.innerHTML = '';
+    state.minuteList.innerHTML = '';
+    state.periodList.innerHTML = '';
+
+    for (let hour = 1; hour <= 12; hour += 1) {
+      const hour24 = datePickerHour24(hour, period);
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'date-picker-time-option';
+      button.dataset.datePickerHour = String(hour);
+      button.textContent = String(hour);
+      button.setAttribute('role', 'option');
+      const hourSelected = hour === hour12 && state.draftHasValue;
+      button.setAttribute('aria-selected', hourSelected ? 'true' : 'false');
+      button.classList.toggle('is-selected', hourSelected);
+      button.disabled = !hasAllowedDatePickerMinute(state, hour24);
+      button.tabIndex = hourSelected && !button.disabled ? 0 : -1;
+      state.hourList.appendChild(button);
+    }
+
+    let renderedMinutes = 0;
+    for (let minute = 0; minute < 60; minute += 1) {
+      const candidate = { ...state.draft, minute };
+      if (!datePickerStepMatches(state, candidate)) continue;
+      renderedMinutes += 1;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'date-picker-time-option';
+      button.dataset.datePickerMinute = String(minute);
+      button.textContent = padDatePickerNumber(minute);
+      button.setAttribute('role', 'option');
+      const minuteSelected = minute === state.draft.minute && state.draftHasValue;
+      button.setAttribute('aria-selected', minuteSelected ? 'true' : 'false');
+      button.classList.toggle('is-selected', minuteSelected);
+      button.disabled = !datePickerWithinBounds(state, candidate);
+      button.tabIndex = minuteSelected && !button.disabled ? 0 : -1;
+      state.minuteList.appendChild(button);
+    }
+    if (!renderedMinutes) {
+      const empty = document.createElement('span');
+      empty.className = 'date-picker-time-empty';
+      empty.textContent = '—';
+      state.minuteList.appendChild(empty);
+    }
+
+    ['AM', 'PM'].forEach((itemPeriod) => {
+      const hour24 = datePickerHour24(hour12, itemPeriod);
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'date-picker-time-option';
+      button.dataset.datePickerPeriod = itemPeriod;
+      button.textContent = itemPeriod;
+      button.setAttribute('role', 'option');
+      const periodSelected = itemPeriod === period && state.draftHasValue;
+      button.setAttribute('aria-selected', periodSelected ? 'true' : 'false');
+      button.classList.toggle('is-selected', periodSelected);
+      button.disabled = !hasAllowedDatePickerMinute(state, hour24);
+      button.tabIndex = periodSelected && !button.disabled ? 0 : -1;
+      state.periodList.appendChild(button);
+    });
+
+    [state.hourList, state.minuteList, state.periodList].forEach((list) => {
+      if (!list.querySelector('.date-picker-time-option[tabindex="0"]')) {
+        const firstEnabled = list.querySelector('.date-picker-time-option:not(:disabled)');
+        if (firstEnabled) firstEnabled.tabIndex = 0;
+      }
+    });
+
+    const done = state.panel.querySelector('[data-date-picker-done]');
+    if (done) done.disabled = !state.draftHasValue || !datePickerCandidateAllowed(state, state.draft);
+  };
+  const renderDatePicker = (state) => {
+    if (state.type !== 'time') renderDatePickerCalendar(state);
+    if (state.type !== 'date') renderDatePickerTime(state);
+    syncDatePickerTrigger(state);
+    if (state.open) positionDatePicker(state);
+  };
+  const positionDatePicker = (state) => {
+    if (!state?.open) return;
+    const rect = state.trigger.getBoundingClientRect();
+    const viewportGap = 10;
+    const mobile = window.matchMedia('(max-width: 640px)').matches;
+    state.panel.style.position = 'fixed';
+    state.panel.style.maxHeight = '';
+    state.panel.style.top = '';
+    state.panel.style.bottom = '';
+    state.panel.style.left = '';
+    state.panel.style.right = '';
+    state.panel.style.width = '';
+
+    if (mobile) {
+      state.panel.style.left = `${viewportGap}px`;
+      state.panel.style.right = `${viewportGap}px`;
+      state.panel.style.bottom = `${viewportGap}px`;
+      state.panel.style.width = 'auto';
+      state.panel.style.maxHeight = `calc(100vh - ${viewportGap * 2}px)`;
+      return;
+    }
+
+    const desiredHeight = Math.min(state.panel.scrollHeight || 520, 560);
+    const spaceBelow = window.innerHeight - rect.bottom - viewportGap;
+    const spaceAbove = rect.top - viewportGap;
+    const openAbove = spaceBelow < Math.min(desiredHeight, 260) && spaceAbove > spaceBelow;
+    const available = Math.max(220, Math.min(560, openAbove ? spaceAbove : spaceBelow));
+    state.panel.style.maxHeight = `${available}px`;
+    state.panel.style.top = openAbove ? 'auto' : `${rect.bottom + 6}px`;
+    state.panel.style.bottom = openAbove ? `${window.innerHeight - rect.top + 6}px` : 'auto';
+
+    const measuredWidth = Math.min(state.panel.getBoundingClientRect().width || 420, window.innerWidth - (viewportGap * 2));
+    const panelLeft = Math.max(viewportGap, Math.min(rect.left, window.innerWidth - measuredWidth - viewportGap));
+    state.panel.style.left = `${panelLeft}px`;
+  };
+  const closeDatePicker = (state, restoreFocus = false) => {
+    if (!state || !state.open) return;
+    state.open = false;
+    state.wrapper.classList.remove('is-open');
+    state.trigger.setAttribute('aria-expanded', 'false');
+    if (supportsPopover && state.panel.matches(':popover-open')) state.panel.hidePopover();
+    else state.panel.hidden = true;
+    if (openDatePickerState === state) openDatePickerState = null;
+    if (restoreFocus && state.trigger.isConnected) state.trigger.focus();
+  };
+  const openDatePicker = (state, focusCalendar = false) => {
+    if (!state || state.input.disabled || state.input.readOnly) return;
+    if (openSelectState) closeSleekSelect(openSelectState);
+    if (openDatePickerState && openDatePickerState !== state) closeDatePicker(openDatePickerState);
+    setDatePickerDraftFromInput(state);
+    state.showJump = false;
+    state.open = true;
+    openDatePickerState = state;
+    state.wrapper.classList.add('is-open');
+    state.trigger.setAttribute('aria-expanded', 'true');
+    renderDatePicker(state);
+    state.panel.hidden = false;
+    if (supportsPopover) state.panel.showPopover();
+    positionDatePicker(state);
+    requestAnimationFrame(() => {
+      if (focusCalendar && state.type !== 'time') {
+        const selected = state.panel.querySelector('.date-picker-day[aria-selected="true"]:not(:disabled)');
+        const focusable = selected || state.panel.querySelector('.date-picker-day[tabindex="0"]:not(:disabled)');
+        focusable?.focus({ preventScroll: true });
+      } else if (focusCalendar && state.type === 'time') {
+        state.hourList.querySelector('.date-picker-time-option.is-selected:not(:disabled), .date-picker-time-option:not(:disabled)')?.focus({ preventScroll: true });
+      }
+    });
+  };
+  const selectDatePickerDay = (state, value) => {
+    const parsed = parseDatePickerValue('date', value);
+    if (!parsed || !datePickerDayAllowed(state, { ...parsed, hour: state.draft.hour, minute: state.draft.minute })) return;
+    state.draft = { ...state.draft, year: parsed.year, month: parsed.month, day: parsed.day };
+    state.focusDate = { ...state.draft };
+    state.draftHasValue = true;
+    if (state.type === 'date') {
+      commitDatePickerValue(state, datePickerDateKey(state.draft), true);
+      return;
+    }
+    renderDatePicker(state);
+  };
+  const updateDatePickerTimePart = (state, kind, rawValue) => {
+    const next = { ...state.draft };
+    if (kind === 'hour') next.hour = datePickerHour24(Number(rawValue), datePickerPeriod(state.draft.hour));
+    if (kind === 'minute') next.minute = Number(rawValue);
+    if (kind === 'period') next.hour = datePickerHour24(datePickerHour12(state.draft.hour), rawValue);
+    if (!datePickerWithinBounds(state, next) && kind === 'minute') return;
+    state.draft = next;
+    state.draftHasValue = true;
+    renderDatePicker(state);
+    requestAnimationFrame(() => {
+      const selector = kind === 'hour' ? `[data-date-picker-hour="${rawValue}"]` : kind === 'minute' ? `[data-date-picker-minute="${rawValue}"]` : `[data-date-picker-period="${rawValue}"]`;
+      state.panel.querySelector(`${selector}:not(:disabled)`)?.focus({ preventScroll: true });
+    });
+  };
+  const destroyDatePicker = (state) => {
+    if (!state) return;
+    if (openDatePickerState === state) openDatePickerState = null;
+    state.open = false;
+    state.observer?.disconnect();
+    if (state.form && state.resetHandler) state.form.removeEventListener('reset', state.resetHandler);
+    if (state.linkedStart && state.linkedStartHandler) state.linkedStart.removeEventListener('change', state.linkedStartHandler);
+    state.panel.remove();
+    state.trigger.remove();
+    state.input.classList.remove('date-picker-native');
+    delete state.input.dataset.datePickerReady;
+    if (state.hadTabIndex) state.input.setAttribute('tabindex', state.originalTabIndex);
+    else state.input.removeAttribute('tabindex');
+    if (state.wrapper.contains(state.input)) state.wrapper.replaceWith(state.input);
+    else state.wrapper.remove();
+    datePickerStates.delete(state.input);
+  };
+  const initDatePicker = (input) => {
+    if (!(input instanceof HTMLInputElement) || !['date', 'datetime-local', 'time'].includes(input.type) || input.hasAttribute('data-native-picker') || input.dataset.datePickerReady === '1') return;
+    input.dataset.datePickerReady = '1';
+    const accessibleLabel = getDatePickerLabel(input);
+    const wrapper = document.createElement('div');
+    wrapper.className = `date-picker date-picker-${input.type}`;
+    input.parentNode.insertBefore(wrapper, input);
+    wrapper.appendChild(input);
+    const hadTabIndex = input.hasAttribute('tabindex');
+    const originalTabIndex = input.getAttribute('tabindex') || '';
+    input.classList.add('date-picker-native');
+    input.tabIndex = -1;
+
+    const panelId = `date-picker-panel-${++datePickerIdCounter}`;
+    const trigger = document.createElement('button');
+    trigger.type = 'button';
+    trigger.className = 'date-picker-trigger';
+    trigger.setAttribute('aria-haspopup', 'dialog');
+    trigger.setAttribute('aria-expanded', 'false');
+    trigger.setAttribute('aria-controls', panelId);
+    trigger.setAttribute('aria-label', accessibleLabel);
+    trigger.appendChild(makeDatePickerIcon(input.type === 'datetime-local' ? 'calendar-clock' : 'calendar', 'ui-icon date-picker-trigger-icon'));
+    const valueNode = document.createElement('span');
+    valueNode.className = 'date-picker-trigger-value';
+    trigger.appendChild(valueNode);
+    wrapper.appendChild(trigger);
+
+    const panel = document.createElement('div');
+    panel.id = panelId;
+    panel.className = `date-picker-panel date-picker-panel-${input.type}`;
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-label', `${accessibleLabel} picker`);
+    panel.hidden = true;
+    if (supportsPopover) panel.setAttribute('popover', 'manual');
+    const contentHost = input.closest('dialog') || document.body;
+    contentHost.appendChild(panel);
+
+    const state = {
+      input,
+      wrapper,
+      trigger,
+      valueNode,
+      panel,
+      contentHost,
+      type: input.type,
+      open: false,
+      showJump: false,
+      draft: datePickerTodayParts(),
+      draftHasValue: false,
+      viewYear: datePickerTodayParts().year,
+      viewMonth: datePickerTodayParts().month,
+      focusDate: datePickerTodayParts(),
+      jumpCenterYear: datePickerTodayParts().year,
+      calendar: null,
+      calendarView: null,
+      jumpView: null,
+      monthLabel: null,
+      dayGrid: null,
+      jumpYears: null,
+      jumpMonths: null,
+      jumpYearRange: null,
+      timePanel: null,
+      hourList: null,
+      minuteList: null,
+      periodList: null,
+      observer: null,
+      form: input.form,
+      resetHandler: null,
+      linkedStart: getLinkedDatePickerStart(input),
+      linkedStartHandler: null,
+      hadTabIndex,
+      originalTabIndex,
+    };
+    datePickerStates.set(input, state);
+    setDatePickerDraftFromInput(state);
+
+    if (state.type !== 'time') {
+      const calendar = document.createElement('section');
+      calendar.className = 'date-picker-calendar';
+      state.calendar = calendar;
+
+      const header = document.createElement('div');
+      header.className = 'date-picker-head';
+      const previous = document.createElement('button');
+      previous.type = 'button';
+      previous.className = 'date-picker-nav';
+      previous.dataset.datePickerPrevious = '1';
+      previous.setAttribute('aria-label', 'Previous month');
+      previous.appendChild(makeDatePickerIcon('chevron-left'));
+      const monthLabel = document.createElement('button');
+      monthLabel.type = 'button';
+      monthLabel.className = 'date-picker-month-label';
+      monthLabel.dataset.datePickerJumpToggle = '1';
+      monthLabel.setAttribute('aria-label', 'Choose month and year');
+      const next = document.createElement('button');
+      next.type = 'button';
+      next.className = 'date-picker-nav';
+      next.dataset.datePickerNext = '1';
+      next.setAttribute('aria-label', 'Next month');
+      next.appendChild(makeDatePickerIcon('chevron-right'));
+      header.append(previous, monthLabel, next);
+      state.monthLabel = monthLabel;
+
+      const calendarView = document.createElement('div');
+      calendarView.className = 'date-picker-calendar-view';
+      state.calendarView = calendarView;
+      const weekdays = document.createElement('div');
+      weekdays.className = 'date-picker-weekdays';
+      weekdays.setAttribute('aria-hidden', 'true');
+      datePickerWeekdays.forEach((day) => {
+        const span = document.createElement('span');
+        span.textContent = day;
+        weekdays.appendChild(span);
+      });
+      const dayGrid = document.createElement('div');
+      dayGrid.className = 'date-picker-grid';
+      dayGrid.setAttribute('role', 'grid');
+      dayGrid.setAttribute('aria-label', 'Calendar');
+      state.dayGrid = dayGrid;
+      calendarView.append(weekdays, dayGrid);
+
+      const jumpView = document.createElement('div');
+      jumpView.className = 'date-picker-jump';
+      jumpView.hidden = true;
+      state.jumpView = jumpView;
+      const jumpHead = document.createElement('div');
+      jumpHead.className = 'date-picker-jump-head';
+      const prevYears = document.createElement('button');
+      prevYears.type = 'button';
+      prevYears.className = 'date-picker-nav';
+      prevYears.dataset.datePickerYearPage = '-11';
+      prevYears.setAttribute('aria-label', 'Earlier years');
+      prevYears.appendChild(makeDatePickerIcon('chevron-left'));
+      const yearRange = document.createElement('strong');
+      yearRange.className = 'date-picker-year-range';
+      const nextYears = document.createElement('button');
+      nextYears.type = 'button';
+      nextYears.className = 'date-picker-nav';
+      nextYears.dataset.datePickerYearPage = '11';
+      nextYears.setAttribute('aria-label', 'Later years');
+      nextYears.appendChild(makeDatePickerIcon('chevron-right'));
+      jumpHead.append(prevYears, yearRange, nextYears);
+      state.jumpYearRange = yearRange;
+      const jumpYears = document.createElement('div');
+      jumpYears.className = 'date-picker-year-grid';
+      state.jumpYears = jumpYears;
+      const jumpMonths = document.createElement('div');
+      jumpMonths.className = 'date-picker-month-grid';
+      state.jumpMonths = jumpMonths;
+      jumpView.append(jumpHead, jumpYears, jumpMonths);
+      calendar.append(header, calendarView, jumpView);
+      panel.appendChild(calendar);
+    }
+
+    if (state.type !== 'date') {
+      const timePanel = document.createElement('section');
+      timePanel.className = 'date-picker-time';
+      state.timePanel = timePanel;
+      const timeTitle = document.createElement('div');
+      timeTitle.className = 'date-picker-time-title';
+      timeTitle.textContent = 'Time';
+      const columns = document.createElement('div');
+      columns.className = 'date-picker-time-columns';
+      const createColumn = (label) => {
+        const group = document.createElement('div');
+        group.className = 'date-picker-time-group';
+        const heading = document.createElement('span');
+        heading.className = 'date-picker-time-label';
+        heading.textContent = label;
+        const list = document.createElement('div');
+        list.className = 'date-picker-time-list';
+        list.setAttribute('role', 'listbox');
+        list.setAttribute('aria-label', label);
+        group.append(heading, list);
+        columns.appendChild(group);
+        return list;
+      };
+      state.hourList = createColumn('Hour');
+      state.minuteList = createColumn('Minute');
+      state.periodList = createColumn('AM / PM');
+      timePanel.append(timeTitle, columns);
+      panel.appendChild(timePanel);
+    }
+
+    const footer = document.createElement('div');
+    footer.className = 'date-picker-footer';
+    const clear = document.createElement('button');
+    clear.type = 'button';
+    clear.className = 'date-picker-footer-button';
+    clear.dataset.datePickerClear = '1';
+    clear.textContent = 'Clear';
+    footer.appendChild(clear);
+    const spacer = document.createElement('span');
+    spacer.className = 'date-picker-footer-spacer';
+    footer.appendChild(spacer);
+    const current = document.createElement('button');
+    current.type = 'button';
+    current.className = 'date-picker-footer-button';
+    current.dataset.datePickerCurrent = '1';
+    current.textContent = state.type === 'date' ? 'Today' : 'Now';
+    footer.appendChild(current);
+    if (state.type !== 'date') {
+      const done = document.createElement('button');
+      done.type = 'button';
+      done.className = 'date-picker-done';
+      done.dataset.datePickerDone = '1';
+      done.textContent = 'Done';
+      footer.appendChild(done);
+    }
+    panel.appendChild(footer);
+
+    syncDatePickerTrigger(state);
+    renderDatePicker(state);
+
+    trigger.addEventListener('click', (event) => {
+      event.preventDefault();
+      if (state.open) closeDatePicker(state); else openDatePicker(state);
+    });
+    trigger.addEventListener('keydown', (event) => {
+      if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(event.key)) {
+        event.preventDefault();
+        openDatePicker(state, true);
+      } else if (event.key === 'Escape' && state.open) {
+        event.preventDefault();
+        event.stopPropagation();
+        closeDatePicker(state, true);
+      }
+    });
+
+    panel.addEventListener('click', (event) => {
+      const day = event.target.closest('[data-date-picker-day]');
+      if (day && !day.disabled) {
+        selectDatePickerDay(state, day.dataset.datePickerDay);
+        return;
+      }
+      if (event.target.closest('[data-date-picker-previous]')) {
+        const currentView = { ...state.focusDate, year: state.viewYear, month: state.viewMonth, day: 1 };
+        const nextView = addDatePickerMonths(currentView, -1);
+        state.viewYear = nextView.year;
+        state.viewMonth = nextView.month;
+        state.focusDate = clampDatePickerFocus(state, { ...state.focusDate, year: nextView.year, month: nextView.month, day: Math.min(state.focusDate.day, new Date(nextView.year, nextView.month, 0).getDate()) });
+        renderDatePicker(state);
+        return;
+      }
+      if (event.target.closest('[data-date-picker-next]')) {
+        const currentView = { ...state.focusDate, year: state.viewYear, month: state.viewMonth, day: 1 };
+        const nextView = addDatePickerMonths(currentView, 1);
+        state.viewYear = nextView.year;
+        state.viewMonth = nextView.month;
+        state.focusDate = clampDatePickerFocus(state, { ...state.focusDate, year: nextView.year, month: nextView.month, day: Math.min(state.focusDate.day, new Date(nextView.year, nextView.month, 0).getDate()) });
+        renderDatePicker(state);
+        return;
+      }
+      if (event.target.closest('[data-date-picker-jump-toggle]')) {
+        state.showJump = !state.showJump;
+        state.jumpCenterYear = state.viewYear;
+        renderDatePicker(state);
+        return;
+      }
+      const yearPage = event.target.closest('[data-date-picker-year-page]');
+      if (yearPage) {
+        state.jumpCenterYear += Number(yearPage.dataset.datePickerYearPage || 0);
+        renderDatePickerJump(state);
+        return;
+      }
+      const year = event.target.closest('[data-date-picker-year]');
+      if (year && !year.disabled) {
+        state.viewYear = Number(year.dataset.datePickerYear);
+        state.jumpCenterYear = state.viewYear;
+        renderDatePickerJump(state);
+        return;
+      }
+      const month = event.target.closest('[data-date-picker-month]');
+      if (month && !month.disabled) {
+        state.viewMonth = Number(month.dataset.datePickerMonth);
+        state.focusDate = clampDatePickerFocus(state, { ...state.focusDate, year: state.viewYear, month: state.viewMonth, day: Math.min(state.focusDate.day, new Date(state.viewYear, state.viewMonth, 0).getDate()) });
+        state.showJump = false;
+        renderDatePicker(state);
+        requestAnimationFrame(() => state.dayGrid.querySelector('.date-picker-day[tabindex="0"]:not(:disabled)')?.focus({ preventScroll: true }));
+        return;
+      }
+      const hour = event.target.closest('[data-date-picker-hour]');
+      if (hour && !hour.disabled) {
+        updateDatePickerTimePart(state, 'hour', hour.dataset.datePickerHour);
+        return;
+      }
+      const minute = event.target.closest('[data-date-picker-minute]');
+      if (minute && !minute.disabled) {
+        updateDatePickerTimePart(state, 'minute', minute.dataset.datePickerMinute);
+        return;
+      }
+      const period = event.target.closest('[data-date-picker-period]');
+      if (period && !period.disabled) {
+        updateDatePickerTimePart(state, 'period', period.dataset.datePickerPeriod);
+        return;
+      }
+      if (event.target.closest('[data-date-picker-clear]')) {
+        commitDatePickerValue(state, '', true);
+        return;
+      }
+      if (event.target.closest('[data-date-picker-current]')) {
+        const now = datePickerTodayParts();
+        if (state.type === 'date') {
+          if (datePickerCandidateAllowed(state, now)) commitDatePickerValue(state, datePickerDateKey(now), true);
+          return;
+        }
+        if (!datePickerCandidateAllowed(state, now)) return;
+        state.draft = now;
+        state.draftHasValue = true;
+        state.viewYear = now.year;
+        state.viewMonth = now.month;
+        state.focusDate = { ...now };
+        renderDatePicker(state);
+        return;
+      }
+      if (event.target.closest('[data-date-picker-done]') && state.draftHasValue && datePickerCandidateAllowed(state, state.draft)) {
+        commitDatePickerValue(state, serializeDatePickerValue(state.type, state.draft), true);
+      }
+    });
+
+    panel.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        closeDatePicker(state, true);
+        return;
+      }
+      const timeOption = event.target.closest('.date-picker-time-option');
+      if (timeOption && ['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) {
+        const list = timeOption.closest('.date-picker-time-list');
+        const options = Array.from(list?.querySelectorAll('.date-picker-time-option:not(:disabled)') || []);
+        const currentIndex = options.indexOf(timeOption);
+        if (options.length) {
+          event.preventDefault();
+          let nextIndex = currentIndex;
+          if (event.key === 'ArrowUp') nextIndex = Math.max(0, currentIndex - 1);
+          if (event.key === 'ArrowDown') nextIndex = Math.min(options.length - 1, currentIndex + 1);
+          if (event.key === 'Home') nextIndex = 0;
+          if (event.key === 'End') nextIndex = options.length - 1;
+          options.forEach((option, index) => { option.tabIndex = index === nextIndex ? 0 : -1; });
+          options[nextIndex]?.focus({ preventScroll: true });
+          options[nextIndex]?.scrollIntoView({ block: 'nearest' });
+        }
+        return;
+      }
+
+      const day = event.target.closest('[data-date-picker-day]');
+      if (!day) return;
+      const current = parseDatePickerValue('date', day.dataset.datePickerDay);
+      if (!current) return;
+      let target = null;
+      if (event.key === 'ArrowLeft') target = addDatePickerDays(current, -1);
+      if (event.key === 'ArrowRight') target = addDatePickerDays(current, 1);
+      if (event.key === 'ArrowUp') target = addDatePickerDays(current, -7);
+      if (event.key === 'ArrowDown') target = addDatePickerDays(current, 7);
+      if (event.key === 'PageUp') target = addDatePickerMonths(current, event.shiftKey ? -12 : -1);
+      if (event.key === 'PageDown') target = addDatePickerMonths(current, event.shiftKey ? 12 : 1);
+      if (event.key === 'Home') target = addDatePickerDays(current, -datePickerPartsToDate(current).getDay());
+      if (event.key === 'End') target = addDatePickerDays(current, 6 - datePickerPartsToDate(current).getDay());
+      if (target) {
+        event.preventDefault();
+        const direction = ['ArrowLeft', 'ArrowUp', 'PageUp', 'Home'].includes(event.key) ? -1 : 1;
+        const allowed = findAllowedDatePickerDay(state, target, direction) || findAllowedDatePickerDay(state, target, -direction);
+        if (allowed) focusDatePickerDay(state, allowed);
+        return;
+      }
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        selectDatePickerDay(state, day.dataset.datePickerDay);
+      }
+    });
+
+    input.addEventListener('input', () => {
+      syncDatePickerTrigger(state);
+      if (state.open) {
+        setDatePickerDraftFromInput(state);
+        renderDatePicker(state);
+      }
+    });
+    input.addEventListener('change', () => syncDatePickerTrigger(state));
+    input.addEventListener('focus', () => trigger.focus());
+    input.addEventListener('invalid', () => {
+      trigger.setAttribute('aria-invalid', 'true');
+      requestAnimationFrame(() => trigger.focus());
+    });
+
+    if (state.form) {
+      state.resetHandler = () => requestAnimationFrame(() => {
+        setDatePickerDraftFromInput(state);
+        renderDatePicker(state);
+      });
+      state.form.addEventListener('reset', state.resetHandler);
+    }
+    if (state.linkedStart) {
+      state.linkedStartHandler = () => {
+        if (state.open) renderDatePicker(state);
+        syncDatePickerTrigger(state);
+      };
+      state.linkedStart.addEventListener('change', state.linkedStartHandler);
+    }
+
+    state.observer = new MutationObserver(() => {
+      syncDatePickerTrigger(state);
+      if (state.open) renderDatePicker(state);
+    });
+    state.observer.observe(input, { attributes: true, attributeFilter: ['disabled', 'readonly', 'required', 'min', 'max', 'step', 'value'] });
+  };
+  const upgradeDatePickers = (root) => {
+    if (root instanceof HTMLInputElement && root.matches(datePickerSelector)) initDatePicker(root);
+    root?.querySelectorAll?.(datePickerSelector).forEach(initDatePicker);
+  };
+  const cleanupDetachedDatePickers = () => {
+    Array.from(datePickerStates.values()).forEach((state) => {
+      if (!state.input.isConnected) destroyDatePicker(state);
+    });
+  };
+
   const cleanupDetachedSleekSelects = () => {
     Array.from(selectStates.values()).forEach((state) => {
       if (!state.select.isConnected) destroySleekSelect(state);
@@ -878,31 +1806,39 @@
   };
 
   document.querySelectorAll('select').forEach(initSleekSelect);
+  document.querySelectorAll(datePickerSelector).forEach(initDatePicker);
 
   const sleekSelectDocumentObserver = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
       mutation.addedNodes.forEach((node) => {
         if (node.nodeType === Node.ELEMENT_NODE || node.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
           upgradeSleekSelects(node);
+          upgradeDatePickers(node);
         }
       });
     });
     cleanupDetachedSleekSelects();
+    cleanupDetachedDatePickers();
   });
   sleekSelectDocumentObserver.observe(document.body, { childList: true, subtree: true });
 
   document.addEventListener('pointerdown', (event) => {
-    if (!openSelectState) return;
-    if (openSelectState.wrapper.contains(event.target) || openSelectState.content.contains(event.target)) return;
-    closeSleekSelect(openSelectState);
+    if (openSelectState && !openSelectState.wrapper.contains(event.target) && !openSelectState.content.contains(event.target)) {
+      closeSleekSelect(openSelectState);
+    }
+    if (openDatePickerState && !openDatePickerState.wrapper.contains(event.target) && !openDatePickerState.panel.contains(event.target)) {
+      closeDatePicker(openDatePickerState);
+    }
   });
 
   window.addEventListener('resize', () => {
     if (openSelectState) positionSleekSelect(openSelectState);
+    if (openDatePickerState) positionDatePicker(openDatePickerState);
   });
 
   document.addEventListener('scroll', () => {
     if (openSelectState) positionSleekSelect(openSelectState);
+    if (openDatePickerState) positionDatePicker(openDatePickerState);
   }, true);
 
   document.querySelectorAll('[data-schedule-team-form]').forEach((form) => {
@@ -1102,7 +2038,20 @@
   confirmDialog?.addEventListener('cancel', clearPendingConfirmation);
 
   document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || !openDatePickerState) return;
+    event.preventDefault();
+    event.stopPropagation();
+    closeDatePicker(openDatePickerState, true);
+  }, true);
+
+  document.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return;
+    if (openDatePickerState) {
+      event.preventDefault();
+      event.stopPropagation();
+      closeDatePicker(openDatePickerState, true);
+      return;
+    }
     if (openSelectState) closeSleekSelect(openSelectState, true);
     if (body.classList.contains('nav-open')) setNavigation(false);
     if (accountDropdown && !accountDropdown.hidden) {
