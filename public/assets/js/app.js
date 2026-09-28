@@ -1547,16 +1547,31 @@
     if (layoutChanged || state.timePanel) queueDatePickerSelectedTimeScroll(state);
   };
   const closeDatePicker = (state, restoreFocus = false) => {
-    if (!state || !state.open) return;
+    if (!state) return;
+    let popoverOpen = false;
+    if (supportsPopover) {
+      try {
+        popoverOpen = state.panel.matches(':popover-open');
+      } catch (_) {
+        popoverOpen = false;
+      }
+    }
+    const wasOpen = state.open || popoverOpen || !state.panel.hidden;
     state.open = false;
     state.wrapper.classList.remove('is-open');
     state.trigger.setAttribute('aria-expanded', 'false');
     state.backdrop.hidden = true;
     setDatePickerScrollLock(state, false);
-    if (supportsPopover && state.panel.matches(':popover-open')) state.panel.hidePopover();
-    else state.panel.hidden = true;
+    if (supportsPopover && popoverOpen) {
+      try {
+        state.panel.hidePopover();
+      } catch (_) {
+        // The hidden fallback below still guarantees the picker is dismissed.
+      }
+    }
+    state.panel.hidden = true;
     if (openDatePickerState === state) openDatePickerState = null;
-    if (restoreFocus && state.trigger.isConnected) state.trigger.focus();
+    if (restoreFocus && wasOpen && state.trigger.isConnected) state.trigger.focus();
   };
   const openDatePicker = (state, focusCalendar = false) => {
     if (!state || state.input.disabled || state.input.readOnly) return;
@@ -1728,11 +1743,15 @@
     sheetClose.dataset.datePickerClose = '1';
     sheetClose.setAttribute('aria-label', 'Close picker');
     sheetClose.appendChild(makeDatePickerIcon('x'));
-    sheetClose.addEventListener('click', (event) => {
+    const closeFromSheetButton = (event) => {
+      if (event.type === 'pointerup' && event.button !== 0) return;
       event.preventDefault();
       event.stopPropagation();
-      closeDatePicker(state, true);
-    });
+      const restoreFocus = event.type === 'click' && event.detail === 0;
+      closeDatePicker(state, restoreFocus);
+    };
+    sheetClose.addEventListener('pointerup', closeFromSheetButton);
+    sheetClose.addEventListener('click', closeFromSheetButton);
     sheetBar.append(sheetTitle, sheetClose);
     panel.appendChild(sheetBar);
 

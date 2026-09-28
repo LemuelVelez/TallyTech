@@ -986,6 +986,8 @@ dialog.date-picker-scroll-lock {
   min-width: 0;
 }
 .date-picker-panel.is-mode-sheet .date-picker-sheet-bar {
+  position: relative;
+  z-index: 5;
   min-height: 44px;
   display: flex;
   align-items: center;
@@ -1005,6 +1007,8 @@ dialog.date-picker-scroll-lock {
   text-overflow: ellipsis;
 }
 .date-picker-sheet-close {
+  position: relative;
+  z-index: 6;
   width: 44px;
   min-width: 44px;
   height: 44px;
@@ -1019,6 +1023,8 @@ dialog.date-picker-scroll-lock {
   color: var(--muted);
   font: inherit;
   cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
 }
 .date-picker-sheet-close:hover { background: var(--surface-hover); color: var(--text); }
 .date-picker-sheet-close:focus-visible {
