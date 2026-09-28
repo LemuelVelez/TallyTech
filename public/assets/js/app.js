@@ -1728,6 +1728,11 @@
     sheetClose.dataset.datePickerClose = '1';
     sheetClose.setAttribute('aria-label', 'Close picker');
     sheetClose.appendChild(makeDatePickerIcon('x'));
+    sheetClose.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      closeDatePicker(state, true);
+    });
     sheetBar.append(sheetTitle, sheetClose);
     panel.appendChild(sheetBar);
 
