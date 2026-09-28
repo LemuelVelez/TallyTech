@@ -616,7 +616,12 @@
     }
 
     dialog.addEventListener('click', (event) => {
-      if (event.target === dialog) dialog.close();
+      if (event.target !== dialog) return;
+      if (openDatePickerState?.contentHost === dialog && openDatePickerState.mode === 'sheet') {
+        closeDatePicker(openDatePickerState, true);
+        return;
+      }
+      dialog.close();
     });
 
     dialog.addEventListener('cancel', (event) => {
@@ -891,6 +896,13 @@
   const datePickerFullDateFormatter = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
   const datePickerMonthNames = Array.from({ length: 12 }, (_, month) => new Intl.DateTimeFormat(undefined, { month: 'short' }).format(new Date(2024, month, 1)));
   const datePickerWeekdays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+  const DATE_PICKER_BREAKPOINTS = Object.freeze({
+    mobileMaxWidth: 640,
+    desktopMinWidth: 1025,
+    shortViewportHeight: 500,
+  });
+  const DATE_PICKER_VIEWPORT_GAP = 10;
+  const DATE_PICKER_ANCHOR_GAP = 6;
 
   const padDatePickerNumber = (value) => String(value).padStart(2, '0');
   const datePickerPartsToDate = (parts) => new Date(parts.year, parts.month - 1, parts.day);
@@ -1338,73 +1350,209 @@
   const renderDatePicker = (state) => {
     if (state.type !== 'time') renderDatePickerCalendar(state);
     if (state.type !== 'date') renderDatePickerTime(state);
+    const done = state.panel.querySelector('[data-date-picker-done]');
+    if (done) done.disabled = !state.draftHasValue || !datePickerCandidateAllowed(state, state.draft);
     syncDatePickerTrigger(state);
     if (state.open) positionDatePicker(state);
   };
-  const positionDatePicker = (state) => {
-    if (!state?.open) return;
-    const rect = state.trigger.getBoundingClientRect();
-    const viewportGap = 10;
-    const anchorGap = 6;
-    const mobile = window.matchMedia('(max-width: 640px)').matches;
+  const getDatePickerViewportRect = () => {
+    const viewport = window.visualViewport;
+    const left = viewport?.offsetLeft || 0;
+    const top = viewport?.offsetTop || 0;
+    const width = viewport?.width || window.innerWidth;
+    const height = viewport?.height || window.innerHeight;
+    return { left, top, right: left + width, bottom: top + height, width, height };
+  };
+  const getDatePickerBoundaryRect = (state, inset = 0) => {
+    const viewport = getDatePickerViewportRect();
     const hostRect = state.contentHost instanceof HTMLDialogElement && state.contentHost.open
       ? state.contentHost.getBoundingClientRect()
       : null;
-    const triggerIsInViewport = rect.bottom > 0 && rect.top < window.innerHeight && rect.right > 0 && rect.left < window.innerWidth;
-    const triggerIsInHost = !hostRect || (rect.bottom > hostRect.top && rect.top < hostRect.bottom && rect.right > hostRect.left && rect.left < hostRect.right);
+    const rawLeft = hostRect ? Math.max(viewport.left, hostRect.left) : viewport.left;
+    const rawTop = hostRect ? Math.max(viewport.top, hostRect.top) : viewport.top;
+    const rawRight = hostRect ? Math.min(viewport.right, hostRect.right) : viewport.right;
+    const rawBottom = hostRect ? Math.min(viewport.bottom, hostRect.bottom) : viewport.bottom;
+    const left = Math.min(rawRight, rawLeft + inset);
+    const top = Math.min(rawBottom, rawTop + inset);
+    const right = Math.max(left, rawRight - inset);
+    const bottom = Math.max(top, rawBottom - inset);
+    return {
+      left,
+      top,
+      right,
+      bottom,
+      width: Math.max(1, right - left),
+      height: Math.max(1, bottom - top),
+      viewport,
+      hostRect,
+    };
+  };
+  const getDatePickerResponsiveContext = () => {
+    const viewport = getDatePickerViewportRect();
+    const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
+    const finePointer = window.matchMedia('(pointer: fine)').matches;
+    const shortViewport = viewport.height < DATE_PICKER_BREAKPOINTS.shortViewportHeight;
+    const mobile = viewport.width <= DATE_PICKER_BREAKPOINTS.mobileMaxWidth || shortViewport;
+    const desktop = !mobile && viewport.width >= DATE_PICKER_BREAKPOINTS.desktopMinWidth && finePointer && !coarsePointer;
+    return {
+      viewport,
+      coarsePointer,
+      finePointer,
+      shortViewport,
+      mobile,
+      desktop,
+      tablet: !mobile && !desktop,
+      landscape: viewport.width > viewport.height,
+    };
+  };
+  const setDatePickerScrollLock = (state, locked) => {
+    if (!state || state.scrollLocked === locked) return;
+    state.scrollLocked = locked;
+    if (state.contentHost instanceof HTMLDialogElement) {
+      state.contentHost.classList.toggle('date-picker-scroll-lock', locked);
+      return;
+    }
+    document.documentElement.classList.toggle('date-picker-scroll-lock', locked);
+    document.body.classList.toggle('date-picker-scroll-lock', locked);
+  };
+  const syncDatePickerModeClasses = (state, mode, context, stacked) => {
+    const previousLayout = `${state.mode || ''}:${state.layout || ''}:${state.orientation || ''}`;
+    state.mode = mode;
+    state.layout = stacked ? 'stacked' : 'side-by-side';
+    state.orientation = context.landscape ? 'landscape' : 'portrait';
+    state.panel.classList.toggle('is-mode-anchored', mode === 'anchored');
+    state.panel.classList.toggle('is-mode-sheet', mode === 'sheet');
+    state.panel.classList.toggle('is-mobile', context.mobile);
+    state.panel.classList.toggle('is-tablet', context.tablet);
+    state.panel.classList.toggle('is-desktop', context.desktop);
+    state.panel.classList.toggle('is-landscape', context.landscape);
+    state.panel.classList.toggle('is-portrait', !context.landscape);
+    state.panel.classList.toggle('is-coarse', context.coarsePointer);
+    state.panel.classList.toggle('is-stacked', Boolean(stacked));
+    const nextLayout = `${state.mode}:${state.layout}:${state.orientation}`;
+    return previousLayout !== nextLayout;
+  };
+  const setDatePickerBackdropRect = (state, boundary) => {
+    if (!state.backdrop) return;
+    Object.assign(state.backdrop.style, {
+      top: `${boundary.top}px`,
+      left: `${boundary.left}px`,
+      width: `${boundary.width}px`,
+      height: `${boundary.height}px`,
+    });
+  };
+  const measureDatePickerNaturalHeight = (state) => {
+    const previousMaxHeight = state.panel.style.maxHeight;
+    state.panel.style.maxHeight = 'none';
+    const height = Math.max(state.panel.scrollHeight, state.panel.getBoundingClientRect().height, 1);
+    state.panel.style.maxHeight = previousMaxHeight;
+    return height;
+  };
+  const positionDatePicker = (state) => {
+    if (!state?.open) return;
 
+    const context = getDatePickerResponsiveContext();
+    const anchorBoundary = getDatePickerBoundaryRect(state, DATE_PICKER_VIEWPORT_GAP);
+    const sheetBoundary = getDatePickerBoundaryRect(state, 0);
+    const rect = state.trigger.getBoundingClientRect();
+    const rootFontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const preferredWidth = (state.type === 'datetime-local' ? 39 : state.type === 'time' ? 24 : 22) * rootFontSize;
+    const twoColumnMinimum = 36 * rootFontSize;
+    const orientationStacked = state.type === 'datetime-local' && !context.landscape;
+
+    state.panel.style.removeProperty('--date-picker-time-list-max');
+    Object.assign(state.panel.style, {
+      position: 'fixed',
+      inset: 'auto',
+      top: `${anchorBoundary.top}px`,
+      bottom: 'auto',
+      left: `${anchorBoundary.left}px`,
+      right: 'auto',
+      width: `${Math.min(preferredWidth, anchorBoundary.width)}px`,
+      maxHeight: 'none',
+    });
+
+    let stacked = state.type === 'datetime-local' && (context.tablet ? orientationStacked : Math.min(preferredWidth, anchorBoundary.width) < twoColumnMinimum);
+    syncDatePickerModeClasses(state, 'anchored', context, stacked);
+    const desiredHeight = measureDatePickerNaturalHeight(state);
+    const spaceBelow = Math.max(0, anchorBoundary.bottom - rect.bottom - DATE_PICKER_ANCHOR_GAP);
+    const spaceAbove = Math.max(0, rect.top - anchorBoundary.top - DATE_PICKER_ANCHOR_GAP);
+    const fitsTabletWidth = preferredWidth <= anchorBoundary.width;
+    const fitsTabletHeight = desiredHeight <= Math.max(spaceBelow, spaceAbove);
+    const useSheet = context.mobile || (context.tablet && (!fitsTabletWidth || !fitsTabletHeight));
+
+    if (useSheet) {
+      stacked = state.type === 'datetime-local' && !context.landscape;
+      const layoutChanged = syncDatePickerModeClasses(state, 'sheet', context, stacked);
+      const sheetMargin = context.shortViewport ? 12 : 16;
+      const maxSheetHeight = Math.max(1, sheetBoundary.height - sheetMargin);
+      const panelWidth = Math.max(1, sheetBoundary.width);
+      const timeListHeight = Math.max(88, Math.min(216, maxSheetHeight - (state.type === 'datetime-local' ? 218 : 168)));
+      state.panel.style.setProperty('--date-picker-time-list-max', `${timeListHeight}px`);
+      Object.assign(state.panel.style, {
+        top: `${sheetBoundary.top}px`,
+        bottom: 'auto',
+        left: `${sheetBoundary.left}px`,
+        right: 'auto',
+        width: `${panelWidth}px`,
+        maxHeight: `${maxSheetHeight}px`,
+      });
+      const panelHeight = Math.min(maxSheetHeight, Math.max(1, state.panel.getBoundingClientRect().height));
+      state.panel.style.top = `${Math.max(sheetBoundary.top, sheetBoundary.bottom - panelHeight)}px`;
+      setDatePickerBackdropRect(state, sheetBoundary);
+      state.backdrop.hidden = false;
+      setDatePickerScrollLock(state, true);
+      if (layoutChanged || state.timePanel) queueDatePickerSelectedTimeScroll(state);
+      return;
+    }
+
+    const panelWidth = Math.min(preferredWidth, anchorBoundary.width);
+    stacked = state.type === 'datetime-local' && (context.tablet ? orientationStacked : panelWidth < twoColumnMinimum);
+    const layoutChanged = syncDatePickerModeClasses(state, 'anchored', context, stacked);
+    state.backdrop.hidden = true;
+    setDatePickerScrollLock(state, false);
+
+    const triggerIsInViewport = rect.bottom > context.viewport.top && rect.top < context.viewport.bottom && rect.right > context.viewport.left && rect.left < context.viewport.right;
+    const triggerIsInHost = !anchorBoundary.hostRect || (rect.bottom > anchorBoundary.hostRect.top && rect.top < anchorBoundary.hostRect.bottom && rect.right > anchorBoundary.hostRect.left && rect.left < anchorBoundary.hostRect.right);
     if (!triggerIsInViewport || !triggerIsInHost) {
       closeDatePicker(state);
       return;
     }
 
-    state.panel.classList.toggle('is-stacked', state.type === 'datetime-local' && mobile);
-
-    if (mobile) {
-      Object.assign(state.panel.style, {
-        position: 'fixed',
-        top: 'auto',
-        bottom: '0px',
-        left: '0px',
-        right: '0px',
-        width: 'auto',
-        maxHeight: '',
-      });
-      return;
-    }
-
-    const rootFontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-    const boundaryLeft = hostRect ? Math.max(viewportGap, hostRect.left + viewportGap) : viewportGap;
-    const boundaryRight = hostRect ? Math.min(window.innerWidth - viewportGap, hostRect.right - viewportGap) : window.innerWidth - viewportGap;
-    const availableWidth = Math.max(1, boundaryRight - boundaryLeft);
-    const preferredWidth = (state.type === 'datetime-local' ? 39 : state.type === 'time' ? 24 : 22) * rootFontSize;
-    const panelWidth = Math.min(preferredWidth, availableWidth);
-    const twoColumnMinimum = 36 * rootFontSize;
-    const stacked = state.type === 'datetime-local' && panelWidth < twoColumnMinimum;
-    state.panel.classList.toggle('is-stacked', stacked);
-
-    const desiredHeight = Math.min(state.panel.scrollHeight || 520, 560);
-    const spaceBelow = Math.max(0, window.innerHeight - rect.bottom - anchorGap - viewportGap);
-    const spaceAbove = Math.max(0, rect.top - anchorGap - viewportGap);
-    const openAbove = spaceBelow < Math.min(desiredHeight, 260) && spaceAbove > spaceBelow;
-    const availableHeight = Math.max(1, Math.min(560, openAbove ? spaceAbove : spaceBelow));
-    const panelLeft = Math.max(boundaryLeft, Math.min(rect.left, boundaryRight - panelWidth));
+    Object.assign(state.panel.style, {
+      width: `${panelWidth}px`,
+      maxHeight: 'none',
+    });
+    const anchoredDesiredHeight = measureDatePickerNaturalHeight(state);
+    const anchoredSpaceBelow = Math.max(0, anchorBoundary.bottom - rect.bottom - DATE_PICKER_ANCHOR_GAP);
+    const anchoredSpaceAbove = Math.max(0, rect.top - anchorBoundary.top - DATE_PICKER_ANCHOR_GAP);
+    const openAbove = anchoredSpaceBelow < Math.min(anchoredDesiredHeight, 260) && anchoredSpaceAbove > anchoredSpaceBelow;
+    const availableHeight = Math.max(1, Math.min(560, openAbove ? anchoredSpaceAbove : anchoredSpaceBelow));
+    const panelLeft = Math.max(anchorBoundary.left, Math.min(rect.left, anchorBoundary.right - panelWidth));
+    const timeListHeight = Math.max(88, Math.min(216, availableHeight - (state.type === 'datetime-local' ? 152 : 132)));
+    state.panel.style.setProperty('--date-picker-time-list-max', `${timeListHeight}px`);
 
     Object.assign(state.panel.style, {
-      position: 'fixed',
-      top: openAbove ? 'auto' : `${rect.bottom + anchorGap}px`,
-      bottom: openAbove ? `${window.innerHeight - rect.top + anchorGap}px` : 'auto',
+      top: `${openAbove ? anchorBoundary.top : rect.bottom + DATE_PICKER_ANCHOR_GAP}px`,
+      bottom: 'auto',
       left: `${panelLeft}px`,
       right: 'auto',
       width: `${panelWidth}px`,
       maxHeight: `${availableHeight}px`,
     });
+    if (openAbove) {
+      const panelHeight = Math.min(availableHeight, Math.max(1, state.panel.getBoundingClientRect().height));
+      state.panel.style.top = `${Math.max(anchorBoundary.top, rect.top - DATE_PICKER_ANCHOR_GAP - panelHeight)}px`;
+    }
+    if (layoutChanged || state.timePanel) queueDatePickerSelectedTimeScroll(state);
   };
   const closeDatePicker = (state, restoreFocus = false) => {
     if (!state || !state.open) return;
     state.open = false;
     state.wrapper.classList.remove('is-open');
     state.trigger.setAttribute('aria-expanded', 'false');
+    state.backdrop.hidden = true;
+    setDatePickerScrollLock(state, false);
     if (supportsPopover && state.panel.matches(':popover-open')) state.panel.hidePopover();
     else state.panel.hidden = true;
     if (openDatePickerState === state) openDatePickerState = null;
@@ -1420,9 +1568,9 @@
     openDatePickerState = state;
     state.wrapper.classList.add('is-open');
     state.trigger.setAttribute('aria-expanded', 'true');
-    renderDatePicker(state);
     state.panel.hidden = false;
-    if (supportsPopover) state.panel.showPopover();
+    if (supportsPopover && !state.panel.matches(':popover-open')) state.panel.showPopover();
+    renderDatePicker(state);
     positionDatePicker(state);
     queueDatePickerSelectedTimeScroll(state);
     requestAnimationFrame(() => {
@@ -1441,7 +1589,7 @@
     state.draft = { ...state.draft, year: parsed.year, month: parsed.month, day: parsed.day };
     state.focusDate = { ...state.draft };
     state.draftHasValue = true;
-    if (state.type === 'date') {
+    if (state.type === 'date' && state.mode !== 'sheet') {
       commitDatePickerValue(state, datePickerDateKey(state.draft), true);
       return;
     }
@@ -1465,9 +1613,11 @@
     if (!state) return;
     if (openDatePickerState === state) openDatePickerState = null;
     state.open = false;
+    setDatePickerScrollLock(state, false);
     state.observer?.disconnect();
     if (state.form && state.resetHandler) state.form.removeEventListener('reset', state.resetHandler);
     if (state.linkedStart && state.linkedStartHandler) state.linkedStart.removeEventListener('change', state.linkedStartHandler);
+    state.backdrop?.remove();
     state.panel.remove();
     state.trigger.remove();
     state.input.classList.remove('date-picker-native');
@@ -1505,6 +1655,11 @@
     trigger.appendChild(valueNode);
     wrapper.appendChild(trigger);
 
+    const backdrop = document.createElement('div');
+    backdrop.className = 'date-picker-backdrop';
+    backdrop.hidden = true;
+    backdrop.setAttribute('aria-hidden', 'true');
+
     const panel = document.createElement('div');
     panel.id = panelId;
     panel.className = `date-picker-panel date-picker-panel-${input.type}`;
@@ -1513,7 +1668,7 @@
     panel.hidden = true;
     if (supportsPopover) panel.setAttribute('popover', 'manual');
     const contentHost = input.closest('dialog') || document.body;
-    contentHost.appendChild(panel);
+    contentHost.append(backdrop, panel);
 
     const state = {
       input,
@@ -1521,9 +1676,14 @@
       trigger,
       valueNode,
       panel,
+      backdrop,
       contentHost,
       type: input.type,
       open: false,
+      mode: null,
+      layout: null,
+      orientation: null,
+      scrollLocked: false,
       showJump: false,
       draft: datePickerTodayParts(),
       draftHasValue: false,
@@ -1556,6 +1716,20 @@
     };
     datePickerStates.set(input, state);
     setDatePickerDraftFromInput(state);
+
+    const sheetBar = document.createElement('div');
+    sheetBar.className = 'date-picker-sheet-bar';
+    const sheetTitle = document.createElement('strong');
+    sheetTitle.className = 'date-picker-sheet-title';
+    sheetTitle.textContent = state.type === 'date' ? 'Choose date' : state.type === 'time' ? 'Choose time' : 'Choose date and time';
+    const sheetClose = document.createElement('button');
+    sheetClose.type = 'button';
+    sheetClose.className = 'date-picker-sheet-close';
+    sheetClose.dataset.datePickerClose = '1';
+    sheetClose.setAttribute('aria-label', 'Close picker');
+    sheetClose.appendChild(makeDatePickerIcon('x'));
+    sheetBar.append(sheetTitle, sheetClose);
+    panel.appendChild(sheetBar);
 
     const body = document.createElement('div');
     body.className = 'date-picker-body';
@@ -1687,14 +1861,12 @@
     current.dataset.datePickerCurrent = '1';
     current.textContent = state.type === 'date' ? 'Today' : 'Now';
     footer.appendChild(current);
-    if (state.type !== 'date') {
-      const done = document.createElement('button');
-      done.type = 'button';
-      done.className = 'date-picker-done';
-      done.dataset.datePickerDone = '1';
-      done.textContent = 'Done';
-      footer.appendChild(done);
-    }
+    const done = document.createElement('button');
+    done.type = 'button';
+    done.className = 'date-picker-done';
+    done.dataset.datePickerDone = '1';
+    done.textContent = 'Done';
+    footer.appendChild(done);
     panel.appendChild(footer);
 
     syncDatePickerTrigger(state);
@@ -1715,7 +1887,17 @@
       }
     });
 
+    backdrop.addEventListener('pointerdown', (event) => {
+      if (event.target !== backdrop || state.mode !== 'sheet') return;
+      event.preventDefault();
+      closeDatePicker(state, true);
+    });
+
     panel.addEventListener('click', (event) => {
+      if (event.target.closest('[data-date-picker-close]')) {
+        closeDatePicker(state, true);
+        return;
+      }
       const day = event.target.closest('[data-date-picker-day]');
       if (day && !day.disabled) {
         selectDatePickerDay(state, day.dataset.datePickerDay);
@@ -1783,16 +1965,16 @@
         return;
       }
       if (event.target.closest('[data-date-picker-clear]')) {
-        commitDatePickerValue(state, '', true);
+        commitDatePickerValue(state, '', state.mode !== 'sheet');
         return;
       }
       if (event.target.closest('[data-date-picker-current]')) {
         const now = datePickerTodayParts();
-        if (state.type === 'date') {
-          if (datePickerCandidateAllowed(state, now)) commitDatePickerValue(state, datePickerDateKey(now), true);
+        if (!datePickerCandidateAllowed(state, now)) return;
+        if (state.type === 'date' && state.mode !== 'sheet') {
+          commitDatePickerValue(state, datePickerDateKey(now), true);
           return;
         }
-        if (!datePickerCandidateAllowed(state, now)) return;
         state.draft = now;
         state.draftHasValue = true;
         state.viewYear = now.year;
@@ -1941,7 +2123,7 @@
     if (openSelectState && !openSelectState.wrapper.contains(event.target) && !openSelectState.content.contains(event.target)) {
       closeSleekSelect(openSelectState);
     }
-    if (openDatePickerState && !openDatePickerState.wrapper.contains(event.target) && !openDatePickerState.panel.contains(event.target)) {
+    if (openDatePickerState?.mode === 'anchored' && !openDatePickerState.wrapper.contains(event.target) && !openDatePickerState.panel.contains(event.target)) {
       closeDatePicker(openDatePickerState);
     }
   });
@@ -1963,6 +2145,9 @@
   };
 
   window.addEventListener('resize', scheduleFloatingPosition, { passive: true });
+  window.addEventListener('orientationchange', scheduleFloatingPosition, { passive: true });
+  window.visualViewport?.addEventListener('resize', scheduleFloatingPosition, { passive: true });
+  window.visualViewport?.addEventListener('scroll', scheduleFloatingPosition, { passive: true });
 
   document.addEventListener('scroll', (event) => {
     const repositionSelect = scrollAffectsFloatingControl(event.target, openSelectState, openSelectState?.content);
