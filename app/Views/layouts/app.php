@@ -12,7 +12,7 @@ $displayName = (string) session()->get('display_name');
 $unread = 0;
 try { $unread = (new \App\Infrastructure\Persistence\MySqlScoringRepository())->unreadNotificationCount((int) session()->get('user_id')); } catch (\Throwable $e) {}
 $unreadLabel = $unread > 99 ? '99+' : (string) $unread;
-$assetRelease = '20261005-1';
+$assetRelease = '20261006-1';
 $assetVersion = static function (string $relativePath) use ($assetRelease): string {
     $path = defined('FCPATH') ? FCPATH . ltrim($relativePath, '/\\') : '';
     $fileVersion = $path !== '' && is_file($path) ? (string) filemtime($path) : '0';
@@ -31,11 +31,11 @@ $jsVersion = $assetVersion('assets/js/app.js');
     <link rel="icon" type="image/x-icon" href="<?= base_url('favicon.ico') ?>?v=2">
     <link rel="stylesheet" href="<?= esc(base_url('assets/css/app.css') . '?v=' . rawurlencode($cssVersion), 'attr') ?>">
 </head>
-<body class="app role-<?= esc($role) ?> <?= $compactSidebar ? 'sidebar-compact' : '' ?> density-<?= esc($resultDensity) ?> theme-<?= esc($theme) ?> font-<?= esc($fontSize) ?>">
+<body class="app role-<?= esc($role) ?> <?= $compactSidebar ? 'sidebar-compact' : '' ?> density-<?= esc($resultDensity) ?> theme-<?= esc($theme) ?> font-<?= esc($fontSize) ?>" data-unread-count-url="<?= esc(site_url('notifications/unread-count'), 'attr') ?>" data-unread-notifications="<?= $unread ?>">
 <?= view('partials/toasts') ?>
 <a class="skip-link" href="#main-content">Skip to main content</a>
 <header class="topbar">
-    <button class="menu-toggle" type="button" data-nav-toggle aria-label="<?= esc($unread > 0 ? 'Open navigation, '.$unread.' unread notifications' : 'Open navigation', 'attr') ?>" aria-controls="app-sidebar" aria-expanded="false"><?= ui_icon('menu') ?><?php if($unread>0):?><span class="menu-toggle-unread" aria-hidden="true"><?= esc($unreadLabel) ?></span><?php endif;?></button>
+    <button class="menu-toggle" type="button" data-nav-toggle aria-label="<?= esc($unread > 0 ? 'Open navigation, '.$unread.' unread notifications' : 'Open navigation', 'attr') ?>" aria-controls="app-sidebar" aria-expanded="false"><?= ui_icon('menu') ?><span class="menu-toggle-unread" aria-hidden="true"<?= $unread>0?'':' hidden' ?>><?= esc($unreadLabel) ?></span></button>
     <a class="brand" href="<?= site_url('dashboard') ?>"><img src="<?= base_url('assets/img/logo.webp') ?>" alt="TallyTech"><span><?= esc($roleLabel) ?></span></a>
 
     <div class="account-menu" data-account-menu>

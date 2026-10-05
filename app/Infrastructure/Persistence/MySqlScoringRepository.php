@@ -221,6 +221,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             'sports' => $eventId > 0 ? $this->db->table('sports')->where('event_id', $eventId)->countAllResults() : 0,
             'pending' => 0,
             'approved' => 0,
+            'returned' => 0,
             'official' => $eventId > 0 ? $this->db->table('results')->where(['event_id' => $eventId, 'status' => 'validated'])->countAllResults() : 0,
         ];
         if ($eventId < 1) {
@@ -228,8 +229,14 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         }
 
         if ($role === 'admin') {
-            $counts['pending'] = $this->db->table('results')->where(['event_id' => $eventId, 'status' => 'pending'])->countAllResults();
+            $counts['pending'] = $this->db->table('results')
+                ->where(['event_id' => $eventId, 'status' => 'pending', 'return_note' => null])
+                ->countAllResults();
             $counts['approved'] = $this->db->table('results')->where(['event_id' => $eventId, 'status' => 'approved'])->countAllResults();
+            $counts['returned'] = $this->db->table('results')
+                ->where(['event_id' => $eventId, 'status' => 'pending'])
+                ->where('return_note IS NOT NULL', null, false)
+                ->countAllResults();
             return $counts;
         }
 
@@ -237,13 +244,31 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         if ($sportIds !== []) {
             $counts['pending'] = $this->db->table('results r')
                 ->join('schedules sc', 'sc.id=r.schedule_id')
-                ->where(['r.event_id' => $eventId, 'r.status' => 'pending'])
+                ->where(['r.event_id' => $eventId, 'r.status' => 'pending', 'r.return_note' => null])
                 ->whereIn('sc.sport_id', $sportIds)
                 ->countAllResults();
+
+            if ($role === 'facilitator') {
+                $counts['approved'] = $this->db->table('results r')
+                    ->join('schedules sc', 'sc.id=r.schedule_id')
+                    ->where(['r.event_id' => $eventId, 'r.status' => 'approved'])
+                    ->whereIn('sc.sport_id', $sportIds)
+                    ->countAllResults();
+                $counts['returned'] = $this->db->table('results r')
+                    ->join('schedules sc', 'sc.id=r.schedule_id')
+                    ->where(['r.event_id' => $eventId, 'r.status' => 'pending'])
+                    ->where('r.return_note IS NOT NULL', null, false)
+                    ->whereIn('sc.sport_id', $sportIds)
+                    ->countAllResults();
+            }
         }
         if ($role === 'manager') {
             $counts['approved'] = $this->db->table('results')
                 ->where(['event_id' => $eventId, 'status' => 'approved', 'approved_by' => $userId])
+                ->countAllResults();
+            $counts['returned'] = $this->db->table('results')
+                ->where(['event_id' => $eventId, 'status' => 'pending', 'returned_by' => $userId])
+                ->where('return_note IS NOT NULL', null, false)
                 ->countAllResults();
         }
 
@@ -1198,15 +1223,23 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         $entries = $this->normaliseResultEntries($result, $data);
         $notes = $this->optionalTextValue($data['notes'] ?? null);
 
+        $returnedBy = (int) ($result['returned_by'] ?? 0);
         $this->db->transStart();
         $this->db->table('results')->where('id', $id)->update([
             'notes' => $notes,
+            'return_note' => null,
+            'returned_by' => null,
+            'returned_at' => null,
             'validated_by' => null,
             'validated_at' => null,
         ]);
         $this->db->table('result_entries')->where('result_id', $id)->delete();
         $this->replaceResultEntries($id, $entries);
-        $this->notify($actorId, 'result_updated', 'Updated pending result #' . $id, ['manager'], null, (int)$result['sport_id']);
+        if ($returnedBy > 0) {
+            $this->notify($actorId, 'result_resubmitted', 'Returned result #' . $id . ' was corrected and resubmitted', [], $returnedBy, (int)$result['sport_id']);
+        } else {
+            $this->notify($actorId, 'result_updated', 'Updated pending result #' . $id, ['manager'], null, (int)$result['sport_id']);
+        }
         $this->finishTransaction();
     }
 
@@ -2626,13 +2659,13 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
     public function approveResult(int $id,int $actorId): void
     {
         $result=$this->resultWithSchedule($id);$this->assertActorOwnsSport((int)$result['sport_id'],$actorId);if(($result['status']??'')!=='pending')throw new RuntimeException('Only pending results can be approved.');
-        $this->db->transStart();$this->db->table('results')->where('id',$id)->update(['status'=>'approved','approved_by'=>$actorId,'approved_at'=>date('Y-m-d H:i:s'),'return_note'=>null]);$this->notify($actorId,'result_approved','Tournament Manager approved result #'.$id,['admin'],null,(int)$result['sport_id']);if((int)($result['submitted_by']??0)>0)$this->notify($actorId,'result_approved','Your result #'.$id.' was approved by the Tournament Manager',[],(int)$result['submitted_by'],(int)$result['sport_id']);$this->finishTransaction();
+        $this->db->transStart();$this->db->table('results')->where('id',$id)->update(['status'=>'approved','approved_by'=>$actorId,'approved_at'=>date('Y-m-d H:i:s'),'return_note'=>null,'returned_by'=>null,'returned_at'=>null]);$this->notify($actorId,'result_approved','Tournament Manager approved result #'.$id,['admin'],null,(int)$result['sport_id']);if((int)($result['submitted_by']??0)>0)$this->notify($actorId,'result_approved','Your result #'.$id.' was approved by the Tournament Manager',[],(int)$result['submitted_by'],(int)$result['sport_id']);$this->finishTransaction();
     }
 
     public function returnResult(int $id,string $note,int $actorId): void
     {
         $result=$this->resultWithSchedule($id);$this->assertActorOwnsSport((int)$result['sport_id'],$actorId);if(!in_array(($result['status']??''),['pending','approved'],true))throw new RuntimeException('Official results cannot be returned.');if(trim($note)==='')throw new RuntimeException('Enter a return note.');
-        $this->db->transStart();$this->db->table('results')->where('id',$id)->update(['status'=>'pending','approved_by'=>null,'approved_at'=>null,'return_note'=>trim($note)]);if((int)($result['submitted_by']??0)>0)$this->notify($actorId,'result_returned','Result returned: '.trim($note),[],(int)$result['submitted_by'],(int)$result['sport_id']);$this->finishTransaction();
+        $this->db->transStart();$this->db->table('results')->where('id',$id)->update(['status'=>'pending','approved_by'=>null,'approved_at'=>null,'return_note'=>trim($note),'returned_by'=>$actorId,'returned_at'=>date('Y-m-d H:i:s')]);if((int)($result['submitted_by']??0)>0)$this->notify($actorId,'result_returned','Result returned: '.trim($note),[],(int)$result['submitted_by'],(int)$result['sport_id']);$this->finishTransaction();
     }
 
     public function resetGeneratedPassword(int $userId,int $actorId): string

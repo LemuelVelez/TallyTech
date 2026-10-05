@@ -16,6 +16,57 @@
   let lastDialogTrigger = null;
   let pendingConfirmForm = null;
   let pendingConfirmSubmitter = null;
+  let unreadSyncSequence = 0;
+
+  const currentUnreadCount = () => {
+    const count = Number.parseInt(body.dataset.unreadNotifications || '0', 10);
+    return Number.isFinite(count) && count > 0 ? count : 0;
+  };
+
+  const updateNavigationAriaLabel = () => {
+    if (!navToggle) return;
+    if (body.classList.contains('nav-open')) {
+      navToggle.setAttribute('aria-label', 'Close navigation');
+      return;
+    }
+    const unread = currentUnreadCount();
+    navToggle.setAttribute('aria-label', unread > 0 ? `Open navigation, ${unread} unread notifications` : 'Open navigation');
+  };
+
+  const updateUnreadBadges = (count) => {
+    const unread = Number.isFinite(Number(count)) ? Math.max(0, Math.trunc(Number(count))) : 0;
+    const label = unread > 99 ? '99+' : String(unread);
+    body.dataset.unreadNotifications = String(unread);
+
+    document.querySelectorAll('.nav-unread, .menu-toggle-unread').forEach((badge) => {
+      badge.textContent = label;
+      badge.hidden = unread === 0;
+      if (badge.classList.contains('nav-unread')) {
+        badge.setAttribute('aria-label', `${unread} unread notifications`);
+      }
+    });
+    updateNavigationAriaLabel();
+  };
+
+  const syncUnreadBadge = async () => {
+    const endpoint = body.dataset.unreadCountUrl;
+    if (!endpoint) return;
+    const sequence = ++unreadSyncSequence;
+    try {
+      const response = await fetch(endpoint, {
+        method: 'GET',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { Accept: 'application/json' },
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      const unread = Number.parseInt(data?.unread ?? 0, 10);
+      if (sequence === unreadSyncSequence) updateUnreadBadges(Number.isFinite(unread) ? unread : 0);
+    } catch (_) {
+      // Keep the server-rendered badge when the unread-count request is unavailable.
+    }
+  };
 
 
   const dismissToast = (toast) => {
@@ -376,8 +427,14 @@
   const setNavigation = (open) => {
     body.classList.toggle('nav-open', open);
     navToggle?.setAttribute('aria-expanded', open ? 'true' : 'false');
-    navToggle?.setAttribute('aria-label', open ? 'Close navigation' : 'Open navigation');
+    updateNavigationAriaLabel();
   };
+
+  window.addEventListener('pageshow', () => syncUnreadBadge());
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') syncUnreadBadge();
+  });
+  window.addEventListener('focus', () => syncUnreadBadge());
 
   const SIDEBAR_COMPACT_KEY = 'tallytech.sidebarCompact';
 
@@ -537,6 +594,11 @@
 
     if (event.target.closest('[data-close]')) {
       event.target.closest('dialog')?.close();
+    }
+
+    if (event.target.closest('[data-notifications-link]')) {
+      updateUnreadBadges(0);
+      setNavigation(false);
     }
 
     if (event.target.closest('[data-nav-toggle]')) {
