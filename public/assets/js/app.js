@@ -477,6 +477,9 @@
     const action = actionLabel.toLowerCase();
     const normalized = `${actionLabel} ${message}`.toLowerCase();
 
+    if (/\breturn\b/.test(action)) {
+      return { title: 'Confirm return', tone: 'danger', actionLabel, icon: 'arrow-left' };
+    }
     if (/\b(delete|remove|deactivate|disable)\b/.test(action) || /\b(delete|remove|deactivate|disable)\b/.test(normalized)) {
       return { title: 'Confirm removal', tone: 'danger', actionLabel, icon: 'trash' };
     }

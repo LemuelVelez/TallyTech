@@ -9,7 +9,10 @@ $fontSize = (string) (session()->get('font_size') ?: 'medium');
 $theme = in_array($theme, ['light', 'dark', 'system'], true) ? $theme : 'system';
 $fontSize = in_array($fontSize, ['small', 'medium', 'large'], true) ? $fontSize : 'medium';
 $displayName = (string) session()->get('display_name');
-$assetRelease = '20260929-2';
+$unread = 0;
+try { $unread = (new \App\Infrastructure\Persistence\MySqlScoringRepository())->unreadNotificationCount((int) session()->get('user_id')); } catch (\Throwable $e) {}
+$unreadLabel = $unread > 99 ? '99+' : (string) $unread;
+$assetRelease = '20261005-1';
 $assetVersion = static function (string $relativePath) use ($assetRelease): string {
     $path = defined('FCPATH') ? FCPATH . ltrim($relativePath, '/\\') : '';
     $fileVersion = $path !== '' && is_file($path) ? (string) filemtime($path) : '0';
@@ -32,7 +35,7 @@ $jsVersion = $assetVersion('assets/js/app.js');
 <?= view('partials/toasts') ?>
 <a class="skip-link" href="#main-content">Skip to main content</a>
 <header class="topbar">
-    <button class="menu-toggle" type="button" data-nav-toggle aria-label="Open navigation" aria-controls="app-sidebar" aria-expanded="false"><?= ui_icon('menu') ?></button>
+    <button class="menu-toggle" type="button" data-nav-toggle aria-label="<?= esc($unread > 0 ? 'Open navigation, '.$unread.' unread notifications' : 'Open navigation', 'attr') ?>" aria-controls="app-sidebar" aria-expanded="false"><?= ui_icon('menu') ?><?php if($unread>0):?><span class="menu-toggle-unread" aria-hidden="true"><?= esc($unreadLabel) ?></span><?php endif;?></button>
     <a class="brand" href="<?= site_url('dashboard') ?>"><img src="<?= base_url('assets/img/logo.webp') ?>" alt="TallyTech"><span><?= esc($roleLabel) ?></span></a>
 
     <div class="account-menu" data-account-menu>
@@ -60,7 +63,7 @@ $jsVersion = $assetVersion('assets/js/app.js');
     </div>
 </header>
 <div class="shell">
-    <?= view('partials/sidebar') ?>
+    <?= view('partials/sidebar', ['unread' => $unread]) ?>
     <button class="nav-backdrop" type="button" data-nav-close aria-label="Close navigation"></button>
     <main class="content" id="main-content">
         <?= $this->renderSection('content') ?>

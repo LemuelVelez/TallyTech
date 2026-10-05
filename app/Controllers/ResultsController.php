@@ -2,6 +2,8 @@
 
 namespace App\Controllers;
 
+use App\Application\Services\ScoringService;
+
 class ResultsController extends BaseController
 {
     public function matches()
@@ -95,6 +97,25 @@ class ResultsController extends BaseController
             $scheduleIds = array_map('intval', array_column($schedules, 'id'));
             $results = array_values(array_filter($results, static fn(array $result): bool => in_array((int) $result['schedule_id'], $scheduleIds, true)));
         }
+
+        foreach ($schedules as $index => &$schedule) {
+            $schedule['_sort_index'] = $index;
+        }
+        unset($schedule);
+        usort($schedules, static function (array $a, array $b): int {
+            $sport = ScoringService::compareSportsByNameAndCategory($a, $b);
+            if ($sport !== 0) {
+                return $sport;
+            }
+            return strcmp((string) ($a['match_date'] ?? ''), (string) ($b['match_date'] ?? ''))
+                ?: ((int) ($a['bracket_order'] ?? 0) <=> (int) ($b['bracket_order'] ?? 0))
+                ?: ((int) ($a['id'] ?? 0) <=> (int) ($b['id'] ?? 0))
+                ?: ((int) ($a['_sort_index'] ?? 0) <=> (int) ($b['_sort_index'] ?? 0));
+        });
+        foreach ($schedules as &$schedule) {
+            unset($schedule['_sort_index']);
+        }
+        unset($schedule);
 
         $resultBySchedule = [];
         foreach ($results as $result) {

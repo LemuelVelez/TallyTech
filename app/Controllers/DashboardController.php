@@ -6,7 +6,7 @@ class DashboardController extends BaseController
 {
     public function index()
     {
-        $data=$this->scoringService()->dashboard((string)session()->get('role'));
+        $data=$this->scoringService()->dashboard((string)session()->get('role'),(int)session()->get('user_id'));
         $data['title']='Dashboard';
         return view('dashboard/index',$data);
     }

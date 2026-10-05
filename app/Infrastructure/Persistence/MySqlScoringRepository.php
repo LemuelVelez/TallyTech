@@ -77,7 +77,11 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         if ($eventId !== null) {
             $builder->where('s.event_id', $eventId);
         }
-        return $builder->orderBy('s.category')->orderBy('s.name')->get()->getResultArray();
+        return $builder
+            ->orderBy('s.name', 'ASC')
+            ->orderBy("CASE LOWER(s.category) WHEN 'men' THEN 0 WHEN 'women' THEN 1 WHEN 'mixed' THEN 2 ELSE 3 END", 'ASC', false)
+            ->orderBy('s.category', 'ASC')
+            ->get()->getResultArray();
     }
 
     public function locations(): array
@@ -146,7 +150,9 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
                 ->join('events e', 'e.id=s.event_id')
                 ->where('us.user_id', $user['id'])
                 ->where('e.is_active', 1)
-                ->orderBy('s.name')
+                ->orderBy('s.name', 'ASC')
+                ->orderBy("CASE LOWER(s.category) WHEN 'men' THEN 0 WHEN 'women' THEN 1 WHEN 'mixed' THEN 2 ELSE 3 END", 'ASC', false)
+                ->orderBy('s.category', 'ASC')
                 ->get()->getResultArray();
         }
         return $users;
@@ -171,22 +177,102 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
 
     public function notifications(int $limit = 30): array
     {
-        $userId=(int)session()->get('user_id'); $role=(string)session()->get('role'); $sportIds=$this->assignedSportIds($userId);
-        $builder=$this->db->table('notifications n')->select('n.*, u.display_name actor_name')->join('users u','u.id=n.actor_user_id','left');
-        $builder->groupStart()->where('n.recipient_user_id',$userId)->orGroupStart()->where('n.recipient_user_id',null)->where('n.recipient_role',$role);
-        if(in_array($role,['manager','facilitator'],true) && $sportIds!==[]) $builder->groupStart()->where('n.sport_id',null)->orWhereIn('n.sport_id',$sportIds)->groupEnd();
-        $builder->groupEnd()->groupEnd();
-        return $builder->orderBy('n.id','DESC')->limit($limit)->get()->getResultArray();
+        $userId = (int) session()->get('user_id');
+        $role = (string) session()->get('role');
+        return $this->notificationVisibilityBuilder($userId, $role)
+            ->select('n.*, u.display_name actor_name')
+            ->join('users u', 'u.id=n.actor_user_id', 'left')
+            ->orderBy('n.id', 'DESC')
+            ->limit($limit)
+            ->get()->getResultArray();
     }
 
     public function markNotificationsRead(int $userId): void
     {
-        $rows=$this->notifications(500); $ids=array_map('intval',array_column($rows,'id')); if($ids!==[])$this->db->table('notifications')->whereIn('id',$ids)->update(['is_read'=>1]);
+        $role = $this->notificationRole($userId);
+        $rows = $this->notificationVisibilityBuilder($userId, $role)->select('n.id')->get()->getResultArray();
+        if ($rows === []) {
+            return;
+        }
+
+        $readAt = date('Y-m-d H:i:s');
+        $reads = array_map(static fn(array $row): array => [
+            'notification_id' => (int) $row['id'],
+            'user_id' => $userId,
+            'read_at' => $readAt,
+        ], $rows);
+        $this->db->table('notification_reads')->ignore(true)->insertBatch($reads);
     }
 
     public function unreadNotificationCount(int $userId): int
     {
-        return count(array_filter($this->notifications(500),static fn(array $n): bool=>(int)($n['is_read']??0)===0));
+        $role = $this->notificationRole($userId);
+        return $this->notificationVisibilityBuilder($userId, $role)
+            ->join('notification_reads nr', 'nr.notification_id=n.id AND nr.user_id=' . $userId, 'left', false)
+            ->where('n.is_read', 0)
+            ->where('nr.notification_id', null)
+            ->countAllResults();
+    }
+
+    public function dashboardCounts(int $eventId, string $role, int $userId): array
+    {
+        $counts = [
+            'teams' => $this->db->table('teams')->countAllResults(),
+            'sports' => $eventId > 0 ? $this->db->table('sports')->where('event_id', $eventId)->countAllResults() : 0,
+            'pending' => 0,
+            'approved' => 0,
+            'official' => $eventId > 0 ? $this->db->table('results')->where(['event_id' => $eventId, 'status' => 'validated'])->countAllResults() : 0,
+        ];
+        if ($eventId < 1) {
+            return $counts;
+        }
+
+        if ($role === 'admin') {
+            $counts['pending'] = $this->db->table('results')->where(['event_id' => $eventId, 'status' => 'pending'])->countAllResults();
+            $counts['approved'] = $this->db->table('results')->where(['event_id' => $eventId, 'status' => 'approved'])->countAllResults();
+            return $counts;
+        }
+
+        $sportIds = $this->assignedSportIds($userId);
+        if ($sportIds !== []) {
+            $counts['pending'] = $this->db->table('results r')
+                ->join('schedules sc', 'sc.id=r.schedule_id')
+                ->where(['r.event_id' => $eventId, 'r.status' => 'pending'])
+                ->whereIn('sc.sport_id', $sportIds)
+                ->countAllResults();
+        }
+        if ($role === 'manager') {
+            $counts['approved'] = $this->db->table('results')
+                ->where(['event_id' => $eventId, 'status' => 'approved', 'approved_by' => $userId])
+                ->countAllResults();
+        }
+
+        return $counts;
+    }
+
+    private function notificationRole(int $userId): string
+    {
+        if ($userId === (int) session()->get('user_id')) {
+            return (string) session()->get('role');
+        }
+        $user = $this->db->table('users')->select('role')->where('id', $userId)->get()->getRowArray();
+        return (string) ($user['role'] ?? '');
+    }
+
+    private function notificationVisibilityBuilder(int $userId, string $role)
+    {
+        $sportIds = $this->assignedSportIds($userId);
+        $builder = $this->db->table('notifications n');
+        $builder->groupStart()
+            ->where('n.recipient_user_id', $userId)
+            ->orGroupStart()
+                ->where('n.recipient_user_id', null)
+                ->where('n.recipient_role', $role);
+        if (in_array($role, ['manager', 'facilitator'], true) && $sportIds !== []) {
+            $builder->groupStart()->where('n.sport_id', null)->orWhereIn('n.sport_id', $sportIds)->groupEnd();
+        }
+        $builder->groupEnd()->groupEnd();
+        return $builder;
     }
 
     public function weightedPoints(?int $eventId = null): array
@@ -320,8 +406,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
                 $sports = array_values(array_filter($sports, static fn(array $sport): bool => isset($sportIdSet[(int) ($sport['id'] ?? 0)])));
             }
 
-            usort($sports, static fn(array $a, array $b): int => strcasecmp((string) ($a['name'] ?? ''), (string) ($b['name'] ?? ''))
-                ?: strcasecmp((string) ($a['category'] ?? ''), (string) ($b['category'] ?? '')));
+            usort($sports, [ScoringService::class, 'compareSportsByNameAndCategory']);
 
             $rows = [];
             foreach ($sports as $sport) {

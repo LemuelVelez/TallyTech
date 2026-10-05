@@ -21,21 +21,38 @@ class ScoringService
         ];
     }
 
-    public function dashboard(string $role): array
+    public function dashboard(string $role, int $userId): array
     {
         $event = $this->repository->activeEvent();
         $eventId = (int) ($event['id'] ?? 0);
         return [
             'activeEvent' => $event,
             'ranking' => $this->repository->ranking($eventId, false),
-            'results' => $this->repository->results($eventId),
-            'schedules' => $this->repository->schedules($eventId),
-            'teams' => $this->repository->teams(),
-            'sports' => $this->repository->sports($eventId),
+            'counts' => $this->repository->dashboardCounts($eventId, $role, $userId),
             'notifications' => $this->repository->notifications(5),
-            'weightedPoints' => $this->repository->weightedPoints($eventId),
             'role' => $role,
         ];
+    }
+
+    public static function sportCategoryOrder(string $category): int
+    {
+        return match (strtolower($category)) {
+            'men' => 0,
+            'women' => 1,
+            'mixed' => 2,
+            default => 3,
+        };
+    }
+
+    public static function compareSportsByNameAndCategory(array $a, array $b): int
+    {
+        $name = strcasecmp((string) ($a['name'] ?? $a['sport_name'] ?? ''), (string) ($b['name'] ?? $b['sport_name'] ?? ''));
+        if ($name !== 0) {
+            return $name;
+        }
+
+        $category = self::sportCategoryOrder((string) ($a['category'] ?? '')) <=> self::sportCategoryOrder((string) ($b['category'] ?? ''));
+        return $category ?: strcasecmp((string) ($a['category'] ?? ''), (string) ($b['category'] ?? ''));
     }
 
     public function sportScores(?int $requestedSportId = null, ?array $allowedSportIds = null): array
@@ -375,14 +392,8 @@ class ScoringService
             $sports,
             static fn(array $sport): bool => (string) ($sport['name'] ?? '') === $selectedName
         ));
-        $categoryOrder = static fn(string $category): int => match (strtolower($category)) {
-            'men' => 0,
-            'women' => 1,
-            'mixed' => 2,
-            default => 3,
-        };
-        usort($selectedSports, static function (array $a, array $b) use ($categoryOrder): int {
-            $order = $categoryOrder((string) ($a['category'] ?? '')) <=> $categoryOrder((string) ($b['category'] ?? ''));
+        usort($selectedSports, static function (array $a, array $b): int {
+            $order = self::sportCategoryOrder((string) ($a['category'] ?? '')) <=> self::sportCategoryOrder((string) ($b['category'] ?? ''));
             return $order ?: strcasecmp((string) ($a['category'] ?? ''), (string) ($b['category'] ?? ''));
         });
 
@@ -569,14 +580,8 @@ class ScoringService
                 static fn(array $sport): bool => (int) ($sport['id'] ?? 0) === $selectedExactId
             ));
         }
-        $categoryOrder = static fn(string $category): int => match (strtolower($category)) {
-            'men' => 0,
-            'women' => 1,
-            'mixed' => 2,
-            default => 3,
-        };
-        usort($selectedSports, static function (array $a, array $b) use ($categoryOrder): int {
-            $order = $categoryOrder((string) ($a['category'] ?? '')) <=> $categoryOrder((string) ($b['category'] ?? ''));
+        usort($selectedSports, static function (array $a, array $b): int {
+            $order = self::sportCategoryOrder((string) ($a['category'] ?? '')) <=> self::sportCategoryOrder((string) ($b['category'] ?? ''));
             return $order ?: strcasecmp((string) ($a['category'] ?? ''), (string) ($b['category'] ?? ''));
         });
 

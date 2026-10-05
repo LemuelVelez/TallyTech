@@ -20,6 +20,7 @@ interface ScoringRepositoryInterface
     public function notifications(int $limit = 30): array;
     public function markNotificationsRead(int $userId): void;
     public function unreadNotificationCount(int $userId): int;
+    public function dashboardCounts(int $eventId, string $role, int $userId): array;
     public function weightedPoints(?int $eventId = null): array;
     public function results(?int $eventId = null, ?string $type = null): array;
     public function resultsByStatus(int $eventId, string $status, ?string $type = null): array;
