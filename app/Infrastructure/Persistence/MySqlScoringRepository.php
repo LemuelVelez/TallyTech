@@ -30,6 +30,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
     private WeightedPointModel $weightedPointsModel;
     private ResultModel $resultsModel;
     private NotificationModel $notificationsModel;
+    private ?bool $notificationReadsAvailable = null;
     /** @var array<string, array> Per-request cache for ranking source data. */
     private array $placementSourceCache = [];
 
@@ -195,6 +196,13 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             return;
         }
 
+        if (! $this->hasNotificationReadsTable()) {
+            $this->db->table('notifications')
+                ->whereIn('id', array_map('intval', array_column($rows, 'id')))
+                ->update(['is_read' => 1]);
+            return;
+        }
+
         $readAt = date('Y-m-d H:i:s');
         $reads = array_map(static fn(array $row): array => [
             'notification_id' => (int) $row['id'],
@@ -207,11 +215,26 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
     public function unreadNotificationCount(int $userId): int
     {
         $role = $this->notificationRole($userId);
-        return $this->notificationVisibilityBuilder($userId, $role)
+        $builder = $this->notificationVisibilityBuilder($userId, $role)
+            ->where('n.is_read', 0);
+
+        if (! $this->hasNotificationReadsTable()) {
+            return $builder->countAllResults();
+        }
+
+        return $builder
             ->join('notification_reads nr', 'nr.notification_id=n.id AND nr.user_id=' . $userId, 'left', false)
-            ->where('n.is_read', 0)
             ->where('nr.notification_id', null)
             ->countAllResults();
+    }
+
+    private function hasNotificationReadsTable(): bool
+    {
+        if ($this->notificationReadsAvailable === null) {
+            $this->notificationReadsAvailable = $this->db->tableExists('notification_reads');
+        }
+
+        return $this->notificationReadsAvailable;
     }
 
     public function dashboardCounts(int $eventId, string $role, int $userId): array
