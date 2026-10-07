@@ -3619,6 +3619,7 @@ body.theme-dark .tt-bracket-note .tt-bracket-note-trophy { color: #f3d98b; }
   .team-ranking-table-panel { min-width: 0; }
 
   .table-wrap {
+    width: 100%;
     max-width: 100%;
     overflow-x: auto;
     overflow-y: auto;
@@ -3627,6 +3628,14 @@ body.theme-dark .tt-bracket-note .tt-bracket-note-trophy { color: #f3d98b; }
     touch-action: pan-x pan-y;
     scrollbar-width: auto;
     scrollbar-gutter: stable;
+  }
+
+  /* Let the complete table move as one horizontal surface on phones. */
+  .table-wrap > table {
+    width: max-content;
+    max-width: none;
+    min-width: max(100%, 620px);
+    table-layout: auto;
   }
 
   .table-wrap[data-scroll-hint]::before {
@@ -3651,87 +3660,125 @@ body.theme-dark .tt-bracket-note .tt-bracket-note-trophy { color: #f3d98b; }
   }
 
   .table-wrap th,
-  .table-wrap td { padding-inline: 11px; }
+  .table-wrap td {
+    min-width: 104px;
+    padding-inline: 11px;
+    vertical-align: middle;
+  }
 
-  .users-table { min-width: 940px !important; }
-  .teams-table { min-width: 620px !important; }
-  .events-table { min-width: 760px !important; }
-  .sports-table { min-width: 900px !important; }
-  .weighted-points-table { min-width: 980px !important; }
-  .schedule-table { min-width: 1120px !important; }
-  .results-schedules-table { min-width: 840px !important; }
-  .sport-score-table { min-width: 820px !important; }
+  /* No frozen columns on mobile: every column, including the first, scrolls. */
+  .table-wrap .table-pin,
+  .sport-score-table .sport-score-team-cell,
+  .team-ranking-table-panel .team-ranking-col-rank,
+  .team-ranking-table-panel .team-ranking-col-team {
+    position: static !important;
+    left: auto !important;
+    right: auto !important;
+    z-index: auto !important;
+    width: auto;
+    max-width: none;
+    box-shadow: none !important;
+  }
 
-  .sport-categories-table,
-  .locations-table,
+  .table-wrap th.table-pin,
+  .sport-score-table th.sport-score-team-cell,
+  .team-ranking-table-panel th.team-ranking-col-rank,
+  .team-ranking-table-panel th.team-ranking-col-team { background: var(--table-head); }
+
+  .table-wrap td.table-pin,
+  .sport-score-table td.sport-score-team-cell,
+  .team-ranking-table-panel td.team-ranking-col-rank,
+  .team-ranking-table-panel td.team-ranking-col-team { background: transparent; }
+
+  .table-wrap tbody tr:hover > td.table-pin,
+  .sport-score-table tbody tr:hover > td.sport-score-team-cell,
+  .team-ranking-table-panel tbody tr:hover td.team-ranking-col-rank,
+  .team-ranking-table-panel tbody tr:hover td.team-ranking-col-team { background: transparent; }
+
+  /* Keep labels readable without forcing a narrow frozen first column. */
+  .table-pin,
+  .sport-score-table .sport-score-team-cell,
+  .team-ranking-table-panel .team-ranking-col-team {
+    min-width: 160px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+  .team-ranking-table-panel .team-ranking-col-rank,
+  .sport-points-table .table-pin,
+  .scoreboard-points-table .table-pin { min-width: 78px; }
+
+  .users-table { min-width: 980px !important; }
+  .teams-table { min-width: 720px !important; }
+  .events-table { min-width: 820px !important; }
+  .sports-table { min-width: 980px !important; }
+  .weighted-points-table { min-width: 1040px !important; }
+  .schedule-table { min-width: 1180px !important; }
+  .results-schedules-table { min-width: 900px !important; }
+  .sport-score-table { min-width: 900px !important; }
+  .sport-categories-table { min-width: 680px !important; }
+  .locations-table { min-width: 680px !important; }
   .sport-points-table,
-  .scoreboard-points-table,
-  .report-table--compact { min-width: 100% !important; }
+  .scoreboard-points-table { min-width: 560px !important; }
+  .report-table--compact { min-width: 620px !important; }
 
   .report-table:not(.report-table--compact) {
-    min-width: max(720px, calc(var(--report-column-count, 5) * 132px)) !important;
+    min-width: max(760px, calc(var(--report-column-count, 5) * 140px)) !important;
   }
 
   .users-table th:nth-child(4),
-  .users-table td:nth-child(4) { min-width: 190px; white-space: normal; overflow-wrap: anywhere; }
+  .users-table td:nth-child(4) { min-width: 220px; white-space: normal; overflow-wrap: anywhere; }
   .users-table th:nth-child(6),
-  .users-table td:nth-child(6) { min-width: 170px; }
+  .users-table td:nth-child(6) { min-width: 180px; }
+  .teams-table th:nth-child(3),
+  .teams-table td:nth-child(3),
+  .events-table th:nth-child(2),
+  .events-table td:nth-child(2) { min-width: 190px; }
   .events-table th:nth-child(4),
-  .events-table td:nth-child(4) { min-width: 170px; }
+  .events-table td:nth-child(4) { min-width: 180px; }
   .schedule-table th:nth-child(2),
-  .schedule-table td:nth-child(2) { min-width: 130px; }
+  .schedule-table td:nth-child(2) { min-width: 140px; }
   .schedule-table th:nth-child(3),
   .schedule-table td:nth-child(3),
   .results-schedules-table th:nth-child(1),
-  .results-schedules-table td:nth-child(1) { min-width: 150px; }
+  .results-schedules-table td:nth-child(1) { min-width: 170px; }
   .schedule-table th:nth-child(5),
   .schedule-table td:nth-child(5),
   .schedule-table th:nth-child(6),
   .schedule-table td:nth-child(6),
   .results-schedules-table th:nth-child(4),
-  .results-schedules-table td:nth-child(4) { min-width: 150px; white-space: normal; overflow-wrap: anywhere; }
+  .results-schedules-table td:nth-child(4) { min-width: 170px; white-space: normal; overflow-wrap: anywhere; }
 
-  .table-pin,
-  .sport-score-table .sport-score-team-cell {
-    position: sticky;
-    left: 0;
-    z-index: 4;
-    width: clamp(96px, 34vw, 150px);
-    min-width: clamp(96px, 34vw, 150px);
-    max-width: clamp(96px, 34vw, 150px);
+  .table-actions-col { min-width: 190px; }
+  .table-actions-col .row-actions { min-width: max-content; flex-wrap: nowrap; }
+  .users-table .table-actions-col,
+  .events-table .table-actions-col { min-width: 230px; }
+
+  .sport-score-table .sport-category-cell { min-width: 130px; }
+  .sport-score-table .sport-score-team-cell { min-width: 210px; text-align: left; }
+  .sport-score-table .sport-score-set-cell { min-width: 78px; }
+  .sport-score-table .sport-score-status-cell { min-width: 120px; }
+  .sport-score-table .sport-score-overall-cell { min-width: 130px; }
+
+  .sport-points-table th:nth-child(2),
+  .sport-points-table td:nth-child(2),
+  .scoreboard-points-table th:nth-child(2),
+  .scoreboard-points-table td:nth-child(2) {
+    min-width: 240px;
     white-space: normal;
     overflow-wrap: anywhere;
-    word-break: break-word;
-    box-shadow: 7px 0 9px -9px rgba(16, 35, 60, 0.55);
   }
-  th.table-pin,
-  .sport-score-table th.sport-score-team-cell {
-    z-index: 6;
-    background: var(--table-head);
-  }
-  td.table-pin,
-  .sport-score-table td.sport-score-team-cell { background: var(--panel); }
-  tbody tr:hover > td.table-pin,
-  .sport-score-table tbody tr:hover > td.sport-score-team-cell { background: var(--table-hover); }
 
-  .teams-table .table-pin,
-  .events-table .table-pin { left: 0; }
-
-  .table-actions-col { min-width: 176px; }
-  .table-actions-col .row-actions { min-width: 0; }
-  .users-table .table-actions-col,
-  .events-table .table-actions-col { min-width: 220px; }
-
-  .sport-score-table .sport-category-cell { min-width: 110px; }
-  .sport-score-table .sport-score-team-cell { text-align: left; }
-
-  .sport-points-panel .sport-points-table,
-  .sport-points-panel .scoreboard-points-table { min-width: 100% !important; }
-
-  .team-ranking-table-panel td.team-ranking-col-rank,
-  .team-ranking-table-panel td.team-ranking-col-team { background: var(--panel); }
-  .team-ranking-table-panel tbody tr:hover td.team-ranking-col-rank,
-  .team-ranking-table-panel tbody tr:hover td.team-ranking-col-team { background: var(--table-hover); }
+  /* Public overall ranking uses the same horizontally-scrollable table on mobile. */
+  .team-ranking--scoreboard .team-ranking-desktop-table { display: block; }
+  .team-ranking--scoreboard .team-ranking-mobile-list { display: none; }
+  .team-ranking--scoreboard .team-ranking-desktop-table > table { min-width: 780px !important; }
+  .team-ranking-table-panel .team-ranking-col-rank { width: auto; min-width: 78px; max-width: none; text-align: center; }
+  .team-ranking-table-panel .team-ranking-col-team { min-width: 220px; max-width: none; }
+  .team-ranking-table-panel th:nth-child(n+3),
+  .team-ranking-table-panel td:nth-child(n+3) { min-width: 88px; text-align: center; }
+  .team-ranking-table-panel th:last-child,
+  .team-ranking-table-panel td:last-child { min-width: 130px; }
 }
 
 @media (max-width: 430px) {
@@ -3739,10 +3786,9 @@ body.theme-dark .tt-bracket-note .tt-bracket-note-trophy { color: #f3d98b; }
   .menu-toggle { margin-right: 6px; }
   .topbar { gap: 0; }
   .table-wrap th,
-  .table-wrap td { padding-inline: 9px; }
-  .sport-categories-table,
-  .locations-table,
-  .sport-points-table,
-  .scoreboard-points-table,
-  .report-table--compact { font-size: 0.82rem; }
+  .table-wrap td {
+    padding-inline: 10px;
+    font-size: 0.84rem;
+  }
+  .table-wrap th { font-size: 0.72rem; }
 }
