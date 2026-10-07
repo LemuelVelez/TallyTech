@@ -2320,7 +2320,7 @@
       if (sportCheckboxes.some((checkbox) => checkbox.checked)) return;
 
       event.preventDefault();
-      sportCheckboxes[0].setCustomValidity('Assign at least one sport to the facilitator.');
+      sportCheckboxes[0].setCustomValidity('Assign at least one sport to the Tournament Manager.');
       sportCheckboxes[0].reportValidity();
     });
 

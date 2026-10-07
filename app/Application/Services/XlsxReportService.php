@@ -48,16 +48,43 @@ class XlsxReportService
         }
 
         $lastDataRow = max(7, $rowNumber - 1);
-        $mergeCells = $columnCount > 1
-            ? '<mergeCells count="4"><mergeCell ref="A1:' . $lastColumn . '1"/><mergeCell ref="A2:' . $lastColumn . '2"/><mergeCell ref="A3:' . $lastColumn . '3"/><mergeCell ref="A4:' . $lastColumn . '4"/></mergeCells>'
-            : '';
-        if ($rows === [] && $columnCount > 1) {
-            $mergeCells = str_replace('count="4"', 'count="5"', $mergeCells);
-            $mergeCells = str_replace('</mergeCells>', '<mergeCell ref="A7:' . $lastColumn . '7"/></mergeCells>', $mergeCells);
+        $signatureRow = $lastDataRow + 3;
+        $signatureCaptionRow = $signatureRow + 1;
+        $signatureColumnCount = max(6, $columnCount);
+        $signatureGroups = [
+            [1, 2],
+            [max(3, (int) floor($signatureColumnCount / 2)), max(4, (int) floor($signatureColumnCount / 2) + 1)],
+            [$signatureColumnCount - 1, $signatureColumnCount],
+        ];
+        $signatureGroups[1][1] = min($signatureGroups[1][1], $signatureColumnCount - 2);
+        $signatureGroups[1][0] = max(3, $signatureGroups[1][1] - 1);
+
+        $signatureCells = [];
+        $signatureCaptionCells = [];
+        foreach ($signatureGroups as [$start, $end]) {
+            $startLetter = $this->columnLetter($start);
+            $signatureCells[] = $this->textCell($startLetter . $signatureRow, '________________________', 0);
+            $signatureCaptionCells[] = $this->textCell($startLetter . $signatureCaptionRow, 'Signature over Printed Name', 5);
         }
+        $sheetRows[] = $this->rowXml($signatureRow, $signatureCells);
+        $sheetRows[] = $this->rowXml($signatureCaptionRow, $signatureCaptionCells);
+
+        $mergeRefs = [];
+        if ($columnCount > 1) {
+            $mergeRefs = ['A1:' . $lastColumn . '1', 'A2:' . $lastColumn . '2', 'A3:' . $lastColumn . '3', 'A4:' . $lastColumn . '4'];
+            if ($rows === []) {
+                $mergeRefs[] = 'A7:' . $lastColumn . '7';
+            }
+        }
+        foreach ($signatureGroups as [$start, $end]) {
+            $mergeRefs[] = $this->columnLetter($start) . $signatureRow . ':' . $this->columnLetter($end) . $signatureRow;
+            $mergeRefs[] = $this->columnLetter($start) . $signatureCaptionRow . ':' . $this->columnLetter($end) . $signatureCaptionRow;
+        }
+        $mergeCells = '<mergeCells count="' . count($mergeRefs) . '">' . implode('', array_map(static fn(string $ref): string => '<mergeCell ref="' . $ref . '"/>', $mergeRefs)) . '</mergeCells>';
 
         $columnsXml = '';
-        foreach ($columns as $index => $column) {
+        for ($index = 0; $index < $signatureColumnCount; $index++) {
+            $column = $columns[$index] ?? '';
             $width = in_array($column, ['team', 'submitted_by', 'validated_by'], true) ? 26 : (in_array($column, ['sport', 'round', 'status'], true) ? 20 : 14);
             $n = $index + 1;
             $columnsXml .= '<col min="' . $n . '" max="' . $n . '" width="' . $width . '" customWidth="1"/>';

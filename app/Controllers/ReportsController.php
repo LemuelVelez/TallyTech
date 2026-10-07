@@ -30,7 +30,7 @@ class ReportsController extends BaseController
         $rawSportId = $this->request->getGet('sport_id');
         $sportId = is_scalar($rawSportId) && preg_match('/^[1-9]\d*$/', (string) $rawSportId) ? (int) $rawSportId : 0;
         $inputError = null;
-        if ((string) session()->get('role') === 'manager') {
+        if (in_array((string) session()->get('role'), ['manager', 'facilitator'], true)) {
             $hasRequestedSport = is_scalar($rawSportId) && trim((string) $rawSportId) !== '';
             if ($sportIds === []) {
                 $inputError = 'Your assigned sports are not available for the selected event.';
@@ -87,7 +87,7 @@ class ReportsController extends BaseController
     {
         [$type, $filters, $inputError] = $this->input();
         if ($inputError !== null) {
-            $target = (string) session()->get('role') === 'manager' && (int) $filters['sport_id'] === 0 ? '/dashboard' : '/reports';
+            $target = in_array((string) session()->get('role'), ['manager', 'facilitator'], true) && (int) $filters['sport_id'] === 0 ? '/dashboard' : '/reports';
             return redirect()->to($target)->with('error', $inputError);
         }
         $repository = $this->repository();
@@ -119,7 +119,7 @@ class ReportsController extends BaseController
     {
         [$type, $filters, $inputError] = $this->input();
         if ($inputError !== null) {
-            $target = (string) session()->get('role') === 'manager' && (int) $filters['sport_id'] === 0 ? '/dashboard' : '/reports';
+            $target = in_array((string) session()->get('role'), ['manager', 'facilitator'], true) && (int) $filters['sport_id'] === 0 ? '/dashboard' : '/reports';
             return redirect()->to($target)->with('error', $inputError);
         }
         $repository = $this->repository();
@@ -141,7 +141,7 @@ class ReportsController extends BaseController
             'columnLabels' => array_combine($reporting->columnsFor($type), array_map([$reporting, 'label'], $reporting->columnsFor($type))) ?: [],
             'filterSummary' => $reporting->filterSummary($filters, $event, $sports),
             'printSettings' => $settings,
-            'teamRanking' => ($settings['include_team_ranking'] ?? '1') === '1' && (int) $filters['event_id'] > 0 ? $repository->ranking((int) $filters['event_id'], false) : [],
+            'teamRanking' => ($settings['include_team_ranking'] ?? '1') === '1' && (int) $filters['event_id'] > 0 ? $this->teamRanking($repository, (int) $filters['event_id']) : [],
         ]);
     }
 
@@ -149,7 +149,7 @@ class ReportsController extends BaseController
     {
         [$type, $filters, $inputError] = $this->input();
         if ($inputError !== null) {
-            $target = (string) session()->get('role') === 'manager' && (int) $filters['sport_id'] === 0 ? '/dashboard' : '/reports';
+            $target = in_array((string) session()->get('role'), ['manager', 'facilitator'], true) && (int) $filters['sport_id'] === 0 ? '/dashboard' : '/reports';
             return redirect()->to($target)->with('error', $inputError);
         }
         $repository = $this->repository();
@@ -176,12 +176,21 @@ class ReportsController extends BaseController
 
     private function actorSports(array $sports): array
     {
-        if ((string) session()->get('role') !== 'manager') return $sports;
-        $managerSportIds = $this->managerSportIds();
+        if (! in_array((string) session()->get('role'), ['manager', 'facilitator'], true)) return $sports;
+        $assignedSportIds = $this->assignedSportIdsForCurrentUser();
         return array_values(array_filter(
             $sports,
-            static fn(array $sport): bool => in_array((int) ($sport['id'] ?? 0), $managerSportIds, true)
+            static fn(array $sport): bool => in_array((int) ($sport['id'] ?? 0), $assignedSportIds, true)
         ));
+    }
+
+    private function teamRanking($repository, int $eventId): array
+    {
+        if (! in_array((string) session()->get('role'), ['manager', 'facilitator'], true)) {
+            return $repository->ranking($eventId, false);
+        }
+
+        return $repository->rankingByStatus($eventId, 'validated', true, $this->assignedSportIdsForCurrentUser());
     }
 
     private function selectedEvent(array $events, int $eventId): ?array

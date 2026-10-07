@@ -23,7 +23,7 @@ class ResultsController extends BaseController
         } catch (\Throwable $e) {
             return redirect()->back()->withInput()->with('error', $this->safeErrorMessage($e, 'The result could not be submitted.'));
         }
-        return redirect()->back()->with('success', (string)session()->get('role')==='manager' ? 'Result saved as approved and sent to Admin validation.' : 'Result submitted for Tournament Manager approval.');
+        return redirect()->back()->with('success', (string)session()->get('role')==='manager' ? 'Result saved as approved and sent to Admin - TSC validation.' : 'Result submitted for Sports Coordinator approval.');
     }
 
     public function update(int $id)
@@ -63,13 +63,13 @@ class ResultsController extends BaseController
     public function approve(int $id)
     {
         try{$this->repository()->approveResult($id,(int)session()->get('user_id'));}catch(\Throwable $e){return redirect()->back()->with('error',$this->safeErrorMessage($e,'The result could not be approved.'));}
-        return redirect()->back()->with('success','Result approved and sent to Admin validation.');
+        return redirect()->back()->with('success','Result approved and sent to Admin - TSC validation.');
     }
 
     public function returnResult(int $id)
     {
         try{$this->repository()->returnResult($id,$this->postString('return_note'),(int)session()->get('user_id'));}catch(\Throwable $e){return redirect()->back()->with('error',$this->safeErrorMessage($e,'The result could not be returned.'));}
-        return redirect()->back()->with('success','Result returned to the facilitator.');
+        return redirect()->back()->with('success','Result returned to the Tournament Manager.');
     }
     private function page(string $type, string $title)
     {

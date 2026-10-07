@@ -212,7 +212,7 @@ $teamMarkStyle = static function (string $name): string {
                                         <?php if ($isConditional): ?>
                                             <div class="tt-bracket-note tt-bracket-note--conditional"><?= ui_icon('alert-triangle') ?><span>If necessary</span></div>
                                         <?php elseif ($winner !== ''): ?>
-                                            <div class="tt-bracket-note"><?= ui_icon('chevron-right') ?><span><?= esc($winner) ?> advances</span></div>
+                                            <div class="tt-bracket-note"><?= ui_icon('chevron-right') ?><span class="tt-bracket-note-trophy" aria-hidden="true"><?= ui_icon('trophy') ?></span><span><?= esc($winner) ?> advances</span></div>
                                         <?php elseif (! empty($match['scheduling_note'])): ?>
                                             <div class="tt-bracket-note"><?= ui_icon('calendar-clock') ?><span><?= esc($match['scheduling_note']) ?></span></div>
                                         <?php endif; ?>

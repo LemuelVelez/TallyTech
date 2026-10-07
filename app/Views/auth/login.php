@@ -7,9 +7,9 @@ $cssVersion = $assetVersion('assets/css/app.css');
 $jsVersion = $assetVersion('assets/js/app.js');
 $rememberedAccount = $rememberedAccount ?? null;
 $roleLabel = static fn(string $role): string => match ($role) {
-    'admin' => 'Admin',
-    'manager' => 'Tournament Manager',
-    'facilitator' => 'Facilitator',
+    'admin' => 'Admin - TSC',
+    'manager' => 'Sports Coordinator',
+    'facilitator' => 'Tournament Manager',
     default => ucfirst($role),
 };
 ?>

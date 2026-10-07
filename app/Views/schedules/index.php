@@ -37,7 +37,7 @@ $stageOptions = [
 <?php if ($activeEvent): ?><div class="event-banner"><b>Active event:</b> <?= esc($activeEvent['name']) ?></div><?php endif; ?>
 <?php if ($activeEvent && ! $locations): ?><div class="alert error">Add or enable a location before creating schedules.</div><?php endif; ?>
 <section class="panel">
-    <div class="panel-head"><div><h2>Master Schedule</h2><p>Players and facilitators can use this operational view to confirm where and when each match is played.</p></div></div>
+    <div class="panel-head"><div><h2>Master Schedule</h2><p>Players and Tournament Managers can use this operational view to confirm where and when each match is played.</p></div></div>
     <div class="table-wrap"><table class="schedule-table"><thead><tr><th>Match ID</th><th>Time</th><th>Sport</th><th>Round</th><th>Team A</th><th>Team B</th><th>Location</th><th>Status</th><th>Actions</th></tr></thead><tbody>
     <?php foreach ($schedules as $schedule): ?>
         <?php $isJudged = ($schedule['result_type'] ?? '') === 'judged'; ?>

@@ -1,7 +1,7 @@
 <?php
 $role = (string) session()->get('role');
-$roleLabel = ['admin' => 'Admin Panel', 'manager' => 'Tournament Manager', 'facilitator' => 'Facilitator'][$role] ?? 'TallyTech';
-$accountRoleLabel = ['admin' => 'Administrator', 'manager' => 'Tournament Manager', 'facilitator' => 'Facilitator'][$role] ?? ucfirst($role);
+$roleLabel = ['admin' => 'Admin - TSC', 'manager' => 'Sports Coordinator', 'facilitator' => 'Tournament Manager'][$role] ?? 'TallyTech';
+$accountRoleLabel = ['admin' => 'Admin - TSC', 'manager' => 'Sports Coordinator', 'facilitator' => 'Tournament Manager'][$role] ?? ucfirst($role);
 $compactSidebar = (bool) session()->get('compact_sidebar');
 $resultDensity = (string) (session()->get('result_density') ?: 'comfortable');
 $theme = (string) (session()->get('theme') ?: 'system');
@@ -12,7 +12,7 @@ $displayName = (string) session()->get('display_name');
 $unread = 0;
 try { $unread = (new \App\Infrastructure\Persistence\MySqlScoringRepository())->unreadNotificationCount((int) session()->get('user_id')); } catch (\Throwable $e) {}
 $unreadLabel = $unread > 99 ? '99+' : (string) $unread;
-$assetRelease = '20261006-1';
+$assetRelease = '20261007-1';
 $assetVersion = static function (string $relativePath) use ($assetRelease): string {
     $path = defined('FCPATH') ? FCPATH . ltrim($relativePath, '/\\') : '';
     $fileVersion = $path !== '' && is_file($path) ? (string) filemtime($path) : '0';

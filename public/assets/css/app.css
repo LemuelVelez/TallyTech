@@ -3556,3 +3556,18 @@ body.theme-dark .stat-card { filter: brightness(.78) saturate(.9); }
   body.theme-system .podium-card.p3, body.theme-system .viewer-rank.r3 { background: linear-gradient(135deg,#754624,#583317); }
   body.theme-system .podium-card.p4, body.theme-system .viewer-rank.r4 { background: linear-gradient(135deg,#3f5d70,#2f4655); }
 }
+
+
+/* Correction round: trophy marker for validated bracket advancement notes. */
+.tt-bracket-note .tt-bracket-note-trophy {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: #866900;
+}
+.tt-bracket-note .tt-bracket-note-trophy .ui-icon { width: 15px; height: 15px; }
+body.theme-dark .tt-bracket-note .tt-bracket-note-trophy { color: #f3d98b; }
+@media (prefers-color-scheme: dark) {
+  body.theme-system .tt-bracket-note .tt-bracket-note-trophy,
+  body.viewer-page .tt-bracket-note .tt-bracket-note-trophy { color: #f3d98b; }
+}

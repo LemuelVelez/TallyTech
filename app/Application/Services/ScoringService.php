@@ -486,11 +486,12 @@ class ScoringService
         ?array $resolvedSchedules = null
     ): array
     {
-        $otherStatus = $status === 'validated' ? 'pending' : 'validated';
         $otherResultScheduleIds = [];
-        foreach ($this->repository->resultsByStatus($eventId, $otherStatus) as $result) {
-            if (in_array((int) ($result['sport_id'] ?? 0), $selectedSportIds, true)) {
-                $otherResultScheduleIds[(int) ($result['schedule_id'] ?? 0)] = true;
+        if ($status !== 'validated') {
+            foreach ($this->repository->resultsByStatus($eventId, 'validated') as $result) {
+                if (in_array((int) ($result['sport_id'] ?? 0), $selectedSportIds, true)) {
+                    $otherResultScheduleIds[(int) ($result['schedule_id'] ?? 0)] = true;
+                }
             }
         }
 
