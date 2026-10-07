@@ -1935,7 +1935,7 @@ body.theme-dark .password-toggle:hover { color: color-mix(in srgb, var(--accent)
 @media (prefers-color-scheme: dark) {
   body.theme-system,
   body.login-page,
-  body.viewer-page {
+  body.viewer-page.theme-system {
     --bg: #0d1521; --panel: #151f2e; --panel-soft: #1b2839; --text: #e7edf5; --muted: #9aa8bb; --line: #2d3b4d; --scroll-track: #1a2635; --field-bg: #101a28; --field-text: #e7edf5; --table-head: #1b2839; --table-hover: #1c2b3e; --surface-hover: #202f42; --dialog-bg: rgba(21, 31, 46, 0.99); --shadow-sm: 0 4px 14px rgba(0,0,0,.22); --shadow: 0 12px 34px rgba(0,0,0,.28); --shadow-lg: 0 24px 64px rgba(0,0,0,.38);
   }
   body.theme-system.role-manager { --accent: #ff9645; --accent-dark: #e66c13; }
@@ -1953,37 +1953,37 @@ body.theme-dark .password-toggle:hover { color: color-mix(in srgb, var(--accent)
   body.theme-system .confirmation-dialog[data-confirm-tone="success"] .confirmation-icon { border-color: #275b3d; background: #123725; color: #9ee6bb; }
   body.theme-system .confirmation-dialog[data-confirm-tone="warning"] .confirmation-icon { border-color: #665424; background: #332b17; color: #f3d98b; }
   body.theme-system input, body.theme-system select, body.theme-system textarea { border-color: var(--line); color-scheme: dark; }
-  body.theme-system .badge.official, body.viewer-page .badge.official { background: #123725; color: #9ee6bb; }
-  body.theme-system .badge.unofficial, body.viewer-page .badge.unofficial { background: #332b17; color: #f3d98b; }
-  body.theme-system .chip, body.viewer-page .chip { background: #132a43; color: #a9cff5; }
-  body.theme-system .toast-success, body.login-page .toast-success, body.viewer-page .toast-success { --toast-icon-bg: #123725; --toast-icon-color: #9ee6bb; }
-  body.theme-system .toast-error, body.login-page .toast-error, body.viewer-page .toast-error { --toast-icon-bg: #3b1d1d; --toast-icon-color: #ffb4ae; }
-  body.theme-system .toast-warning, body.login-page .toast-warning, body.viewer-page .toast-warning { --toast-icon-bg: #332b17; --toast-icon-color: #f3d98b; }
-  body.theme-system .toast-info, body.login-page .toast-info, body.viewer-page .toast-info { --toast-icon-bg: #132a43; --toast-icon-color: #a9cff5; }
-  body.theme-system .warning-box, body.viewer-page .warning-box { border-color: #665424; background: #332b17; color: #f3d98b; }
+  body.theme-system .badge.official, body.viewer-page.theme-system .badge.official { background: #123725; color: #9ee6bb; }
+  body.theme-system .badge.unofficial, body.viewer-page.theme-system .badge.unofficial { background: #332b17; color: #f3d98b; }
+  body.theme-system .chip, body.viewer-page.theme-system .chip { background: #132a43; color: #a9cff5; }
+  body.theme-system .toast-success, body.login-page .toast-success, body.viewer-page.theme-system .toast-success { --toast-icon-bg: #123725; --toast-icon-color: #9ee6bb; }
+  body.theme-system .toast-error, body.login-page .toast-error, body.viewer-page.theme-system .toast-error { --toast-icon-bg: #3b1d1d; --toast-icon-color: #ffb4ae; }
+  body.theme-system .toast-warning, body.login-page .toast-warning, body.viewer-page.theme-system .toast-warning { --toast-icon-bg: #332b17; --toast-icon-color: #f3d98b; }
+  body.theme-system .toast-info, body.login-page .toast-info, body.viewer-page.theme-system .toast-info { --toast-icon-bg: #132a43; --toast-icon-color: #a9cff5; }
+  body.theme-system .warning-box, body.viewer-page.theme-system .warning-box { border-color: #665424; background: #332b17; color: #f3d98b; }
   body.theme-system .sleek-select-option.is-selected { background: color-mix(in srgb, var(--accent), transparent 82%); color: color-mix(in srgb, var(--accent), white 36%); }
   body.theme-system .sleek-select-option.is-selected:hover:not(:disabled),
   body.theme-system .sleek-select-option.is-selected.is-focused:not(:disabled) { background: color-mix(in srgb, var(--accent), transparent 74%); color: color-mix(in srgb, var(--accent), white 42%); }
   body.theme-system .sleek-select-option.is-placeholder.is-selected { background: transparent; color: var(--muted); }
   body.theme-system .sleek-select-option.is-placeholder.is-selected:hover:not(:disabled),
   body.theme-system .sleek-select-option.is-placeholder.is-selected.is-focused:not(:disabled) { background: var(--surface-hover); color: var(--muted); }
-  body.theme-system .bracket-team.winner, body.viewer-page .bracket-team.winner { background: #123725; color: #9ee6bb; }
-  body.theme-system .public-tournament-match.conditional, body.viewer-page .public-tournament-match.conditional { border-color: #8f752d; background: #332b17; }
-  body.theme-system .public-tournament-match.conditional .match-meta span:last-child, body.viewer-page .public-tournament-match.conditional .match-meta span:last-child { color: #f3d98b; }
+  body.theme-system .bracket-team.winner, body.viewer-page.theme-system .bracket-team.winner { background: #123725; color: #9ee6bb; }
+  body.theme-system .public-tournament-match.conditional, body.viewer-page.theme-system .public-tournament-match.conditional { border-color: #8f752d; background: #332b17; }
+  body.theme-system .public-tournament-match.conditional .match-meta span:last-child, body.viewer-page.theme-system .public-tournament-match.conditional .match-meta span:last-child { color: #f3d98b; }
   body.theme-system .sport-chip.active { background: color-mix(in srgb, var(--accent), transparent 82%); color: color-mix(in srgb, var(--accent), white 36%); }
-  body.theme-system .tt-bracket-component, body.viewer-page .tt-bracket-component { --tt-bkt-win: #9ee6bb; --tt-bkt-accent: #79b7e3; --tt-bkt-amber: #e4bd5b; }
-  body.theme-system .tt-bracket-lane--grand, body.viewer-page .tt-bracket-lane--grand { background: linear-gradient(180deg, #2a291f, #211f19); }
-  body.theme-system .tt-bracket-lane--upper .tt-bracket-lane-icon, body.viewer-page .tt-bracket-lane--upper .tt-bracket-lane-icon { background: #123725; color: #9ee6bb; }
-  body.theme-system .tt-bracket-lane--lower .tt-bracket-lane-icon, body.viewer-page .tt-bracket-lane--lower .tt-bracket-lane-icon { background: #3b2918; color: #f2bd82; }
-  body.theme-system .tt-bracket-lane--grand .tt-bracket-lane-icon, body.viewer-page .tt-bracket-lane--grand .tt-bracket-lane-icon { background: #332b17; color: #f3d98b; }
-  body.theme-system .tt-bracket-team-mark, body.viewer-page .tt-bracket-team-mark { border-color: hsl(var(--tt-team-hue), 35%, 42%); background: hsl(var(--tt-team-hue), 30%, 24%); color: hsl(var(--tt-team-hue), 55%, 80%); }
-  body.theme-system .tt-bracket-slot.bracket-team.winner .tt-bracket-team-main, body.viewer-page .tt-bracket-slot.bracket-team.winner .tt-bracket-team-main { background: #123725; }
-  body.theme-system .tt-bracket-slot.bracket-team.winner .tt-bracket-score, body.viewer-page .tt-bracket-slot.bracket-team.winner .tt-bracket-score { background: #173d2a; color: #9ee6bb; }
-  body.theme-system .tt-bracket-slot.bracket-team.winner .tt-bracket-score::before, body.viewer-page .tt-bracket-slot.bracket-team.winner .tt-bracket-score::before { background: #123725; }
-  body.theme-system .tt-bracket-note--conditional, body.viewer-page .tt-bracket-note--conditional { color: #f3d98b; }
-  body.theme-system .tt-bracket-champion, body.viewer-page .tt-bracket-champion { border-top-color: #665424; background: #332b17; color: #f3d98b; }
-  body.theme-system .tt-bracket-champion > span, body.viewer-page .tt-bracket-champion > span { background: #665424; color: #fff1b8; }
-  body.theme-system .tt-bracket-champion small, body.theme-system .tt-bracket-champion strong, body.viewer-page .tt-bracket-champion small, body.viewer-page .tt-bracket-champion strong { color: #f3d98b; }
+  body.theme-system .tt-bracket-component, body.viewer-page.theme-system .tt-bracket-component { --tt-bkt-win: #9ee6bb; --tt-bkt-accent: #79b7e3; --tt-bkt-amber: #e4bd5b; }
+  body.theme-system .tt-bracket-lane--grand, body.viewer-page.theme-system .tt-bracket-lane--grand { background: linear-gradient(180deg, #2a291f, #211f19); }
+  body.theme-system .tt-bracket-lane--upper .tt-bracket-lane-icon, body.viewer-page.theme-system .tt-bracket-lane--upper .tt-bracket-lane-icon { background: #123725; color: #9ee6bb; }
+  body.theme-system .tt-bracket-lane--lower .tt-bracket-lane-icon, body.viewer-page.theme-system .tt-bracket-lane--lower .tt-bracket-lane-icon { background: #3b2918; color: #f2bd82; }
+  body.theme-system .tt-bracket-lane--grand .tt-bracket-lane-icon, body.viewer-page.theme-system .tt-bracket-lane--grand .tt-bracket-lane-icon { background: #332b17; color: #f3d98b; }
+  body.theme-system .tt-bracket-team-mark, body.viewer-page.theme-system .tt-bracket-team-mark { border-color: hsl(var(--tt-team-hue), 35%, 42%); background: hsl(var(--tt-team-hue), 30%, 24%); color: hsl(var(--tt-team-hue), 55%, 80%); }
+  body.theme-system .tt-bracket-slot.bracket-team.winner .tt-bracket-team-main, body.viewer-page.theme-system .tt-bracket-slot.bracket-team.winner .tt-bracket-team-main { background: #123725; }
+  body.theme-system .tt-bracket-slot.bracket-team.winner .tt-bracket-score, body.viewer-page.theme-system .tt-bracket-slot.bracket-team.winner .tt-bracket-score { background: #173d2a; color: #9ee6bb; }
+  body.theme-system .tt-bracket-slot.bracket-team.winner .tt-bracket-score::before, body.viewer-page.theme-system .tt-bracket-slot.bracket-team.winner .tt-bracket-score::before { background: #123725; }
+  body.theme-system .tt-bracket-note--conditional, body.viewer-page.theme-system .tt-bracket-note--conditional { color: #f3d98b; }
+  body.theme-system .tt-bracket-champion, body.viewer-page.theme-system .tt-bracket-champion { border-top-color: #665424; background: #332b17; color: #f3d98b; }
+  body.theme-system .tt-bracket-champion > span, body.viewer-page.theme-system .tt-bracket-champion > span { background: #665424; color: #fff1b8; }
+  body.theme-system .tt-bracket-champion small, body.theme-system .tt-bracket-champion strong, body.viewer-page.theme-system .tt-bracket-champion small, body.viewer-page.theme-system .tt-bracket-champion strong { color: #f3d98b; }
   body.theme-system .panel-head a,
   body.theme-system .action-card em,
   body.theme-system .activity > span,
@@ -1995,13 +1995,13 @@ body.theme-dark .password-toggle:hover { color: color-mix(in srgb, var(--accent)
   body.theme-system .account-dropdown a:hover,
   body.theme-system .account-dropdown button:hover,
   body.theme-system .password-toggle:hover { color: color-mix(in srgb, var(--accent), white 40%); }
-  body.viewer-page .sport-chip.active { background: #332b17; color: #ffe38b; }
+  body.viewer-page.theme-system .sport-chip.active { background: #332b17; color: #ffe38b; }
   body.login-page .alert.success { background: #123725; color: #9ee6bb; border-color: #275b3d; }
   body.login-page .alert.error { background: #3b1d1d; color: #ffb4ae; border-color: #673232; }
   body.login-page { color-scheme: dark; }
   body.login-page input { border-color: var(--line); color-scheme: dark; }
   body.login-page .login-logo { color: #7edfab; }
-  body.viewer-page { color-scheme: dark; }
+  body.viewer-page.theme-system { color-scheme: dark; }
 }
 .toolbar { display: flex; align-items: end; gap: 10px; flex-wrap: wrap; width: 100%; }
 .toolbar > label { min-width: 145px; flex: 1 1 160px; margin: 0; display: flex; flex-direction: column; gap: 6px; color: var(--muted); font-size: .76rem; font-weight: 800; }
@@ -3570,7 +3570,7 @@ body.theme-dark .stat-card { filter: brightness(.78) saturate(.9); }
 body.theme-dark .tt-bracket-note .tt-bracket-note-trophy { color: #f3d98b; }
 @media (prefers-color-scheme: dark) {
   body.theme-system .tt-bracket-note .tt-bracket-note-trophy,
-  body.viewer-page .tt-bracket-note .tt-bracket-note-trophy { color: #f3d98b; }
+  body.viewer-page.theme-system .tt-bracket-note .tt-bracket-note-trophy { color: #f3d98b; }
 }
 
 
@@ -3593,6 +3593,7 @@ body.theme-dark .tt-bracket-note .tt-bracket-note-trophy { color: #f3d98b; }
 .theme-toggle:active { transform: scale(0.96); }
 .theme-toggle .ui-icon { width: 22px; height: 22px; }
 .theme-toggle[disabled] { cursor: wait; opacity: 0.72; }
+.viewer-theme-toggle:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
 
 /* Managed-sport select-all option */
 .sport-select-all {

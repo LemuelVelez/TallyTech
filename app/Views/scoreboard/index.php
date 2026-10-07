@@ -75,12 +75,18 @@ $jsVersion = $assetVersion('assets/js/app.js');
     <link rel="icon" type="image/x-icon" href="<?= base_url('favicon.ico') ?>?v=2">
     <link rel="stylesheet" href="<?= esc(base_url('assets/css/app.css') . '?v=' . rawurlencode($cssVersion), 'attr') ?>">
 </head>
-<body class="viewer-page<?= $presentationFrame ? ' viewer-page--presentation-frame' : '' ?><?= $isOfficialScoreboard ? ' scoreboard-view--official' : ' scoreboard-view--unofficial' ?>"<?= $presentationFrame ? ' data-scoreboard-presentation-frame="true"' : '' ?>>
+<body class="viewer-page theme-system<?= $presentationFrame ? ' viewer-page--presentation-frame' : '' ?><?= $isOfficialScoreboard ? ' scoreboard-view--official' : ' scoreboard-view--unofficial' ?>"<?= $presentationFrame ? ' data-scoreboard-presentation-frame="true"' : '' ?>>
 <?php if (! $presentationFrame): ?>
 <a class="skip-link" href="#scoreboard-content">Skip to scoreboard content</a>
 <header class="viewer-nav">
     <a class="viewer-brand" href="<?= site_url('scoreboard') ?>"><img src="<?= base_url('assets/img/logo.webp') ?>" alt="TallyTech"><b>TallyTech</b></a>
-    <div><span><?= $hasActiveEvent ? 'LIVE' : 'IDLE' ?></span><a href="<?= site_url('login') ?>" class="btn viewer-login"><?= ui_icon('log-in') ?><span>Login</span></a></div>
+    <div class="viewer-nav-actions">
+        <span><?= $hasActiveEvent ? 'LIVE' : 'IDLE' ?></span>
+        <button class="theme-toggle viewer-theme-toggle" type="button" data-public-theme-toggle data-theme-current="system" aria-label="Theme: System. Switch to Light" title="Theme: System. Switch to Light">
+            <?= ui_icon('monitor') ?>
+        </button>
+        <a href="<?= site_url('login') ?>" class="btn viewer-login"><?= ui_icon('log-in') ?><span>Login</span></a>
+    </div>
 </header>
 <?php endif; ?>
 

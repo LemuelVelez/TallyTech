@@ -169,6 +169,25 @@
     }
   }
 
+  const THEME_STORAGE_KEY = 'tallytech.theme.v1';
+  const validTheme = (theme) => ['light', 'dark', 'system'].includes(theme);
+  const readStoredTheme = () => {
+    try {
+      const theme = window.localStorage.getItem(THEME_STORAGE_KEY);
+      return validTheme(theme) ? theme : null;
+    } catch (_) {
+      return null;
+    }
+  };
+  const persistTheme = (theme) => {
+    if (!validTheme(theme)) return;
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch (_) {
+      // Theme still works for the current page when storage is unavailable.
+    }
+  };
+
   const themeForm = document.querySelector('[data-theme-form]');
   if (themeForm) {
     const themeToggle = themeForm.querySelector('[data-theme-toggle]');
@@ -178,6 +197,7 @@
     const themeCycle = { light: 'dark', dark: 'system', system: 'light' };
     const themeNames = { light: 'Light', dark: 'Dark', system: 'System' };
     const themeIcons = { light: 'sun', dark: 'moon', system: 'monitor' };
+    persistTheme(themeToggle?.dataset.themeCurrent || 'system');
 
     const updateCsrfTokens = (hash) => {
       if (!hash) return;
@@ -227,14 +247,45 @@
         updateCsrfTokens(data.csrf_hash);
         if (!response.ok || data.ok !== true) throw new Error(data.message || 'Theme could not be saved.');
 
+        persistTheme(requestedTheme);
         const settingsTheme = document.querySelector(`input[name="theme"][value="${requestedTheme}"]`);
         if (settingsTheme instanceof HTMLInputElement) settingsTheme.checked = true;
       } catch (error) {
         applyTheme(previousTheme);
+        persistTheme(previousTheme);
         showClientToast('error', 'Error', error instanceof Error ? error.message : 'Theme could not be saved.');
       } finally {
         themeToggle.disabled = false;
       }
+    });
+  }
+
+  const publicThemeToggle = document.querySelector('[data-public-theme-toggle]');
+  if (publicThemeToggle) {
+    const themeCycle = { light: 'dark', dark: 'system', system: 'light' };
+    const themeNames = { light: 'Light', dark: 'Dark', system: 'System' };
+    const themeIcons = { light: 'sun', dark: 'moon', system: 'monitor' };
+    const themeUse = publicThemeToggle.querySelector('use');
+    const themeIconBase = themeUse?.getAttribute('href')?.split('#')[0] || '';
+
+    const applyPublicTheme = (theme) => {
+      if (!validTheme(theme)) return;
+      body.classList.remove('theme-light', 'theme-dark', 'theme-system');
+      body.classList.add(`theme-${theme}`);
+      const nextTheme = themeCycle[theme];
+      const label = `Theme: ${themeNames[theme]}. Switch to ${themeNames[nextTheme]}`;
+      publicThemeToggle.dataset.themeCurrent = theme;
+      publicThemeToggle.setAttribute('aria-label', label);
+      publicThemeToggle.setAttribute('title', label);
+      if (themeUse && themeIconBase) themeUse.setAttribute('href', `${themeIconBase}#${themeIcons[theme]}`);
+    };
+
+    applyPublicTheme(readStoredTheme() || publicThemeToggle.dataset.themeCurrent || 'system');
+    publicThemeToggle.addEventListener('click', () => {
+      const currentTheme = publicThemeToggle.dataset.themeCurrent || 'system';
+      const nextTheme = themeCycle[currentTheme] || 'light';
+      applyPublicTheme(nextTheme);
+      persistTheme(nextTheme);
     });
   }
 

@@ -17,7 +17,7 @@ $themeIcons = ['light' => 'sun', 'dark' => 'moon', 'system' => 'monitor'];
 $themeNames = ['light' => 'Light', 'dark' => 'Dark', 'system' => 'System'];
 $nextTheme = $themeCycle[$theme] ?? 'light';
 $themeAriaLabel = 'Theme: ' . ($themeNames[$theme] ?? 'System') . '. Switch to ' . ($themeNames[$nextTheme] ?? 'Light');
-$assetRelease = '20261007-2';
+$assetRelease = '20261008-1';
 $assetVersion = static function (string $relativePath) use ($assetRelease): string {
     $path = defined('FCPATH') ? FCPATH . ltrim($relativePath, '/\\') : '';
     $fileVersion = $path !== '' && is_file($path) ? (string) filemtime($path) : '0';
