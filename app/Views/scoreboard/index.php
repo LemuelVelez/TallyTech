@@ -224,8 +224,8 @@ $jsVersion = $assetVersion('assets/js/app.js');
                     <h2><?= $isOfficialScoreboard ? 'Official Overall Sport Points' : 'Unofficial Overall Sport Points' ?></h2>
                     <span><?= esc($selectedSport['name']) ?> · <?= $isOfficialScoreboard ? 'validated results' : 'pending results · subject to change' ?></span>
                 </div>
-                <div class="table-wrap"><table><thead><tr><th>Rank</th><th>Team</th><th>Points</th></tr></thead><tbody>
-                    <?php if(count($selectedSportIds)===1): ?><?php foreach([1,2,3,4] as $place):$team=$overallSportPoints[$place]??null;?><tr><td><b><?= $place ?></b></td><td><?= $team?esc($team['name']):'TBD' ?></td><td><?= $team?'<b>'.esc(format_points($team['total_points'])).'</b>':'—' ?></td></tr><?php endforeach;?><?php else: ?><?php foreach ($overallSportPoints as $i => $team): ?><tr><td><b><?= esc((string) ($i + 1)) ?></b></td><td><?= esc($team['name']) ?></td><td><b><?= esc(format_points($team['total_points'])) ?></b></td></tr><?php endforeach; ?><?php endif; ?>
+                <div class="table-wrap"><table class="scoreboard-points-table"><thead><tr><th class="table-pin">Rank</th><th>Team</th><th>Points</th></tr></thead><tbody>
+                    <?php if(count($selectedSportIds)===1): ?><?php foreach([1,2,3,4] as $place):$team=$overallSportPoints[$place]??null;?><tr><td class="table-pin"><b><?= $place ?></b></td><td><?= $team?esc($team['name']):'TBD' ?></td><td><?= $team?'<b>'.esc(format_points($team['total_points'])).'</b>':'—' ?></td></tr><?php endforeach;?><?php else: ?><?php foreach ($overallSportPoints as $i => $team): ?><tr><td class="table-pin"><b><?= esc((string) ($i + 1)) ?></b></td><td><?= esc($team['name']) ?></td><td><b><?= esc(format_points($team['total_points'])) ?></b></td></tr><?php endforeach; ?><?php endif; ?>
                     <?php if (empty($overallSportPoints)): ?><tr><td colspan="3" class="empty">No <?= $isOfficialScoreboard ? 'validated' : 'provisional' ?> sport points yet.</td></tr><?php endif; ?>
                 </tbody></table></div>
             </section>

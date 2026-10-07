@@ -91,6 +91,153 @@
     if (close) dismissToast(close.closest('[data-toast]'));
   });
 
+  const showClientToast = (type, label, message) => {
+    let stack = document.querySelector('[data-toast-stack]');
+    if (!stack) {
+      stack = document.createElement('div');
+      stack.className = 'toast-stack';
+      stack.dataset.toastStack = '';
+      stack.setAttribute('aria-live', 'polite');
+      stack.setAttribute('aria-atomic', 'false');
+      document.body.prepend(stack);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.dataset.toast = '';
+    toast.dataset.dismissAfter = '5000';
+    toast.setAttribute('role', type === 'error' || type === 'warning' ? 'alert' : 'status');
+
+    const icon = document.createElement('span');
+    icon.className = 'toast-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = type === 'error' ? '!' : '•';
+
+    const copy = document.createElement('div');
+    copy.className = 'toast-copy';
+    const strong = document.createElement('strong');
+    strong.textContent = label;
+    const text = document.createElement('span');
+    text.textContent = message;
+    copy.append(strong, text);
+
+    const close = document.createElement('button');
+    close.className = 'toast-close';
+    close.type = 'button';
+    close.dataset.toastClose = '';
+    close.setAttribute('aria-label', 'Dismiss notification');
+    close.textContent = '×';
+
+    toast.append(icon, copy, close);
+    stack.append(toast);
+    window.setTimeout(() => dismissToast(toast), 5000);
+  };
+
+  const tableWraps = Array.from(document.querySelectorAll('.table-wrap'));
+  if (tableWraps.length) {
+    const mobileTables = window.matchMedia('(max-width: 860px)');
+    const updateTableScrollState = (wrapper) => {
+      const table = wrapper.querySelector('table');
+      if (!table) return;
+      const isScrollable = mobileTables.matches && table.scrollWidth > wrapper.clientWidth + 2;
+      if (isScrollable) {
+        wrapper.dataset.scrollHint = wrapper.dataset.scrollHintText || 'Swipe horizontally to see all columns';
+      } else {
+        wrapper.removeAttribute('data-scroll-hint');
+      }
+    };
+
+    tableWraps.forEach((wrapper, index) => {
+      wrapper.dataset.scrollHintText = wrapper.dataset.scrollHint || 'Swipe horizontally to see all columns';
+      wrapper.setAttribute('tabindex', wrapper.getAttribute('tabindex') || '0');
+      wrapper.setAttribute('role', wrapper.getAttribute('role') || 'region');
+      if (!wrapper.hasAttribute('aria-label')) {
+        const heading = wrapper.closest('.panel, .viewer-panel, .team-ranking-table-panel')?.querySelector('h2, h3')
+          || document.querySelector('.page-head h1, .section-title h2, h1');
+        wrapper.setAttribute('aria-label', heading?.textContent?.trim() || `Data table ${index + 1}`);
+      }
+      requestAnimationFrame(() => updateTableScrollState(wrapper));
+      wrapper.addEventListener('scroll', () => updateTableScrollState(wrapper), { passive: true });
+    });
+
+    const refreshTableScrollStates = () => tableWraps.forEach(updateTableScrollState);
+    window.addEventListener('resize', refreshTableScrollStates, { passive: true });
+    mobileTables.addEventListener?.('change', refreshTableScrollStates);
+    if ('ResizeObserver' in window) {
+      const tableResizeObserver = new ResizeObserver(refreshTableScrollStates);
+      tableWraps.forEach((wrapper) => tableResizeObserver.observe(wrapper));
+    }
+  }
+
+  const themeForm = document.querySelector('[data-theme-form]');
+  if (themeForm) {
+    const themeToggle = themeForm.querySelector('[data-theme-toggle]');
+    const themeValue = themeForm.querySelector('[data-theme-value]');
+    const themeUse = themeToggle?.querySelector('use');
+    const themeIconBase = themeUse?.getAttribute('href')?.split('#')[0] || '';
+    const themeCycle = { light: 'dark', dark: 'system', system: 'light' };
+    const themeNames = { light: 'Light', dark: 'Dark', system: 'System' };
+    const themeIcons = { light: 'sun', dark: 'moon', system: 'monitor' };
+
+    const updateCsrfTokens = (hash) => {
+      if (!hash) return;
+      document.querySelectorAll('input[name="csrf_test_name"]').forEach((input) => {
+        input.value = hash;
+      });
+    };
+
+    const applyTheme = (theme) => {
+      if (!themeCycle[theme]) return;
+      body.classList.remove('theme-light', 'theme-dark', 'theme-system');
+      body.classList.add(`theme-${theme}`);
+      const nextTheme = themeCycle[theme];
+      if (themeToggle) {
+        themeToggle.dataset.themeCurrent = theme;
+        const label = `Theme: ${themeNames[theme]}. Switch to ${themeNames[nextTheme]}`;
+        themeToggle.setAttribute('aria-label', label);
+        themeToggle.setAttribute('title', label);
+      }
+      if (themeValue) themeValue.value = nextTheme;
+      if (themeUse && themeIconBase) themeUse.setAttribute('href', `${themeIconBase}#${themeIcons[theme]}`);
+    };
+
+    themeForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!themeToggle || !themeValue || themeToggle.disabled) return;
+
+      const previousTheme = themeToggle.dataset.themeCurrent || 'system';
+      const requestedTheme = themeValue.value;
+      const csrfInput = themeForm.querySelector('input[name="csrf_test_name"]');
+      const requestBody = new URLSearchParams(new FormData(themeForm));
+      requestBody.set('theme', requestedTheme);
+      applyTheme(requestedTheme);
+      themeToggle.disabled = true;
+
+      try {
+        const response = await fetch(themeForm.action, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {
+            Accept: 'application/json',
+            'X-CSRF-TOKEN': csrfInput?.value || '',
+          },
+          body: requestBody,
+        });
+        const data = await response.json().catch(() => ({}));
+        updateCsrfTokens(data.csrf_hash);
+        if (!response.ok || data.ok !== true) throw new Error(data.message || 'Theme could not be saved.');
+
+        const settingsTheme = document.querySelector(`input[name="theme"][value="${requestedTheme}"]`);
+        if (settingsTheme instanceof HTMLInputElement) settingsTheme.checked = true;
+      } catch (error) {
+        applyTheme(previousTheme);
+        showClientToast('error', 'Error', error instanceof Error ? error.message : 'Theme could not be saved.');
+      } finally {
+        themeToggle.disabled = false;
+      }
+    });
+  }
+
   const scoreboardPresentationFrame = body.matches('[data-scoreboard-presentation-frame]');
   const scoreboardPresentationStage = document.querySelector('[data-scoreboard-presentation-stage]');
   const scoreboardPresentButton = document.querySelector('[data-scoreboard-present]');
@@ -2292,6 +2439,48 @@
     });
 
     syncScheduleTeams();
+  });
+
+  document.querySelectorAll('[data-sport-group]').forEach((group) => {
+    const selectAll = group.querySelector('[data-select-all]');
+    if (!(selectAll instanceof HTMLInputElement)) return;
+    const sportCheckboxes = Array.from(group.querySelectorAll('input[name="sport_ids[]"][type="checkbox"]'));
+
+    const syncSelectAll = () => {
+      const selectable = sportCheckboxes.filter((checkbox) => !checkbox.disabled);
+      const checkedCount = selectable.filter((checkbox) => checkbox.checked).length;
+      selectAll.checked = selectable.length > 0 && checkedCount === selectable.length;
+      selectAll.indeterminate = checkedCount > 0 && checkedCount < selectable.length;
+      selectAll.disabled = selectable.length === 0;
+    };
+
+    selectAll.addEventListener('change', () => {
+      sportCheckboxes.forEach((checkbox) => {
+        if (!checkbox.disabled) checkbox.checked = selectAll.checked;
+        checkbox.setCustomValidity('');
+      });
+      selectAll.indeterminate = false;
+    });
+    sportCheckboxes.forEach((checkbox) => checkbox.addEventListener('change', syncSelectAll));
+    syncSelectAll();
+  });
+
+  document.querySelectorAll('[data-managed-sports-form]').forEach((form) => {
+    const sportCheckboxes = Array.from(form.querySelectorAll('input[name="sport_ids[]"][type="checkbox"]'));
+    if (!sportCheckboxes.length) return;
+
+    const clearSportValidity = () => sportCheckboxes.forEach((checkbox) => checkbox.setCustomValidity(''));
+    sportCheckboxes.forEach((checkbox) => checkbox.addEventListener('change', clearSportValidity));
+
+    form.addEventListener('submit', (event) => {
+      clearSportValidity();
+      if (sportCheckboxes.some((checkbox) => checkbox.checked)) return;
+
+      event.preventDefault();
+      const firstAvailable = sportCheckboxes.find((checkbox) => !checkbox.disabled) || sportCheckboxes[0];
+      firstAvailable.setCustomValidity(form.dataset.sportRequiredMessage || 'Select at least one sport.');
+      firstAvailable.reportValidity();
+    });
   });
 
   document.querySelectorAll('[data-role-managed-form]').forEach((form) => {

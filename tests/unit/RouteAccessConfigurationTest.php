@@ -22,6 +22,18 @@ final class RouteAccessConfigurationTest extends TestCase
         $this->assertStringContainsString("sports-managers/(:num)/reset-password", $routes);
     }
 
+    public function testThemeUpdateRouteIsAvailableToEveryAuthenticatedRole(): void
+    {
+        $routes = (string) file_get_contents(__DIR__ . '/../../app/Config/Routes.php');
+        $authStart = strpos($routes, "\$routes->group('', ['filter'=>'auth']");
+        $adminStart = strpos($routes, "['filter'=>'role:admin']", $authStart + 1);
+
+        $this->assertNotFalse($authStart);
+        $this->assertNotFalse($adminStart);
+        $authenticatedRoutes = substr($routes, $authStart, $adminStart - $authStart);
+        $this->assertStringContainsString("settings/theme','SettingsController::updateTheme", $authenticatedRoutes);
+    }
+
     public function testAdminRouteGroupKeepsValidationAndSportsCoordinatorManagementOnly(): void
     {
         $routes = (string) file_get_contents(__DIR__ . '/../../app/Config/Routes.php');

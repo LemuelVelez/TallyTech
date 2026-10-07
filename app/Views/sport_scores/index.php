@@ -9,8 +9,8 @@
 <?php if ($selectedSport): ?>
 <section class="panel sport-points-panel">
     <div class="panel-head"><div><h2>Overall Sport Points</h2><p><?= esc($selectedSport['name']) ?> only · validated results.</p></div></div>
-    <div class="table-wrap"><table><thead><tr><th>Rank</th><th>Team</th><th>Points</th></tr></thead><tbody>
-        <?php foreach ($ranking as $i => $team): ?><tr><td><b><?= $i + 1 ?></b></td><td><?= esc($team['name']) ?></td><td><b><?= esc(format_points($team['total_points'])) ?></b></td></tr><?php endforeach; ?>
+    <div class="table-wrap"><table class="sport-points-table"><thead><tr><th class="table-pin">Rank</th><th>Team</th><th>Points</th></tr></thead><tbody>
+        <?php foreach ($ranking as $i => $team): ?><tr><td class="table-pin"><b><?= $i + 1 ?></b></td><td><?= esc($team['name']) ?></td><td><b><?= esc(format_points($team['total_points'])) ?></b></td></tr><?php endforeach; ?>
         <?php if (empty($ranking)): ?><tr><td colspan="3" class="empty">No validated sport points yet.</td></tr><?php endif; ?>
     </tbody></table></div>
 </section>

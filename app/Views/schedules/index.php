@@ -38,11 +38,11 @@ $stageOptions = [
 <?php if ($activeEvent && ! $locations): ?><div class="alert error">Add or enable a location before creating schedules.</div><?php endif; ?>
 <section class="panel">
     <div class="panel-head"><div><h2>Master Schedule</h2><p>Players and Tournament Managers can use this operational view to confirm where and when each match is played.</p></div></div>
-    <div class="table-wrap"><table class="schedule-table"><thead><tr><th>Match ID</th><th>Time</th><th>Sport</th><th>Round</th><th>Team A</th><th>Team B</th><th>Location</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+    <div class="table-wrap"><table class="schedule-table"><thead><tr><th class="table-pin">Match ID</th><th>Time</th><th>Sport</th><th>Round</th><th>Team A</th><th>Team B</th><th>Location</th><th>Status</th><th class="table-actions-col">Actions</th></tr></thead><tbody>
     <?php foreach ($schedules as $schedule): ?>
         <?php $isJudged = ($schedule['result_type'] ?? '') === 'judged'; ?>
         <tr>
-            <td><span class="badge"><?= esc($schedule['match_code'] ?? '—') ?></span></td>
+            <td class="table-pin"><span class="badge"><?= esc($schedule['match_code'] ?? '—') ?></span></td>
             <td><b><?= esc(date('g:i A', strtotime($schedule['match_date']))) ?></b><small class="muted"><?= esc(date('M j, Y', strtotime($schedule['match_date']))) ?></small></td>
             <td><b><?= esc($schedule['sport_name']) ?></b><small class="muted"><?= esc($schedule['category']) ?></small></td>
             <td><?= esc($schedule['round']) ?><small class="muted"><?= esc(ucwords(str_replace('_', ' ', $schedule['tournament_format'] ?? 'single_elimination'))) ?></small></td>
@@ -50,7 +50,7 @@ $stageOptions = [
             <td><?= $isJudged ? '—' : esc($schedule['slot_b_label'] ?? 'TBD') ?></td>
             <td><b><?= esc($schedule['location_name'] ?? '—') ?></b></td>
             <td><span class="badge <?= $schedule['status'] === 'played' ? 'official' : ($schedule['status'] === 'cancelled' ? 'unofficial' : 'neutral') ?>"><?= strtoupper(esc($schedule['status'])) ?></span></td>
-            <td><div class="row-actions"><button class="btn tiny" data-modal="schedule-edit-<?= (int) $schedule['id'] ?>"><?= ui_icon('pencil') ?><span>Edit</span></button><form method="post" action="<?= site_url('schedules/' . $schedule['id'] . '/delete') ?>" data-confirm="Delete this schedule? Schedules with submitted results cannot be removed."><?= csrf_field() ?><button class="btn tiny danger"><?= ui_icon('trash') ?><span>Delete</span></button></form></div></td>
+            <td class="table-actions-col"><div class="row-actions"><button class="btn tiny" data-modal="schedule-edit-<?= (int) $schedule['id'] ?>"><?= ui_icon('pencil') ?><span>Edit</span></button><form method="post" action="<?= site_url('schedules/' . $schedule['id'] . '/delete') ?>" data-confirm="Delete this schedule? Schedules with submitted results cannot be removed."><?= csrf_field() ?><button class="btn tiny danger"><?= ui_icon('trash') ?><span>Delete</span></button></form></div></td>
         </tr>
     <?php endforeach; ?>
     <?php if (! $schedules): ?><tr><td colspan="9" class="empty">No schedules for the active event.</td></tr><?php endif; ?>

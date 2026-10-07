@@ -13,7 +13,7 @@ $routes->group('', ['filter'=>'auth'], static function(RouteCollection $routes):
     $routes->get('notifications','NotificationsController::index');
     $routes->get('notifications/unread-count','NotificationsController::unreadCount');
     $routes->get('team-ranking','DashboardController::ranking',['filter'=>'role:admin,manager,facilitator']);
-    $routes->get('settings','SettingsController::index'); $routes->post('settings','SettingsController::update');
+    $routes->get('settings','SettingsController::index'); $routes->post('settings','SettingsController::update'); $routes->post('settings/theme','SettingsController::updateTheme');
     $routes->get('account/password','AccountController::password'); $routes->post('account/password','AccountController::updatePassword');
 
     $routes->group('', ['filter'=>'role:admin'], static function(RouteCollection $routes): void {

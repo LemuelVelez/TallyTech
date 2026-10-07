@@ -12,6 +12,49 @@ class SettingsController extends BaseController
         ]);
     }
 
+    public function updateTheme()
+    {
+        $theme = $this->postString('theme');
+        $acceptsJson = $this->request->isAJAX() || str_contains(strtolower($this->request->getHeaderLine('Accept')), 'application/json');
+
+        if (! in_array($theme, ['light', 'dark', 'system'], true)) {
+            if ($acceptsJson) {
+                return $this->response->setStatusCode(422)->setJSON([
+                    'ok' => false,
+                    'message' => 'Select a valid theme.',
+                    'csrf_hash' => csrf_hash(),
+                ]);
+            }
+
+            return redirect()->back()->with('error', 'Select a valid theme.');
+        }
+
+        try {
+            $this->repository()->updateUserSettings((int) session()->get('user_id'), ['theme' => $theme]);
+            session()->set('theme', $theme);
+        } catch (\Throwable $e) {
+            if ($acceptsJson) {
+                return $this->response->setStatusCode(500)->setJSON([
+                    'ok' => false,
+                    'message' => 'Theme could not be saved.',
+                    'csrf_hash' => csrf_hash(),
+                ]);
+            }
+
+            return redirect()->back()->with('error', 'Theme could not be saved.');
+        }
+
+        if ($acceptsJson) {
+            return $this->response->setJSON([
+                'ok' => true,
+                'theme' => $theme,
+                'csrf_hash' => csrf_hash(),
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Theme updated.');
+    }
+
     public function update()
     {
         $section = $this->postString('section') ?: 'display';
