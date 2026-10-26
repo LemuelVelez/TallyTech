@@ -106,47 +106,4 @@ foreach ($result['entries'] as $entry) { $entryByTeam[(int) $entry['team_id']] =
 
 <?php if ($canSubmit): ?><dialog id="result-modal"><form method="post" action="<?= site_url('results') ?>" class="modal-card wide" data-confirm="Submit this result as unofficial? It will be visible in TallyTech and will require Sports Coordinator approval and Admin - TSC validation before becoming official."><?= csrf_field() ?><div class="modal-head"><h2>Encode <?= $resultType === 'match' ? 'Match' : 'Judged' ?> Result</h2><button type="button" data-close aria-label="Close"><?= ui_icon('x') ?></button></div><label>Schedule<select name="schedule_id" required data-result-schedule><option value="">Select schedule</option><?php foreach ($availableSchedules as $schedule): ?><option value="<?= (int) $schedule['id'] ?>" data-scoring-type="<?= esc($schedule['scoring_type'] ?? 'points', 'attr') ?>" data-set-count="<?= max(1, min(9, (int) ($schedule['set_count'] ?? 1))) ?>" data-team-a="<?= esc($schedule['slot_a_label'] ?? 'Team A', 'attr') ?>" data-team-b="<?= esc($schedule['slot_b_label'] ?? 'Team B', 'attr') ?>"><?= esc($schedule['sport_name'].' · '.$schedule['category'].' · '.$schedule['round'].' · '.date('M j g:i A', strtotime($schedule['match_date']))) ?></option><?php endforeach; ?></select></label><?php if ($resultType === 'match'): ?><fieldset data-match-winner-choice hidden><legend>Winning Team</legend><label class="check"><input type="radio" name="winner" value="a" disabled required><span data-winner-a-label>Team A</span></label><label class="check"><input type="radio" name="winner" value="b" disabled required><span data-winner-b-label>Team B</span></label></fieldset><div data-match-set-inputs><?php for ($set = 0; $set < $maxAvailableSetCount; $set++): ?><div class="form-grid match-set-row" data-set-index="<?= $set + 1 ?>"><label><span data-team-a-label>Team A</span> · <?= esc($ordinal($set + 1)) ?> Set<input type="number" step="0.01" min="0" max="99999999.99" name="team_a_sets[]" <?= $set === 0 ? 'required' : '' ?>></label><label><span data-team-b-label>Team B</span> · <?= esc($ordinal($set + 1)) ?> Set<input type="number" step="0.01" min="0" max="99999999.99" name="team_b_sets[]" <?= $set === 0 ? 'required' : '' ?>></label></div><?php endfor; ?></div><?php else: ?><div class="judged-grid"><?php foreach ($teams as $team): ?><label><?= esc($team['name']) ?><input type="number" step="0.01" min="0" max="99999999.99" name="judged[<?= (int) $team['id'] ?>]" placeholder="Score"></label><?php endforeach; ?></div><?php endif; ?><label>Notes<textarea name="notes" rows="3" placeholder="Optional notes from the score sheet"></textarea></label><div class="warning-box">This submission is published immediately as <b>UNOFFICIAL</b>. A Sports Coordinator must approve it before an Admin - TSC can validate it as official.</div><button class="btn primary full"><?= ui_icon('clipboard-check') ?><span>Submit Result</span></button></form></dialog><?php endif; ?>
 
-<?php if ($canSubmit && $resultType === 'match'): ?>
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    var select = document.querySelector('[data-result-schedule]');
-    if (!select) return;
-    var rows = Array.from(document.querySelectorAll('[data-match-set-inputs] [data-set-index]'));
-    var update = function () {
-        var option = select.options[select.selectedIndex];
-        var isWinLoss = option && option.dataset.scoringType === 'win_loss';
-        var winnerGroup = document.querySelector('[data-match-winner-choice]');
-        if (winnerGroup) {
-            winnerGroup.hidden = !isWinLoss;
-            winnerGroup.querySelectorAll('input').forEach(function (input) { input.disabled = !isWinLoss; });
-        }
-        var setContainer = document.querySelector('[data-match-set-inputs]');
-        if (setContainer) setContainer.hidden = !!isWinLoss;
-        var setCount = Math.max(1, parseInt(option && option.dataset.setCount ? option.dataset.setCount : '1', 10));
-        var teamA = option && option.dataset.teamA ? option.dataset.teamA : 'Team A';
-        var teamB = option && option.dataset.teamB ? option.dataset.teamB : 'Team B';
-        var choiceA = document.querySelector('[data-winner-a-label]');
-        var choiceB = document.querySelector('[data-winner-b-label]');
-        if (choiceA) choiceA.textContent = teamA;
-        if (choiceB) choiceB.textContent = teamB;
-        rows.forEach(function (row) {
-            var index = parseInt(row.dataset.setIndex || '1', 10);
-            var enabled = !isWinLoss && index <= setCount;
-            row.hidden = !enabled;
-            row.querySelectorAll('input').forEach(function (input) {
-                input.disabled = !enabled;
-                input.required = enabled && index === 1;
-                if (!enabled) input.value = '';
-            });
-            var a = row.querySelector('[data-team-a-label]');
-            var b = row.querySelector('[data-team-b-label]');
-            if (a) a.textContent = teamA;
-            if (b) b.textContent = teamB;
-        });
-    };
-    select.addEventListener('change', update);
-    update();
-});
-</script>
-<?php endif; ?>
 <?= $this->endSection() ?>

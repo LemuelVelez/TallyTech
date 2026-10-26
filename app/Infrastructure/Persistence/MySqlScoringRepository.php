@@ -77,7 +77,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
             $data['created_at'] = $data['updated_at'];
             $this->db->table('user_profiles')->insert($data);
         }
-        $this->finishTransaction();
+        $this->finishTransaction(false);
     }
 
     public function findUserByUsername(string $username): ?array
@@ -1366,7 +1366,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
                 $this->db->table('user_settings')->insert(['user_id' => $userId, 'setting_key' => $key, 'setting_value' => (string) $value]);
             }
         }
-        $this->finishTransaction();
+        $this->finishTransaction(false);
     }
 
     public function getUserSettings(int $userId): array
@@ -2768,17 +2768,19 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
     public function resetGeneratedPassword(int $userId,int $actorId): string
     {
         $user=$this->requireRow('users',$userId,'User');$this->assertAccountManagementPermission((string)$user['role'],$actorId);$alphabet='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';$bytes=random_bytes(10);$password='';for($i=0;$i<10;$i++)$password.=$alphabet[ord($bytes[$i])%strlen($alphabet)];$password.='!7a';
-        $this->db->transStart();$this->db->table('users')->where('id',$userId)->update(['password_hash'=>password_hash($password,PASSWORD_DEFAULT),'generated_password'=>base64_encode(service('encrypter')->encrypt($password))]);$this->db->table('auth_remember_tokens')->where('user_id',$userId)->delete();$actorRole=(string)($this->requireRow('users',$actorId,'User')['role']??'');$sportIds=$this->assignedSportIds($userId);$sportId=$sportIds[0]??null;if($actorRole==='admin')$this->notify($actorId,'password_reset','Reset password for '.$user['display_name'],['admin']);else $this->notify($actorId,'password_reset','Reset Tournament Manager password for '.$user['display_name'],[],$actorId,$sportId);$this->notify($actorId,'password_reset','A new system-generated password was issued for your account',[],$userId,$sportId);$this->finishTransaction();return $password;
+        $this->db->transStart();$this->db->table('users')->where('id',$userId)->update(['password_hash'=>password_hash($password,PASSWORD_DEFAULT),'generated_password'=>base64_encode(service('encrypter')->encrypt($password))]);$this->db->table('auth_remember_tokens')->where('user_id',$userId)->delete();$actorRole=(string)($this->requireRow('users',$actorId,'User')['role']??'');$sportIds=$this->assignedSportIds($userId);$sportId=$sportIds[0]??null;if($actorRole==='admin')$this->notify($actorId,'password_reset','Reset password for '.$user['display_name'],['admin']);else $this->notify($actorId,'password_reset','Reset Tournament Manager password for '.$user['display_name'],[],$actorId,$sportId);$this->notify($actorId,'password_reset','A new system-generated password was issued for your account',[],$userId,$sportId);$this->finishTransaction(false);return $password;
     }
 
-    private function finishTransaction(): void
+    private function finishTransaction(bool $affectsScoreboard = true): void
     {
         $this->placementSourceCache = [];
         $this->db->transComplete();
         if (! $this->db->transStatus()) {
             throw new RuntimeException('The database operation could not be completed.');
         }
-        // Include every standings-affecting write in the shared version token.
-        cache()->save('tt_scoreboard_version', bin2hex(random_bytes(16)), 2592000);
+        // Profile-only edits do not affect public standings or bracket data.
+        if ($affectsScoreboard) {
+            cache()->save('tt_scoreboard_version', bin2hex(random_bytes(16)), 2592000);
+        }
     }
 }

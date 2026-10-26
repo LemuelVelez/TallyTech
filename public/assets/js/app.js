@@ -640,6 +640,50 @@
   });
   window.addEventListener('focus', () => syncUnreadBadge());
 
+  // Result creation: switch between per-set scores and a real-team winner choice.
+  const resultScheduleSelect = document.querySelector('[data-result-schedule]');
+  if (resultScheduleSelect) {
+    const scoreRows = [...document.querySelectorAll('[data-match-set-inputs] [data-set-index]')];
+    const winnerGroup = document.querySelector('[data-match-winner-choice]');
+    const setContainer = document.querySelector('[data-match-set-inputs]');
+    const updateScoringInputs = () => {
+      const option = resultScheduleSelect.selectedOptions[0];
+      const winLoss = option?.dataset.scoringType === 'win_loss';
+      const setCount = Math.max(1, Number.parseInt(option?.dataset.setCount || '1', 10) || 1);
+      const teamA = option?.dataset.teamA || 'Team A';
+      const teamB = option?.dataset.teamB || 'Team B';
+      if (winnerGroup) {
+        winnerGroup.hidden = !winLoss;
+        winnerGroup.querySelectorAll('input[name="winner"]').forEach((input) => {
+          input.disabled = !winLoss;
+          input.required = winLoss;
+          if (!winLoss) input.checked = false;
+        });
+      }
+      if (setContainer) setContainer.hidden = winLoss;
+      const choiceA = document.querySelector('[data-winner-a-label]');
+      const choiceB = document.querySelector('[data-winner-b-label]');
+      if (choiceA) choiceA.textContent = teamA;
+      if (choiceB) choiceB.textContent = teamB;
+      scoreRows.forEach((row) => {
+        const index = Number.parseInt(row.dataset.setIndex || '1', 10);
+        const enabled = !winLoss && index <= setCount;
+        row.hidden = !enabled;
+        row.querySelectorAll('input').forEach((input) => {
+          input.disabled = !enabled;
+          input.required = enabled && index === 1;
+          if (!enabled) input.value = '';
+        });
+        const a = row.querySelector('[data-team-a-label]');
+        const b = row.querySelector('[data-team-b-label]');
+        if (a) a.textContent = teamA;
+        if (b) b.textContent = teamB;
+      });
+    };
+    resultScheduleSelect.addEventListener('change', updateScoringInputs);
+    updateScoringInputs();
+  }
+
   document.querySelectorAll('form.modal-card').forEach((form) => {
     const type = form.querySelector('select[name="result_type"]');
     const scoringField = form.querySelector('[data-sport-scoring]');

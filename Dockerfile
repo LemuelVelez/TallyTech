@@ -54,7 +54,7 @@ RUN install -D -m 0644 public/uploads/team-avatars/.htaccess /usr/local/share/ta
 # at /var/www/html/public/uploads/team-avatars and
 # /var/www/html/public/uploads/user-avatars so uploads survive redeploys.
 
-ENV CI_ENVIRONMENT=production
+ENV CI_ENVIRONMENT=development
 
 EXPOSE 3000
 

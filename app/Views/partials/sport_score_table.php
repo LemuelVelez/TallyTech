@@ -26,7 +26,7 @@ $scoreText = static fn(float|int $score): string => rtrim(rtrim(number_format((f
 
 <?php if ($selectedSport): ?>
 <section class="<?= esc($panelClass) ?> sport-score-table-panel">
-    <div class="section-title"><h2><?= esc($selectedSport['name']) ?> Score Table</h2><span><?= ($selectedSport['scoring_type'] ?? 'points') === 'win_loss' ? 'Win/Loss based on selected winner' : 'Win/Loss is based on sets won' ?></span></div>
+    <div class="section-title"><h2><?= esc($selectedSport['name']) ?> Score Table</h2><span><?= ($selectedSport['result_type'] ?? 'match') === 'judged' ? 'Judged scoring' : (($selectedSport['scoring_type'] ?? 'points') === 'win_loss' ? 'Win/Loss based on selected winner' : 'Match results are based on sets won') ?></span></div>
     <div class="score-thresholds">
         <?php foreach ($table['thresholds'] ?? [] as $threshold): ?>
             <span class="score-threshold"><b><?= esc($threshold['category']) ?>:</b>
@@ -37,29 +37,40 @@ $scoreText = static fn(float|int $score): string => rtrim(rtrim(number_format((f
             </span>
         <?php endforeach; ?>
     </div>
-    <div class="table-wrap" data-scroll-hint="Swipe horizontally to see status and overall points">
-        <table class="sport-score-table">
-            <thead><tr><th>Category</th><th class="sport-score-team-cell">Team</th><?php for ($set = 1; $set <= $maxSetCount; $set++): ?><th class="sport-score-set-cell"><?= esc($ordinal($set)) ?></th><?php endfor; ?><th class="sport-score-status-cell">Status</th><th class="sport-score-overall-cell">Overall Points</th></tr></thead>
-            <tbody>
-            <?php foreach ($table['categories'] ?? [] as $category): ?>
-                <?php $rows = $category['rows'] ?? []; ?>
-                <?php if ($rows): ?>
-                    <?php foreach ($rows as $index => $row): ?>
-                        <tr>
-                            <?php if ($index === 0): ?><td rowspan="<?= count($rows) ?>" class="sport-category-cell"><b><?= esc($category['category']) ?></b></td><?php endif; ?>
-                            <td class="sport-score-team-cell"><b><?= esc($row['team_name']) ?></b><?php if (!empty($row['match_code'])): ?><small class="muted"><?= esc($row['match_code']) ?></small><?php endif; ?></td>
-                            <?php for ($set = 0; $set < $maxSetCount; $set++): ?><td class="sport-score-set-cell"><?= (($category['scoring_type'] ?? 'points') === 'win_loss') ? '—' : (array_key_exists($set, $row['set_scores'] ?? []) ? esc($scoreText($row['set_scores'][$set])) : '—') ?></td><?php endfor; ?>
-                            <td class="sport-score-status-cell"><?php if (($row['status'] ?? '') !== ''): ?><span class="badge <?= $row['status'] === 'Win' ? 'official' : 'neutral' ?>"><?= esc($row['status']) ?></span><?php else: ?>—<?php endif; ?></td>
-                            <td class="sport-score-overall-cell"><b><?= !empty($row['set_scores']) ? esc($scoreText($row['overall_points'])) : '—' ?></b></td>
-                        </tr>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <tr><td class="sport-category-cell"><b><?= esc($category['category']) ?></b></td><td colspan="<?= $maxSetCount + 3 ?>" class="empty">No participating teams or submitted scores yet.</td></tr>
-                <?php endif; ?>
-            <?php endforeach; ?>
-            <?php if (empty($table['categories'])): ?><tr><td colspan="<?= $maxSetCount + 4 ?>" class="empty">No score table is available for this sport.</td></tr><?php endif; ?>
-            </tbody>
-        </table>
-    </div>
+    <?php foreach ($table['categories'] ?? [] as $category): ?>
+        <?php
+            $isWinLoss = ($category['result_type'] ?? 'match') === 'match' && ($category['scoring_type'] ?? 'points') === 'win_loss';
+            $categorySetCount = $isWinLoss ? 0 : max(1, (int) ($category['set_count'] ?? 1));
+            $rows = $category['rows'] ?? [];
+        ?>
+        <div class="table-wrap sport-category-score-block" data-scroll-hint="Swipe horizontally for more score columns">
+            <table class="sport-score-table">
+                <thead><tr>
+                    <th>Category</th><th class="sport-score-team-cell">Team</th>
+                    <?php for ($set = 1; $set <= $categorySetCount; $set++): ?><th class="sport-score-set-cell"><?= esc($ordinal($set)) ?></th><?php endfor; ?>
+                    <th class="sport-score-status-cell">Status</th>
+                    <?php if (! $isWinLoss): ?><th class="sport-score-overall-cell">Overall Points</th><?php endif; ?>
+                </tr></thead>
+                <tbody>
+                    <?php if ($rows): ?>
+                        <?php foreach ($rows as $index => $row): ?>
+                            <tr>
+                                <?php if ($index === 0): ?><td rowspan="<?= count($rows) ?>" class="sport-category-cell"><b><?= esc($category['category']) ?></b></td><?php endif; ?>
+                                <td class="sport-score-team-cell"><b><?= esc($row['team_name']) ?></b><?php if (! empty($row['match_code'])): ?><small class="muted"><?= esc($row['match_code']) ?></small><?php endif; ?></td>
+                                <?php for ($set = 0; $set < $categorySetCount; $set++): ?>
+                                    <td class="sport-score-set-cell"><?= array_key_exists($set, $row['set_scores'] ?? []) ? esc($scoreText($row['set_scores'][$set])) : '—' ?></td>
+                                <?php endfor; ?>
+                                <td class="sport-score-status-cell"><?php if (($row['status'] ?? '') !== ''): ?><span class="badge <?= $row['status'] === 'Win' ? 'official' : 'neutral' ?>"><?= esc($row['status']) ?></span><?php else: ?>—<?php endif; ?></td>
+                                <?php if (! $isWinLoss): ?><td class="sport-score-overall-cell"><b><?= ! empty($row['set_scores']) ? esc($scoreText($row['overall_points'])) : '—' ?></b></td><?php endif; ?>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr><td><b><?= esc($category['category']) ?></b></td><td colspan="<?= $categorySetCount + ($isWinLoss ? 2 : 3) ?>" class="empty">No participating teams or submitted scores yet.</td></tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    <?php endforeach; ?>
+    <?php if (empty($table['categories'])): ?><div class="empty">No score table is available for this sport.</div><?php endif; ?>
 </section>
 <?php endif; ?>

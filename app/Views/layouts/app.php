@@ -19,7 +19,7 @@ $nextTheme = $themeCycle[$theme] ?? 'light';
 $themeAriaLabel = 'Theme: ' . ($themeNames[$theme] ?? 'System') . '. Switch to ' . ($themeNames[$nextTheme] ?? 'Light');
 $avatarPath = (string) session()->get('photo_path');
 $avatarUrl = preg_match('~^uploads/user-avatars/[a-f0-9]{32}\.webp$~', $avatarPath) ? base_url($avatarPath) : base_url('assets/img/logo.webp');
-$assetRelease = '20261026-3';
+$assetRelease = '20261026-4';
 $assetVersion = static function (string $relativePath) use ($assetRelease): string {
     $path = defined('FCPATH') ? FCPATH . ltrim($relativePath, '/\\') : '';
     $fileVersion = $path !== '' && is_file($path) ? (string) filemtime($path) : '0';

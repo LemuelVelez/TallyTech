@@ -61,14 +61,13 @@ abstract class BaseController extends Controller
 
     protected function managerCanManageFacilitator(int $id): bool
     {
+        if ($id <= 0 || (string) session()->get('role') !== 'manager') return false;
         $allowed = $this->managerSportIds();
         if ($allowed === []) return false;
-        foreach ($this->repository()->usersByRole('facilitator') as $user) {
-            if ((int) $user['id'] !== $id) continue;
-            $assigned = array_map('intval', array_column($user['sports'] ?? [], 'id'));
-            return $assigned !== [] && array_diff($assigned, $allowed) === [];
-        }
-        return false;
+        $facilitator = $this->repository()->userProfile($id);
+        if (! $facilitator || ($facilitator['role'] ?? '') !== 'facilitator') return false;
+        $assigned = $this->repository()->assignedSportIds($id);
+        return $assigned !== [] && array_diff($assigned, $allowed) === [];
     }
 
     protected function managerSportId(): ?int

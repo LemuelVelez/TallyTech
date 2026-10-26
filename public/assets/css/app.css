@@ -3793,3 +3793,7 @@ body.theme-dark .tt-bracket-note .tt-bracket-note-trophy { color: #f3d98b; }
 .profile-wide { grid-column:1/-1 }
 .profile-avatar-preview { width:104px;height:104px;object-fit:cover;border-radius:50%;border:2px solid var(--line) }
 @media(max-width:600px) { .profile-grid { grid-template-columns:minmax(0,1fr) } .profile-wide { grid-column:auto } .topbar-notifications { min-width:36px;height:38px } }
+
+/* Honor HTML hidden on dynamic scoring, profile, and modal controls. */
+[hidden] { display: none !important; }
+.sport-category-score-block + .sport-category-score-block { margin-top: 1rem; }

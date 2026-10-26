@@ -39,6 +39,25 @@ final class ScoringServiceTest extends TestCase
     }
 
 
+    public function testPublicOfficialScoreboardDoesNotCalculateUnofficialMode(): void
+    {
+        $event = ['id' => 17, 'name' => 'Intramurals'];
+        $sports = [['id' => 7, 'name' => 'Chess', 'category' => 'Men', 'result_type' => 'match']];
+        $repository = $this->createMock(ScoringRepositoryInterface::class);
+        $repository->method('activeEvent')->willReturn($event);
+        $repository->method('sports')->willReturn($sports);
+        $repository->method('schedules')->willReturn([]);
+        $repository->method('resolveBracketSlots')->willReturn([]);
+        $repository->expects($this->once())->method('resultsByStatus')->with(17, 'validated')->willReturn([]);
+        $repository->method('rankingBySport')->willReturn([]);
+        $repository->method('ranking')->willReturn([]);
+        $repository->expects($this->never())->method('rankingByStatus');
+
+        $data = (new ScoringService($repository))->scoreboard(7, false, 'official');
+        $this->assertSame('Official Scoreboard', $data['officialScoreboard']['label']);
+        $this->assertSame([], $data['unofficialScoreboard']);
+    }
+
     public function testCommonDataUsesExplicitEmptyEventScopeWhenNoEventIsActive(): void
     {
         $repository = $this->createMock(ScoringRepositoryInterface::class);

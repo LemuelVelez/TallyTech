@@ -99,19 +99,25 @@ class ScoringService
         ];
     }
 
-    public function scoreboard(?int $requestedSportId = null, bool $overall = false): array
+    public function scoreboard(?int $requestedSportId = null, bool $overall = false, string $mode = 'both'): array
     {
+        if (! in_array($mode, ['official', 'unofficial', 'both'], true)) {
+            throw new RuntimeException('Invalid scoreboard mode.');
+        }
         $event = $this->repository->activeEvent();
         $eventId = (int) ($event['id'] ?? 0);
         $cacheEnabled = ! defined('ENVIRONMENT') || ENVIRONMENT !== 'testing';
         $version = $cacheEnabled ? (string) (cache()->get('tt_scoreboard_version') ?: 'initial') : 'testing';
-        $cacheKey = 'tt_sb_' . hash('sha256', $version . '|' . $eventId . '|' . ($requestedSportId ?? 0) . '|' . (int) $overall);
+        $cacheKey = 'tt_sb_' . hash('sha256', $version . '|' . $eventId . '|' . ($requestedSportId ?? 0) . '|' . (int) $overall . '|' . $mode);
         $cacheLock = null;
         if ($cacheEnabled) {
             $cached = cache()->get($cacheKey);
             if (is_array($cached)) return $cached;
             // Only one worker recalculates each cold scoreboard entry.
-            $cacheLock = @fopen(WRITEPATH . 'cache/' . $cacheKey . '.lock', 'c');
+            // Lock per view (not per version): versioned lock files would accumulate
+            // after every standings update and eventually fill writable/cache.
+            $lockKey = hash('sha256', $eventId . '|' . ($requestedSportId ?? 0) . '|' . (int) $overall . '|' . $mode);
+            $cacheLock = @fopen(WRITEPATH . 'cache/tt_sb_lock_' . $lockKey . '.lock', 'c');
             if (is_resource($cacheLock) && flock($cacheLock, LOCK_EX)) {
                 $cached = cache()->get($cacheKey);
                 if (is_array($cached)) {
@@ -128,10 +134,18 @@ class ScoringService
         $selectedSportIds = $isOverall ? [] : $selection['selectedSportIds'];
         $selectedSport = $isOverall ? null : $selection['selectedSport'];
 
-        $official = $this->buildScoreboardDataset($eventId, $selectedSportIds, 'validated');
-        $unofficial = $this->buildScoreboardDataset($eventId, $selectedSportIds, 'pending');
-        $official['overallRanking'] = $eventId > 0 ? $this->repository->ranking($eventId, false) : [];
-        $unofficial['overallRanking'] = $eventId > 0 ? $this->repository->rankingByStatus($eventId, 'pending', true) : [];
+        // A public visitor requests one mode. Avoid calculating the unused mode.
+        // 'both' retains the original API for application integrations/tests.
+        $official = [];
+        $unofficial = [];
+        if ($mode !== 'unofficial') {
+            $official = $this->buildScoreboardDataset($eventId, $selectedSportIds, 'validated');
+            $official['overallRanking'] = $eventId > 0 ? $this->repository->ranking($eventId, false) : [];
+        }
+        if ($mode !== 'official') {
+            $unofficial = $this->buildScoreboardDataset($eventId, $selectedSportIds, 'pending');
+            $unofficial['overallRanking'] = $eventId > 0 ? $this->repository->rankingByStatus($eventId, 'pending', true) : [];
+        }
 
         $payload = [
             'activeEvent' => $event,

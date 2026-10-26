@@ -17,7 +17,9 @@ class ScoreboardController extends BaseController
         $requestedView = strtolower(trim((string) $this->request->getGet('view')));
         $overall = $requestedView === 'overall' || $sportId === null;
 
-        $data = $this->scoringService()->scoreboard($sportId, $overall);
+        $rawMode = $this->request->getGet('scoreboard');
+        $mode = is_string($rawMode) && $rawMode === 'unofficial' ? 'unofficial' : 'official';
+        $data = $this->scoringService()->scoreboard($sportId, $overall, $mode);
         $data['title'] = 'Live Scoreboard';
         $data['scoreboardVersion'] = (string) (cache()->get('tt_scoreboard_version') ?: 'initial');
         return view('scoreboard/index', $data);
