@@ -141,18 +141,6 @@ class UsersController extends BaseController
         return redirect()->back()->with('success', $label . ' account removed.');
     }
 
-    private function managerCanManageFacilitator(int $id): bool
-    {
-        $managerSportIds = $this->managerSportIds();
-        if ($managerSportIds === []) return false;
-        foreach ($this->repository()->usersByRole('facilitator') as $user) {
-            if ((int) ($user['id'] ?? 0) !== $id) continue;
-            $userSportIds = array_map('intval', array_column($user['sports'] ?? [], 'id'));
-            return $userSportIds !== [] && array_diff($userSportIds, $managerSportIds) === [];
-        }
-        return false;
-    }
-
     private function roleLabel(string $role): string
     {
         return $role === 'manager' ? 'Sports Coordinator' : ($role === 'facilitator' ? 'Tournament Manager' : 'User');

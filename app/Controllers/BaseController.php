@@ -28,18 +28,20 @@ abstract class BaseController extends Controller
      */
 
     // protected $session;
+    private ?MySqlScoringRepository $cachedRepository = null;
+    private ?ScoringService $cachedScoringService = null;
 
     /**
      * @return void
      */
     protected function repository(): MySqlScoringRepository
     {
-        return new MySqlScoringRepository();
+        return $this->cachedRepository ??= MySqlScoringRepository::shared();
     }
 
     protected function scoringService(): ScoringService
     {
-        return new ScoringService($this->repository());
+        return $this->cachedScoringService ??= new ScoringService($this->repository());
     }
 
     protected function assignedSportIdsForCurrentUser(): array
@@ -55,6 +57,18 @@ abstract class BaseController extends Controller
     {
         if ((string) session()->get('role') !== 'manager') return [];
         return $this->assignedSportIdsForCurrentUser();
+    }
+
+    protected function managerCanManageFacilitator(int $id): bool
+    {
+        $allowed = $this->managerSportIds();
+        if ($allowed === []) return false;
+        foreach ($this->repository()->usersByRole('facilitator') as $user) {
+            if ((int) $user['id'] !== $id) continue;
+            $assigned = array_map('intval', array_column($user['sports'] ?? [], 'id'));
+            return $assigned !== [] && array_diff($assigned, $allowed) === [];
+        }
+        return false;
     }
 
     protected function managerSportId(): ?int

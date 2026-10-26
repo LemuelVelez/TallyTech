@@ -69,6 +69,8 @@ $jsVersion = $assetVersion('assets/js/app.js');
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+    <meta data-scoreboard-version content="<?= esc($scoreboardVersion ?? 'initial', 'attr') ?>">
+    <meta data-scoreboard-version-url content="<?= esc(site_url('scoreboard/version'), 'attr') ?>">
     <meta name="tallytech-scoreboard-refresh" content="30" data-scoreboard-refresh>
     <meta name="theme-color" content="#061b3a">
     <title><?= esc($isOfficialScoreboard ? 'Official Scoreboard' : 'Unofficial Scoreboard') ?> · TallyTech</title>
@@ -200,7 +202,7 @@ $jsVersion = $assetVersion('assets/js/app.js');
                                     <b><?= esc($result['category'] . ' · ' . $result['round']) ?></b>
                                     <span class="badge <?= $isOfficialScoreboard ? 'official' : 'unofficial' ?>"><?= $isOfficialScoreboard ? 'OFFICIAL' : 'PROVISIONAL' ?></span>
                                 </div>
-                                <?php foreach ($result['entries'] as $entry): ?><p><span><?= esc($entry['team_name']) ?></span><strong><?= esc(rtrim(rtrim(number_format((float) $entry['raw_score'], 2, '.', ''), '0'), '.')) ?></strong></p><?php endforeach; ?>
+                                <?php foreach ($result['entries'] as $entry): ?><p><span><?= esc($entry['team_name']) ?></span><strong><?= esc(($result['scoring_type'] ?? 'points') === 'win_loss' ? ((float) $entry['raw_score'] > 0 ? 'Win' : 'Loss') : rtrim(rtrim(number_format((float) $entry['raw_score'], 2, '.', ''), '0'), '.')) ?></strong></p><?php endforeach; ?>
                                 <small><?= esc(date('M j, g:i A', strtotime($result['submitted_at']))) ?></small>
                             </article>
                         <?php endforeach; ?>

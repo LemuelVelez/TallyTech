@@ -3,6 +3,7 @@ use CodeIgniter\Router\RouteCollection;
 /** @var RouteCollection $routes */
 $routes->get('/', 'ScoreboardController::index');
 $routes->get('scoreboard', 'ScoreboardController::index');
+$routes->get('scoreboard/version', 'ScoreboardController::version');
 $routes->get('login', 'AuthController::login');
 $routes->post('login', 'AuthController::attempt');
 $routes->post('login/continue', 'AuthController::continueRemembered');
@@ -10,6 +11,9 @@ $routes->post('login/forget', 'AuthController::forgetRemembered');
 $routes->post('logout', 'AuthController::logout');
 $routes->group('', ['filter'=>'auth'], static function(RouteCollection $routes): void {
     $routes->get('dashboard','DashboardController::index');
+    $routes->get('profile','ProfileController::index');
+    $routes->post('profile','ProfileController::update');
+    $routes->get('users/(:num)/profile','ProfileController::view/$1');
     $routes->get('notifications','NotificationsController::index');
     $routes->get('notifications/unread-count','NotificationsController::unreadCount');
     $routes->get('team-ranking','DashboardController::ranking',['filter'=>'role:admin,manager,facilitator']);

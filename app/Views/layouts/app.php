@@ -10,14 +10,16 @@ $theme = in_array($theme, ['light', 'dark', 'system'], true) ? $theme : 'system'
 $fontSize = in_array($fontSize, ['small', 'medium', 'large'], true) ? $fontSize : 'medium';
 $displayName = (string) session()->get('display_name');
 $unread = 0;
-try { $unread = (new \App\Infrastructure\Persistence\MySqlScoringRepository())->unreadNotificationCount((int) session()->get('user_id')); } catch (\Throwable $e) {}
+try { $unread = \App\Infrastructure\Persistence\MySqlScoringRepository::shared()->unreadNotificationCount((int) session()->get('user_id')); } catch (\Throwable $e) {}
 $unreadLabel = $unread > 99 ? '99+' : (string) $unread;
 $themeCycle = ['light' => 'dark', 'dark' => 'system', 'system' => 'light'];
 $themeIcons = ['light' => 'sun', 'dark' => 'moon', 'system' => 'monitor'];
 $themeNames = ['light' => 'Light', 'dark' => 'Dark', 'system' => 'System'];
 $nextTheme = $themeCycle[$theme] ?? 'light';
 $themeAriaLabel = 'Theme: ' . ($themeNames[$theme] ?? 'System') . '. Switch to ' . ($themeNames[$nextTheme] ?? 'Light');
-$assetRelease = '20261008-2';
+$avatarPath = (string) session()->get('photo_path');
+$avatarUrl = preg_match('~^uploads/user-avatars/[a-f0-9]{32}\.webp$~', $avatarPath) ? base_url($avatarPath) : base_url('assets/img/logo.webp');
+$assetRelease = '20261026-3';
 $assetVersion = static function (string $relativePath) use ($assetRelease): string {
     $path = defined('FCPATH') ? FCPATH . ltrim($relativePath, '/\\') : '';
     $fileVersion = $path !== '' && is_file($path) ? (string) filemtime($path) : '0';
@@ -31,7 +33,7 @@ $jsVersion = $assetVersion('assets/js/app.js');
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-    <meta name="theme-color" content="#0c7e43">
+    <meta name="theme-color" content="#d95600">
     <title><?= esc($title ?? 'TallyTech') ?> · TallyTech</title>
     <link rel="icon" type="image/x-icon" href="<?= base_url('favicon.ico') ?>?v=2">
     <link rel="stylesheet" href="<?= esc(base_url('assets/css/app.css') . '?v=' . rawurlencode($cssVersion), 'attr') ?>">
@@ -40,8 +42,10 @@ $jsVersion = $assetVersion('assets/js/app.js');
 <?= view('partials/toasts') ?>
 <a class="skip-link" href="#main-content">Skip to main content</a>
 <header class="topbar">
-    <button class="menu-toggle" type="button" data-nav-toggle aria-label="<?= esc($unread > 0 ? 'Open navigation, '.$unread.' unread notifications' : 'Open navigation', 'attr') ?>" aria-controls="app-sidebar" aria-expanded="false"><?= ui_icon('menu') ?><span class="menu-toggle-unread" aria-hidden="true"<?= $unread>0?'':' hidden' ?>><?= esc($unreadLabel) ?></span></button>
+    <button class="menu-toggle" type="button" data-nav-toggle aria-label="Open navigation" aria-controls="app-sidebar" aria-expanded="false"><?= ui_icon('menu') ?></button>
     <a class="brand" href="<?= site_url('dashboard') ?>"><img src="<?= base_url('assets/img/logo.webp') ?>" alt="TallyTech"><span><?= esc($roleLabel) ?></span></a>
+
+    <a class="topbar-notifications" href="<?= site_url('notifications') ?>" data-notification-bell aria-label="<?= esc('Notifications, '.$unread.' unread', 'attr') ?>" title="Notifications"><?= ui_icon('bell') ?><span class="bell-unread" aria-hidden="true"<?= $unread>0?'':' hidden' ?>><?= esc($unreadLabel) ?></span></a>
 
     <form class="theme-toggle-form" method="post" action="<?= site_url('settings/theme') ?>" data-theme-form>
         <?= csrf_field() ?>
@@ -53,7 +57,7 @@ $jsVersion = $assetVersion('assets/js/app.js');
 
     <div class="account-menu" data-account-menu>
         <button class="topbar-user" type="button" data-account-toggle aria-label="Open user menu for <?= esc($displayName, 'attr') ?>" aria-expanded="false" aria-controls="account-dropdown" aria-haspopup="menu">
-            <img class="user-avatar" src="<?= base_url('assets/img/logo.webp') ?>" alt="">
+            <img class="user-avatar" src="<?= esc($avatarUrl, 'attr') ?>" alt="">
             <span class="user-identity">
                 <span class="user-name"><?= esc($displayName) ?></span>
                 <small><?= esc($accountRoleLabel) ?></small>
@@ -62,9 +66,11 @@ $jsVersion = $assetVersion('assets/js/app.js');
         </button>
         <div class="account-dropdown" id="account-dropdown" data-account-dropdown role="menu" hidden>
             <div class="account-dropdown-head">
+                <img class="profile-dropdown-avatar" src="<?= esc($avatarUrl, 'attr') ?>" alt="">
                 <b><?= esc($displayName) ?></b>
                 <span><?= esc($accountRoleLabel) ?></span>
             </div>
+            <a href="<?= site_url('profile') ?>" role="menuitem"><?= ui_icon('user') ?><span>Your Profile</span></a>
             <a href="<?= site_url('dashboard') ?>" role="menuitem"><?= ui_icon('dashboard') ?><span>Dashboard</span></a>
             <a href="<?= site_url('settings') ?>" role="menuitem"><?= ui_icon('settings') ?><span>Settings</span></a>
             <a href="<?= site_url('account/password') ?>" role="menuitem"><?= ui_icon('key') ?><span>Change Password</span></a>

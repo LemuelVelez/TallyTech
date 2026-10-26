@@ -158,6 +158,7 @@ class ResultsController extends BaseController
 
         return [
             'schedule_id' => $this->postPositiveInt('schedule_id'),
+            'winner' => $this->postString('winner'),
             'team_a_score' => $this->postString('team_a_score'),
             'team_b_score' => $this->postString('team_b_score'),
             'team_a_sets' => is_array($teamASets) ? $teamASets : [],

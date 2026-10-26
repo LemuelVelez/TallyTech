@@ -63,9 +63,11 @@ class SportsController extends BaseController
     private function sportPayload(int $eventId): array
     {
         $name=trim($this->postString('name'));$categoryId=$this->postPositiveInt('category_id');$type=$this->postString('result_type');
+        try { $scoringType = \App\Application\Services\ScoringService::normaliseSportScoringType($type, $this->postString('scoring_type')); }
+        catch (\RuntimeException $e) { return ['error' => $e->getMessage()]; }
         if($name===''||mb_strlen($name)>120||!$categoryId||!in_array($type,['match','judged'],true))return ['error'=>'Complete all sport fields.'];
         $points=[];foreach(['first_points','second_points','third_points','fourth_points','participation_points'] as $field){$raw=trim($this->postString($field));if($raw===''||!preg_match('/^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/',$raw)||(float)$raw>999999.99)return ['error'=>'Enter valid weighted points for all placements.'];$points[$field]=number_format((float)$raw,2,'.','');}
-        return ['event_id'=>$eventId,'name'=>$name,'category_id'=>$categoryId,'result_type'=>$type,'weighted_points'=>$points];
+        return ['event_id'=>$eventId,'name'=>$name,'category_id'=>$categoryId,'result_type'=>$type,'scoring_type'=>$scoringType,'weighted_points'=>$points];
     }
 
 }

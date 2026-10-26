@@ -29,8 +29,7 @@
       navToggle.setAttribute('aria-label', 'Close navigation');
       return;
     }
-    const unread = currentUnreadCount();
-    navToggle.setAttribute('aria-label', unread > 0 ? `Open navigation, ${unread} unread notifications` : 'Open navigation');
+    navToggle.setAttribute('aria-label', 'Open navigation');
   };
 
   const updateUnreadBadges = (count) => {
@@ -38,19 +37,22 @@
     const label = unread > 99 ? '99+' : String(unread);
     body.dataset.unreadNotifications = String(unread);
 
-    document.querySelectorAll('.nav-unread, .menu-toggle-unread').forEach((badge) => {
+    document.querySelectorAll('.nav-unread, .bell-unread').forEach((badge) => {
       badge.textContent = label;
       badge.hidden = unread === 0;
       if (badge.classList.contains('nav-unread')) {
         badge.setAttribute('aria-label', `${unread} unread notifications`);
       }
     });
+    document.querySelector('[data-notification-bell]')?.setAttribute('aria-label', `Notifications, ${unread} unread`);
     updateNavigationAriaLabel();
   };
 
+  let lastUnreadFetch = 0;
   const syncUnreadBadge = async () => {
     const endpoint = body.dataset.unreadCountUrl;
-    if (!endpoint) return;
+    if (!endpoint || Date.now() - lastUnreadFetch < 15000) return;
+    lastUnreadFetch = Date.now();
     const sequence = ++unreadSyncSequence;
     try {
       const response = await fetch(endpoint, {
@@ -497,11 +499,15 @@
     const scheduleScoreboardRefresh = () => {
       window.setTimeout(() => {
         if (document.visibilityState === 'visible' && !scoreboardPresentationActive) {
-          window.location.reload();
+          fetch(document.querySelector('[data-scoreboard-version-url]')?.content || '/scoreboard/version', { cache: 'no-store' })
+            .then((response) => response.ok ? response.json() : null)
+            .then((data) => {
+              if (data && data.version && data.version !== document.querySelector('[data-scoreboard-version]')?.content) window.location.reload();
+            }).catch(() => {}).finally(scheduleScoreboardRefresh);
           return;
         }
         scheduleScoreboardRefresh();
-      }, refreshMs);
+      }, refreshMs + (Math.random() * 10000 - 5000));
     };
     scheduleScoreboardRefresh();
   }
@@ -628,11 +634,27 @@
     updateNavigationAriaLabel();
   };
 
-  window.addEventListener('pageshow', () => syncUnreadBadge());
+  window.addEventListener('pageshow', (event) => { if (event.persisted) syncUnreadBadge(); });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') syncUnreadBadge();
   });
   window.addEventListener('focus', () => syncUnreadBadge());
+
+  document.querySelectorAll('form.modal-card').forEach((form) => {
+    const type = form.querySelector('select[name="result_type"]');
+    const scoringField = form.querySelector('[data-sport-scoring]');
+    if (!type || !scoringField) return;
+    const select = scoringField.querySelector('select[name="scoring_type"]');
+    const update = () => {
+      scoringField.hidden = type.value !== 'match';
+      if (select) {
+        select.disabled = type.value !== 'match';
+        if (type.value !== 'match') select.value = 'points';
+      }
+    };
+    type.addEventListener('change', update);
+    update();
+  });
 
   const SIDEBAR_COMPACT_KEY = 'tallytech.sidebarCompact';
 

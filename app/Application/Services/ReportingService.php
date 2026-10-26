@@ -116,7 +116,7 @@ class ReportingService
                     $row['points'] = (float) $row['points'];
                 }
                 if (isset($row['score'])) {
-                    $row['score'] = (float) $row['score'];
+                    if (is_numeric($row['score'])) $row['score'] = (float) $row['score'];
                 }
                 if (array_key_exists('placement', $row) && $row['placement'] !== null && $row['placement'] !== '') {
                     $row['placement'] = (int) $row['placement'];

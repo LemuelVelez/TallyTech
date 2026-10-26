@@ -6,6 +6,39 @@ use PHPUnit\Framework\TestCase;
 
 final class ScoringServiceTest extends TestCase
 {
+    public function testWinLossEntriesEncodeWinnerAsSyntheticSets(): void
+    {
+        $entries = \App\Application\Services\ScoringService::winLossEntries(4, 6, 'b');
+        $this->assertSame([0,1], array_column($entries, 'raw_score'));
+        $this->assertSame(['[0]','[1]'], array_column($entries, 'set_scores'));
+    }
+
+    public function testWinLossOutcomesResolveThroughExistingBracketLogic(): void
+    {
+        $entries = ScoringService::winLossEntries(4, 6, 'b');
+        $entries[0]['team_id'] = 4;
+        $entries[1]['team_id'] = 6;
+        $placements = ScoringService::resolveTournamentPlacements([
+            ['id'=>99,'sport_id'=>17,'type'=>'match','result_type'=>'match','scoring_type'=>'win_loss',
+             'tournament_format'=>'single_elimination','phase'=>'final','bracket_side'=>'grand',
+             'match_code'=>'M1','round'=>'Final','entries'=>$entries],
+        ]);
+        $this->assertSame(1,$placements[99][6]);
+        $this->assertSame(2,$placements[99][4]);
+    }
+
+    public function testWinLossRejectsMissingWinner(): void
+    {
+        $this->expectException(\RuntimeException::class);
+        \App\Application\Services\ScoringService::winLossEntries(4, 6, null);
+    }
+
+    public function testJudgedSportAlwaysUsesPoints(): void
+    {
+        $this->assertSame('points', \App\Application\Services\ScoringService::normaliseSportScoringType('judged','win_loss'));
+    }
+
+
     public function testCommonDataUsesExplicitEmptyEventScopeWhenNoEventIsActive(): void
     {
         $repository = $this->createMock(ScoringRepositoryInterface::class);

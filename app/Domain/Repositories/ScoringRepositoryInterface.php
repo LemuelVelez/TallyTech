@@ -79,6 +79,9 @@ interface ScoringRepositoryInterface
     public function assertActorOwnsSport(int $sportId, int $actorId): void;
     public function resetGeneratedPassword(int $userId, int $actorId): string;
 
+    public function userProfile(int $userId): ?array;
+    public function updateUserProfile(int $userId, array $data): void;
+
     public function updateUserSettings(int $userId, array $settings): void;
     public function getUserSettings(int $userId): array;
 }

@@ -19,6 +19,12 @@ use RuntimeException;
 
 class MySqlScoringRepository implements ScoringRepositoryInterface
 {
+    private static ?self $requestInstance = null;
+    public static function shared(): self
+    {
+        return self::$requestInstance ??= new self();
+    }
+
     private const MAX_RESULT_SCORE = 99999999.99;
     private UserModel $users;
     private EventModel $eventsModel;
@@ -30,7 +36,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
     private WeightedPointModel $weightedPointsModel;
     private ResultModel $resultsModel;
     private NotificationModel $notificationsModel;
-    private ?bool $notificationReadsAvailable = null;
+    private static ?bool $notificationReadsAvailable = null;
     /** @var array<string, array> Per-request cache for ranking source data. */
     private array $placementSourceCache = [];
 
@@ -47,6 +53,31 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         $this->weightedPointsModel = new WeightedPointModel($this->db);
         $this->resultsModel = new ResultModel($this->db);
         $this->notificationsModel = new NotificationModel($this->db);
+    }
+
+    public function userProfile(int $userId): ?array
+    {
+        return $this->db->table('users u')
+            ->select('u.id, u.display_name, u.username, u.role, u.status, p.photo_path, p.address, p.phone, p.facebook_url, p.email, p.college_office, p.position, p.emergency_contact_name, p.emergency_contact_phone, p.bio')
+            ->join('user_profiles p','p.user_id=u.id','left')
+            ->where('u.id', $userId)->get()->getRowArray() ?: null;
+    }
+
+    public function updateUserProfile(int $userId, array $data): void
+    {
+        $name = $data['display_name'];
+        unset($data['display_name']);
+        $this->db->transStart();
+        $this->db->table('users')->where('id', $userId)->update(['display_name'=>$name]);
+        $data['updated_at'] = date('Y-m-d H:i:s');
+        if ($this->db->table('user_profiles')->where('user_id',$userId)->countAllResults() > 0) {
+            $this->db->table('user_profiles')->where('user_id',$userId)->update($data);
+        } else {
+            $data['user_id'] = $userId;
+            $data['created_at'] = $data['updated_at'];
+            $this->db->table('user_profiles')->insert($data);
+        }
+        $this->finishTransaction();
     }
 
     public function findUserByUsername(string $username): ?array
@@ -121,7 +152,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
     public function schedules(?int $eventId = null, ?string $resultType = null): array
     {
         $builder = $this->db->table('schedules sc')
-            ->select('sc.*, s.name sport_name, s.category, s.result_type, s.set_count, s.winning_points, l.name location_name, ta.name team_a_name, ta.avatar_path team_a_avatar, tb.name team_b_name, tb.avatar_path team_b_avatar')
+            ->select('sc.*, s.name sport_name, s.category, s.result_type, s.set_count, s.winning_points, s.scoring_type, l.name location_name, ta.name team_a_name, ta.avatar_path team_a_avatar, tb.name team_b_name, tb.avatar_path team_b_avatar')
             ->join('sports s', 's.id=sc.sport_id')
             ->join('locations l', 'l.id=sc.location_id', 'left')
             ->join('teams ta', 'ta.id=sc.team_a_id', 'left')
@@ -138,23 +169,29 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
     public function usersByRole(string $role): array
     {
         $users = $this->db->table('users')->where('role', $role)->orderBy('display_name')->get()->getResultArray();
+        $sportsByUser = [];
+        foreach (array_chunk(array_map('intval',array_column($users,'id')),500) as $ids) {
+            foreach ($this->db->table('user_sports us')
+                ->select('us.user_id,s.id,s.name,s.category')
+                ->join('sports s','s.id=us.sport_id')
+                ->join('events e','e.id=s.event_id')
+                ->whereIn('us.user_id',$ids)->where('e.is_active',1)
+                ->orderBy('s.name','ASC')
+                ->orderBy("CASE LOWER(s.category) WHEN 'men' THEN 0 WHEN 'women' THEN 1 WHEN 'mixed' THEN 2 ELSE 3 END",'ASC',false)
+                ->orderBy('s.category','ASC')->get()->getResultArray() as $sport) {
+                $sportsByUser[(int)$sport['user_id']][] = [
+                    'id'=>$sport['id'],'name'=>$sport['name'],'category'=>$sport['category']
+                ];
+            }
+        }
+        $viewerId = (int) session()->get('user_id');
+        $viewerRole = (string) session()->get('role');
         foreach ($users as &$user) {
-            $viewerId = (int) session()->get('user_id');
-            $viewerRole = (string) session()->get('role');
             $user['generated_password_plain'] = null;
             if (! empty($user['generated_password']) && ($viewerRole === 'admin' || (int) ($user['created_by'] ?? 0) === $viewerId)) {
                 try { $user['generated_password_plain'] = service('encrypter')->decrypt(base64_decode((string) $user['generated_password'], true) ?: ''); } catch (\Throwable $e) { $user['generated_password_plain'] = null; }
             }
-            $user['sports'] = $this->db->table('user_sports us')
-                ->select('s.id,s.name,s.category')
-                ->join('sports s', 's.id=us.sport_id')
-                ->join('events e', 'e.id=s.event_id')
-                ->where('us.user_id', $user['id'])
-                ->where('e.is_active', 1)
-                ->orderBy('s.name', 'ASC')
-                ->orderBy("CASE LOWER(s.category) WHEN 'men' THEN 0 WHEN 'women' THEN 1 WHEN 'mixed' THEN 2 ELSE 3 END", 'ASC', false)
-                ->orderBy('s.category', 'ASC')
-                ->get()->getResultArray();
+            $user['sports'] = $sportsByUser[(int)$user['id']] ?? [];
         }
         return $users;
     }
@@ -230,11 +267,11 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
 
     private function hasNotificationReadsTable(): bool
     {
-        if ($this->notificationReadsAvailable === null) {
-            $this->notificationReadsAvailable = $this->db->tableExists('notification_reads');
+        if (self::$notificationReadsAvailable === null) {
+            self::$notificationReadsAvailable = $this->db->tableExists('notification_reads');
         }
 
-        return $this->notificationReadsAvailable;
+        return self::$notificationReadsAvailable;
     }
 
     public function dashboardCounts(int $eventId, string $role, int $userId): array
@@ -774,6 +811,10 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         $data['event_id'] = $eventId;
         $data['category'] = $category['name'];
         $this->assertActiveEvent((int) $sport['event_id']);
+        if (($sport['scoring_type'] ?? 'points') !== ($data['scoring_type'] ?? 'points')
+            && $this->db->table('results r')->join('schedules sc', 'sc.id=r.schedule_id')->where('sc.sport_id', $id)->countAllResults() > 0) {
+            throw new RuntimeException('Scoring type cannot change after results have been submitted for this sport.');
+        }
         if (($sport['result_type'] ?? '') !== $data['result_type'] && $this->db->table('schedules')->where('sport_id', $id)->countAllResults() > 0) {
             throw new RuntimeException('Sport type cannot be changed after schedules have been created.');
         }
@@ -1434,7 +1475,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
                             'category' => (string) ($result['category'] ?? ''),
                             'round' => (string) ($result['round'] ?? ''),
                             'team' => (string) ($entry['team_name'] ?? ''),
-                            'score' => $entry['raw_score'] ?? null,
+                            'score' => ($result['scoring_type'] ?? 'points') === 'win_loss' ? (((float) ($entry['raw_score'] ?? 0)) > 0 ? 'Win' : 'Loss') : ($entry['raw_score'] ?? null),
                             'placement' => $placement,
                             'points' => $points,
                             'status' => $status,
@@ -1486,7 +1527,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
     private function resultRows(?int $eventId, ?string $type, ?string $status): array
     {
         $builder = $this->db->table('results r')
-            ->select('r.*, sc.sport_id, sc.team_a_id, sc.team_b_id, sc.round, sc.tournament_format, sc.match_code, sc.phase, sc.bracket_side, sc.match_date, s.name sport_name, s.category, s.result_type, s.set_count, s.winning_points, l.name location_name, u.display_name submitted_by_name, v.display_name validated_by_name')
+            ->select('r.*, sc.sport_id, sc.team_a_id, sc.team_b_id, sc.round, sc.tournament_format, sc.match_code, sc.phase, sc.bracket_side, sc.match_date, s.name sport_name, s.category, s.result_type, s.set_count, s.winning_points, s.scoring_type, l.name location_name, u.display_name submitted_by_name, v.display_name validated_by_name')
             ->join('schedules sc', 'sc.id=r.schedule_id')
             ->join('sports s', 's.id=sc.sport_id')
             ->join('locations l', 'l.id=sc.location_id', 'left')
@@ -1503,9 +1544,19 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         }
 
         $rows = $builder->orderBy('r.id', 'DESC')->get()->getResultArray();
-        foreach ($rows as &$row) {
-            $row['entries'] = $this->resultEntries((int) $row['id']);
+        $entriesByResult = [];
+        $ids = array_map('intval', array_column($rows, 'id'));
+        // Fetch result entries in batches rather than one query per match.
+        foreach (array_chunk($ids, 500) as $batch) {
+            foreach ($this->db->table('result_entries re')
+                ->select('re.*, t.name team_name, t.code team_code')
+                ->join('teams t','t.id=re.team_id')
+                ->whereIn('re.result_id',$batch)
+                ->orderBy('re.placement')->orderBy('re.id')->get()->getResultArray() as $entry) {
+                $entriesByResult[(int)$entry['result_id']][] = $entry;
+            }
         }
+        foreach ($rows as &$row) $row['entries'] = $entriesByResult[(int)$row['id']] ?? [];
         unset($row);
 
         return $rows;
@@ -2272,7 +2323,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
     private function resultSchedule(int $scheduleId): array
     {
         $schedule = $this->db->table('schedules sc')
-            ->select('sc.*, s.result_type, s.name sport_name, s.category, s.set_count, s.winning_points')
+            ->select('sc.*, s.result_type, s.name sport_name, s.category, s.set_count, s.winning_points, s.scoring_type')
             ->join('sports s', 's.id=sc.sport_id')
             ->where('sc.id', $scheduleId)
             ->get()->getRowArray();
@@ -2285,7 +2336,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
     private function resultWithSchedule(int $resultId): array
     {
         $result = $this->db->table('results r')
-            ->select('r.*, sc.sport_id, sc.team_a_id, sc.team_b_id, sc.round, sc.tournament_format, sc.match_code, sc.phase, sc.bracket_side, sc.is_conditional, sc.match_date, s.result_type, s.name sport_name, s.category, s.set_count, s.winning_points')
+            ->select('r.*, sc.sport_id, sc.team_a_id, sc.team_b_id, sc.round, sc.tournament_format, sc.match_code, sc.phase, sc.bracket_side, sc.is_conditional, sc.match_date, s.result_type, s.name sport_name, s.category, s.set_count, s.winning_points, s.scoring_type')
             ->join('schedules sc', 'sc.id=r.schedule_id')
             ->join('sports s', 's.id=sc.sport_id')
             ->where('r.id', $resultId)
@@ -2332,6 +2383,10 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         if (($scheduleOrResult['result_type'] ?? '') === 'match') {
             if (! $scheduleOrResult['team_a_id'] || ! $scheduleOrResult['team_b_id']) {
                 throw new RuntimeException('Match schedules require Team A and Team B.');
+            }
+
+            if (($scheduleOrResult['scoring_type'] ?? 'points') === 'win_loss') {
+                return ScoringService::winLossEntries((int) $scheduleOrResult['team_a_id'], (int) $scheduleOrResult['team_b_id'], $data['winner'] ?? null);
             }
 
             $setCount = max(1, min(9, (int) ($scheduleOrResult['set_count'] ?? 1)));
@@ -2723,5 +2778,7 @@ class MySqlScoringRepository implements ScoringRepositoryInterface
         if (! $this->db->transStatus()) {
             throw new RuntimeException('The database operation could not be completed.');
         }
+        // Include every standings-affecting write in the shared version token.
+        cache()->save('tt_scoreboard_version', bin2hex(random_bytes(16)), 2592000);
     }
 }

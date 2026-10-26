@@ -15,6 +15,7 @@ class NotificationsController extends BaseController
             $unread = 0;
         }
 
+        session()->close();
         return $this->response
             ->setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
             ->setHeader('Pragma', 'no-cache')

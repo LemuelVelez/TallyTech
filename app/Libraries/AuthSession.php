@@ -11,6 +11,7 @@ class AuthSession
     {
         $db = db_connect();
         $settingsRows = $db->table('user_settings')->where('user_id', (int) $user['id'])->get()->getResultArray();
+        $photo = $db->table('user_profiles')->select('photo_path')->where('user_id',(int)$user['id'])->get()->getRowArray();
         $settings = [];
         foreach ($settingsRows as $row) {
             $settings[(string) $row['setting_key']] = (string) ($row['setting_value'] ?? '');
@@ -27,7 +28,7 @@ class AuthSession
         session()->regenerate(true);
         session()->remove('compact_sidebar');
         session()->set([
-            'user_id' => (int) $user['id'], 'username' => (string) $user['username'], 'display_name' => (string) $user['display_name'], 'role' => (string) $user['role'],
+            'user_id' => (int) $user['id'], 'username' => (string) $user['username'], 'display_name' => (string) $user['display_name'], 'photo_path' => (string) ($photo['photo_path'] ?? ''), 'role' => (string) $user['role'],
             'result_density' => $density, 'theme' => $theme, 'font_size' => $font, 'paper_size' => $paper, 'orientation' => $orientation,
             'include_team_ranking' => $includeTeamRanking, 'include_filter_summary' => $includeFilterSummary, 'show_timestamp' => $showTimestamp,
         ]);

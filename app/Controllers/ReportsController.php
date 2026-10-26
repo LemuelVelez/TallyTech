@@ -128,7 +128,7 @@ class ReportsController extends BaseController
         $reporting = new ReportingService($repository);
         $settings = $repository->getUserSettings((int) session()->get('user_id'));
 
-        return view('reports/print', [
+        $html = view('reports/print', [
             'title' => $event['name'] ?? 'TallyTech Report',
             'event' => $event,
             'type' => $type,
@@ -143,6 +143,8 @@ class ReportsController extends BaseController
             'printSettings' => $settings,
             'teamRanking' => ($settings['include_team_ranking'] ?? '1') === '1' && (int) $filters['event_id'] > 0 ? $this->teamRanking($repository, (int) $filters['event_id']) : [],
         ]);
+        session()->close();
+        return $html;
     }
 
     public function xlsx()
@@ -167,6 +169,7 @@ class ReportsController extends BaseController
                 $reporting->pointColumns(),
                 $reporting->filterSummary($filters, $event, $sports)
             );
+            session()->close();
             return $this->response->download($export['filename'], $export['content'], true);
         } catch (\Throwable $e) {
             $query = http_build_query(array_merge(['type' => $type], $filters));

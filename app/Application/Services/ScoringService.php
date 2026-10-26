@@ -9,6 +9,26 @@ class ScoringService
 {
     public function __construct(private ScoringRepositoryInterface $repository) {}
 
+    public static function normaliseSportScoringType(string $resultType, string $scoringType): string
+    {
+        if ($resultType === 'judged') return 'points';
+        if ($resultType !== 'match' || ! in_array($scoringType,['points','win_loss'],true)) {
+            throw new RuntimeException('Select a valid scoring type for match sports.');
+        }
+        return $scoringType;
+    }
+
+    public static function winLossEntries(int $teamAId, int $teamBId, mixed $winner): array
+    {
+        if ($teamAId <= 0 || $teamBId <= 0 || $teamAId === $teamBId || ! in_array($winner,['a','b'],true)) {
+            throw new RuntimeException('Choose the winning team for Win or Loss scoring.');
+        }
+        return [
+            ['team_id'=>$teamAId,'raw_score'=>$winner==='a'?1:0,'set_scores'=>$winner==='a'?'[1]':'[0]','placement'=>null],
+            ['team_id'=>$teamBId,'raw_score'=>$winner==='b'?1:0,'set_scores'=>$winner==='b'?'[1]':'[0]','placement'=>null],
+        ];
+    }
+
     public function commonData(): array
     {
         $event = $this->repository->activeEvent();
@@ -83,6 +103,24 @@ class ScoringService
     {
         $event = $this->repository->activeEvent();
         $eventId = (int) ($event['id'] ?? 0);
+        $cacheEnabled = ! defined('ENVIRONMENT') || ENVIRONMENT !== 'testing';
+        $version = $cacheEnabled ? (string) (cache()->get('tt_scoreboard_version') ?: 'initial') : 'testing';
+        $cacheKey = 'tt_sb_' . hash('sha256', $version . '|' . $eventId . '|' . ($requestedSportId ?? 0) . '|' . (int) $overall);
+        $cacheLock = null;
+        if ($cacheEnabled) {
+            $cached = cache()->get($cacheKey);
+            if (is_array($cached)) return $cached;
+            // Only one worker recalculates each cold scoreboard entry.
+            $cacheLock = @fopen(WRITEPATH . 'cache/' . $cacheKey . '.lock', 'c');
+            if (is_resource($cacheLock) && flock($cacheLock, LOCK_EX)) {
+                $cached = cache()->get($cacheKey);
+                if (is_array($cached)) {
+                    flock($cacheLock, LOCK_UN);
+                    fclose($cacheLock);
+                    return $cached;
+                }
+            }
+        }
         $sports = $this->repository->sports($eventId);
         $selection = $this->scoreboardSportSelection($sports, $requestedSportId);
         // The scoreboard always opens on Overall unless a valid sport was explicitly requested.
@@ -95,7 +133,7 @@ class ScoringService
         $official['overallRanking'] = $eventId > 0 ? $this->repository->ranking($eventId, false) : [];
         $unofficial['overallRanking'] = $eventId > 0 ? $this->repository->rankingByStatus($eventId, 'pending', true) : [];
 
-        return [
+        $payload = [
             'activeEvent' => $event,
             'sports' => $sports,
             'isOverall' => $isOverall,
@@ -113,6 +151,14 @@ class ScoringService
             'officialScoreboard' => $official,
             'unofficialScoreboard' => $unofficial,
         ];
+        if ($cacheEnabled) {
+            cache()->save($cacheKey, $payload, 15);
+            if (is_resource($cacheLock)) {
+                flock($cacheLock, LOCK_UN);
+                fclose($cacheLock);
+            }
+        }
+        return $payload;
     }
 
     public function saveResult(array $data, int $actorId): int
@@ -267,7 +313,7 @@ class ScoringService
 
             if ($tied) {
                 if ($throwOnUnresolvedTie) {
-                    throw new RuntimeException('The two semifinal losers are still tied after sets won, total points, and point difference. Add a 3rd place playoff or correct the official semifinal scores before validation.');
+                    throw new RuntimeException('The semifinal losers remain tied. For Win/Loss sports, add a 3rd-place match; otherwise add a 3rd-place playoff or correct the official semifinal scores.');
                 }
                 continue;
             }
@@ -593,6 +639,8 @@ class ScoringService
             $maxSetCount = max($maxSetCount, max(1, min(9, (int) ($sport['set_count'] ?? 1))));
         }
 
+        if ($selectedSports && count(array_filter($selectedSports, static fn(array $sport): bool => ($sport['scoring_type'] ?? 'points') === 'win_loss')) === count($selectedSports)) $maxSetCount = 0;
+
         if (! $eventId || ! $selectedSportIds) {
             return [
                 'sportGroups' => $sportGroups,
@@ -620,6 +668,7 @@ class ScoringService
                 'category' => $category,
                 'winning_points' => $winningPoints,
                 'result_type' => $resultType,
+                'scoring_type' => (string) ($sport['scoring_type'] ?? 'points'),
             ];
 
             $participants = [];
@@ -684,6 +733,7 @@ class ScoringService
                 'set_count' => $setCount,
                 'winning_points' => $winningPoints,
                 'result_type' => $resultType,
+                'scoring_type' => (string) ($sport['scoring_type'] ?? 'points'),
                 'rows' => $rows,
             ];
         }

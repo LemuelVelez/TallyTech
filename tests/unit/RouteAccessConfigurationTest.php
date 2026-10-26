@@ -32,6 +32,9 @@ final class RouteAccessConfigurationTest extends TestCase
         $this->assertNotFalse($adminStart);
         $authenticatedRoutes = substr($routes, $authStart, $adminStart - $authStart);
         $this->assertStringContainsString("settings/theme','SettingsController::updateTheme", $authenticatedRoutes);
+        $this->assertStringContainsString("get('profile','ProfileController::index", $authenticatedRoutes);
+        $this->assertStringContainsString("post('profile','ProfileController::update", $authenticatedRoutes);
+        $this->assertStringContainsString("users/(:num)/profile','ProfileController::view", $authenticatedRoutes);
     }
 
     public function testAdminRouteGroupKeepsValidationAndSportsCoordinatorManagementOnly(): void

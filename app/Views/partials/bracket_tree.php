@@ -53,6 +53,7 @@ $statusLabel = static function (array $match): string {
 $scoreFor = static function (array $match, ?int $teamId): string {
     if (! $teamId || ! array_key_exists($teamId, $match['score_by_team'] ?? [])) return '';
     $score = (float) $match['score_by_team'][$teamId];
+    if (($match['scoring_type'] ?? 'points') === 'win_loss') return $score > 0 ? 'Win' : 'Loss';
     return rtrim(rtrim(number_format($score, 2, '.', ''), '0'), '.');
 };
 
