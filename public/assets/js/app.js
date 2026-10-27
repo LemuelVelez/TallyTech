@@ -2,6 +2,7 @@
   const body = document.body;
   const navToggle = document.querySelector('[data-nav-toggle]');
   const sidebarCompactToggle = document.querySelector('[data-sidebar-compact-toggle]');
+  const sidebar = document.getElementById('app-sidebar');
   const accountMenu = document.querySelector('[data-account-menu]');
   const accountToggle = accountMenu?.querySelector('[data-account-toggle]');
   const accountDropdown = accountMenu?.querySelector('[data-account-dropdown]');
@@ -731,6 +732,49 @@
       ? body.classList.contains('sidebar-compact')
       : storedCompact === '1';
     setSidebarCompact(initialCompact, false);
+  }
+
+  // Keep the independent sidebar scrollbar steady across full-page navigation.
+  // Remember the position per role, and only adjust it if the current menu item
+  // would otherwise be outside the visible part of the sidebar.
+  if (sidebar) {
+    const roleClass = Array.from(body.classList).find((name) => name.startsWith('role-')) || 'role-default';
+    const scrollKey = `tallytech.sidebarScroll.${roleClass}`;
+    const saveSidebarScroll = () => {
+      try {
+        window.sessionStorage.setItem(scrollKey, String(sidebar.scrollTop));
+      } catch (_) {
+        // Navigation remains usable when session storage is unavailable.
+      }
+    };
+
+    try {
+      const previousScroll = window.sessionStorage.getItem(scrollKey);
+      if (previousScroll !== null) {
+        const offset = Number(previousScroll);
+        if (Number.isFinite(offset) && offset >= 0) sidebar.scrollTop = offset;
+      }
+    } catch (_) {
+      // On a fresh session, start at the current menu item instead.
+    }
+
+    const currentItem = sidebar.querySelector('nav .nav-item[aria-current="page"]');
+    if (currentItem) {
+      const viewport = sidebar.getBoundingClientRect();
+      const item = currentItem.getBoundingClientRect();
+      const gap = 12;
+      if (item.top < viewport.top + gap) {
+        sidebar.scrollTop += item.top - viewport.top - gap;
+      } else if (item.bottom > viewport.bottom - gap) {
+        sidebar.scrollTop += item.bottom - viewport.bottom + gap;
+      }
+    }
+
+    sidebar.addEventListener('scroll', saveSidebarScroll, { passive: true });
+    sidebar.querySelector('nav')?.addEventListener('click', (event) => {
+      if (event.target.closest('a.nav-item')) saveSidebarScroll();
+    });
+    window.addEventListener('pagehide', saveSidebarScroll);
   }
 
   const accountItems = () => accountDropdown
