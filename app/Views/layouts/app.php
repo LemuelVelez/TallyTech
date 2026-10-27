@@ -1,7 +1,7 @@
 <?php
 $role = (string) session()->get('role');
-$roleLabel = ['admin' => 'Admin - TSC', 'manager' => 'Sports Coordinator', 'facilitator' => 'Tournament Manager'][$role] ?? 'TallyTech';
-$accountRoleLabel = ['admin' => 'Admin - TSC', 'manager' => 'Sports Coordinator', 'facilitator' => 'Tournament Manager'][$role] ?? ucfirst($role);
+$roleLabel = $role === '' ? 'TallyTech' : role_label($role);
+$accountRoleLabel = role_label($role);
 $compactSidebar = (bool) session()->get('compact_sidebar');
 $resultDensity = (string) (session()->get('result_density') ?: 'comfortable');
 $theme = (string) (session()->get('theme') ?: 'system');

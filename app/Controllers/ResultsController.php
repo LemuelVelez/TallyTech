@@ -23,7 +23,7 @@ class ResultsController extends BaseController
         } catch (\Throwable $e) {
             return redirect()->back()->withInput()->with('error', $this->safeErrorMessage($e, 'The result could not be submitted.'));
         }
-        return redirect()->back()->with('success', (string)session()->get('role')==='manager' ? 'Result saved as approved and sent to Admin - TSC validation.' : 'Result submitted for Sports Coordinator approval.');
+        return redirect()->back()->with('success', (string)session()->get('role')==='sports_coordinator' ? 'Result saved as approved and sent to Admin validation.' : 'Result submitted for Sports Coordinator approval.');
     }
 
     public function update(int $id)
@@ -63,7 +63,7 @@ class ResultsController extends BaseController
     public function approve(int $id)
     {
         try{$this->repository()->approveResult($id,(int)session()->get('user_id'));}catch(\Throwable $e){return redirect()->back()->with('error',$this->safeErrorMessage($e,'The result could not be approved.'));}
-        return redirect()->back()->with('success','Result approved and sent to Admin - TSC validation.');
+        return redirect()->back()->with('success','Result approved and sent to Admin validation.');
     }
 
     public function returnResult(int $id)
@@ -89,9 +89,9 @@ class ResultsController extends BaseController
             ));
         }
 
-        if (in_array((string) session()->get('role'), ['manager','facilitator'], true)) {
-            $allowed = (string) session()->get('role') === 'manager'
-                ? $this->managerSportIds()
+        if (in_array((string) session()->get('role'), ['sports_coordinator','tournament_manager'], true)) {
+            $allowed = (string) session()->get('role') === 'sports_coordinator'
+                ? $this->coordinatorSportIds()
                 : $repository->assignedSportIds((int) session()->get('user_id'));
             $schedules = array_values(array_filter($schedules, static fn(array $schedule): bool => in_array((int) $schedule['sport_id'], $allowed, true)));
             $scheduleIds = array_map('intval', array_column($schedules, 'id'));

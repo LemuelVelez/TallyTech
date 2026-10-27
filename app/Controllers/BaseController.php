@@ -46,40 +46,40 @@ abstract class BaseController extends Controller
 
     protected function assignedSportIdsForCurrentUser(): array
     {
-        if (! in_array((string) session()->get('role'), ['manager', 'facilitator'], true)) return [];
+        if (! in_array((string) session()->get('role'), ['sports_coordinator', 'tournament_manager'], true)) return [];
         return array_values(array_unique(array_map(
             'intval',
             $this->repository()->assignedSportIds((int) session()->get('user_id'))
         )));
     }
 
-    protected function managerSportIds(): array
+    protected function coordinatorSportIds(): array
     {
-        if ((string) session()->get('role') !== 'manager') return [];
+        if ((string) session()->get('role') !== 'sports_coordinator') return [];
         return $this->assignedSportIdsForCurrentUser();
     }
 
-    protected function managerCanManageFacilitator(int $id): bool
+    protected function coordinatorCanManageTournamentManager(int $id): bool
     {
-        if ($id <= 0 || (string) session()->get('role') !== 'manager') return false;
-        $allowed = $this->managerSportIds();
+        if ($id <= 0 || (string) session()->get('role') !== 'sports_coordinator') return false;
+        $allowed = $this->coordinatorSportIds();
         if ($allowed === []) return false;
-        $facilitator = $this->repository()->userProfile($id);
-        if (! $facilitator || ($facilitator['role'] ?? '') !== 'facilitator') return false;
+        $tournamentManager = $this->repository()->userProfile($id);
+        if (! $tournamentManager || ($tournamentManager['role'] ?? '') !== 'tournament_manager') return false;
         $assigned = $this->repository()->assignedSportIds($id);
         return $assigned !== [] && array_diff($assigned, $allowed) === [];
     }
 
-    protected function managerSportId(): ?int
+    protected function coordinatorSportId(): ?int
     {
-        $ids = $this->managerSportIds();
+        $ids = $this->coordinatorSportIds();
         return count($ids) === 1 ? (int) $ids[0] : null;
     }
 
-    protected function managerCanAccessSport(int $sportId): bool
+    protected function coordinatorCanAccessSport(int $sportId): bool
     {
-        return (string) session()->get('role') !== 'manager'
-            || in_array($sportId, $this->managerSportIds(), true);
+        return (string) session()->get('role') !== 'sports_coordinator'
+            || in_array($sportId, $this->coordinatorSportIds(), true);
     }
 
     /**

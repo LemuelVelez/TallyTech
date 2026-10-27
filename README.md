@@ -71,10 +71,17 @@ Additionally, make sure that the following extensions are enabled in your PHP:
 
 ## TallyTech security configuration
 
-TallyTech encrypts system-generated account passwords before storing them. Before creating or resetting Tournament Manager or Facilitator accounts, set a unique encryption key in the deployment `.env` file, for example:
+TallyTech encrypts system-generated account passwords before storing them. Before creating or resetting Sports Coordinator or Tournament Manager accounts, set a unique encryption key in the deployment `.env` file, for example:
 
 ```ini
 encryption.key = hex2bin:<64-random-hex-characters>
 ```
 
 Generate a different 32-byte key for every deployment and do not commit the real key to source control. The `.env.example` entry is only a configuration template.
+
+## User roles
+
+- **Admin:** Validates approved results, manages Sports Coordinator accounts, and accesses reports, team rankings, and settings.
+- **Sports Coordinator:** Manages teams, events, sports, categories, locations, schedules, brackets, and Tournament Manager accounts; approves or returns results.
+- **Tournament Manager:** Encodes results, edits or deletes their own pending results, and views reports and team rankings.
+- **Viewers:** Watch the public scoreboard (`/` or `/scoreboard`) without an account or login. Viewers are not a database account role.

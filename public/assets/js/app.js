@@ -2608,10 +2608,10 @@
 
     const selectedRole = () => roleSelect?.value || hiddenRole?.value || '';
     const syncSportSection = () => {
-      const facilitator = selectedRole() === 'facilitator';
-      if (sportSection) sportSection.hidden = !facilitator;
+      const tournamentManager = selectedRole() === 'tournament_manager';
+      if (sportSection) sportSection.hidden = !tournamentManager;
       sportCheckboxes.forEach((checkbox) => {
-        checkbox.disabled = !facilitator;
+        checkbox.disabled = !tournamentManager;
         checkbox.setCustomValidity('');
       });
     };
@@ -2622,7 +2622,7 @@
     }));
 
     form.addEventListener('submit', (event) => {
-      if (selectedRole() !== 'facilitator' || !sportCheckboxes.length) return;
+      if (selectedRole() !== 'tournament_manager' || !sportCheckboxes.length) return;
       if (sportCheckboxes.some((checkbox) => checkbox.checked)) return;
 
       event.preventDefault();

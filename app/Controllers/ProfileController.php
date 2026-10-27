@@ -25,7 +25,7 @@ class ProfileController extends BaseController
         $role = (string) session()->get('role');
         if ($viewerId !== $userId
             && $role !== 'admin'
-            && ! ($role === 'manager' && $this->managerCanManageFacilitator($userId))) {
+            && ! ($role === 'sports_coordinator' && $this->coordinatorCanManageTournamentManager($userId))) {
             return $this->response->setStatusCode(403)->setBody('Profile access denied.');
         }
         $profile = $this->repository()->userProfile($userId);

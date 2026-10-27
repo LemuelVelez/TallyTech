@@ -43,19 +43,19 @@ class TallyTechSeeder extends Seeder
                     'status' => 'active',
                     'created_at' => $now,
                 ]),
-                'manager' => $this->ensureUser([
-                    'username' => 'manager',
+                'sports_coordinator' => $this->ensureUser([
+                    'username' => 'sports.coordinator',
                     'password_hash' => password_hash('Manager_123', PASSWORD_DEFAULT),
-                    'display_name' => 'Joy Tournament Manager',
-                    'role' => 'manager',
+                    'display_name' => 'Joy Sports Coordinator',
+                    'role' => 'sports_coordinator',
                     'status' => 'active',
                     'created_at' => $now,
                 ]),
-                'facilitator' => $this->ensureUser([
-                    'username' => 'facilitator',
-                    'password_hash' => password_hash('Facilitator_123', PASSWORD_DEFAULT),
-                    'display_name' => 'Game Facilitator',
-                    'role' => 'facilitator',
+                'tournament_manager' => $this->ensureUser([
+                    'username' => 'tournament.sports_coordinator',
+                    'password_hash' => password_hash('TournamentManager_123', PASSWORD_DEFAULT),
+                    'display_name' => 'Sample Tournament Manager',
+                    'role' => 'tournament_manager',
                     'status' => 'active',
                     'created_at' => $now,
                 ]),
@@ -101,17 +101,17 @@ class TallyTechSeeder extends Seeder
                 'Cheerdance' => $this->ensureSport($eventId, 'Cheerdance', 'Mixed', 'judged', 1, null, $now),
             ];
 
-            $this->ensureUserSport($ids['manager'], $sports['Basketball']);
-            $this->ensureUserSport($ids['facilitator'], $sports['Basketball']);
+            $this->ensureUserSport($ids['sports_coordinator'], $sports['Basketball']);
+            $this->ensureUserSport($ids['tournament_manager'], $sports['Basketball']);
 
             foreach ($sports as $sportId) {
                 $this->ensureWeightedPoints($eventId, $sportId, $ids['admin'], $ids['admin'], $now);
             }
 
 
-            $this->ensureNotification($ids['facilitator'], 'result_submitted', 'Submitted unofficial Cheerdance judged result', $now);
+            $this->ensureNotification($ids['tournament_manager'], 'result_submitted', 'Submitted unofficial Cheerdance judged result', $now);
             $this->ensureNotification($ids['admin'], 'result_validated', 'Validated Basketball bracket results as official', $now);
-            $this->ensureNotification($ids['manager'], 'weighted_points_validated', 'Weighted points are ready for scoring', $now);
+            $this->ensureNotification($ids['sports_coordinator'], 'weighted_points_validated', 'Weighted points are ready for scoring', $now);
 
             if (! $this->db->transComplete()) {
                 throw new RuntimeException('Unable to complete database seed transaction.');
@@ -166,8 +166,8 @@ class TallyTechSeeder extends Seeder
     {
         return match ($role) {
             'admin' => 'Admin_123',
-            'manager' => 'Manager_123',
-            'facilitator' => 'Facilitator_123',
+            'sports_coordinator' => 'Manager_123',
+            'tournament_manager' => 'TournamentManager_123',
             default => throw new RuntimeException('Unsupported seeded role: ' . $role),
         };
     }
@@ -278,7 +278,7 @@ class TallyTechSeeder extends Seeder
         $this->changes++;
     }
 
-    private function ensureWeightedPoints(int $eventId, int $sportId, int $managerId, int $adminId, string $now): void
+    private function ensureWeightedPoints(int $eventId, int $sportId, int $coordinatorId, int $adminId, string $now): void
     {
         $exists = $this->db->table('weighted_points')->where('event_id', $eventId)->where('sport_id', $sportId)->countAllResults() > 0;
         if ($exists) {
@@ -294,7 +294,7 @@ class TallyTechSeeder extends Seeder
             'fourth_points' => 3,
             'participation_points' => 2,
             'status' => 'validated',
-            'submitted_by' => $managerId,
+            'submitted_by' => $coordinatorId,
             'validated_by' => $adminId,
             'submitted_at' => $now,
             'validated_at' => $now,

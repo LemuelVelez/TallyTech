@@ -9,10 +9,10 @@ class SchedulesController extends BaseController
     public function index()
     {
         $data = $this->scoringService()->commonData();
-        $managerSportIds = $this->managerSportIds();
+        $coordinatorSportIds = $this->coordinatorSportIds();
         $data['sports'] = array_values(array_filter(
             $data['sports'],
-            static fn(array $sport): bool => in_array((int) $sport['id'], $managerSportIds, true)
+            static fn(array $sport): bool => in_array((int) $sport['id'], $coordinatorSportIds, true)
         ));
         $data['title'] = 'Tournament Schedules';
         $data['schedules'] = $this->repository()->resolveBracketSlots(
@@ -20,7 +20,7 @@ class SchedulesController extends BaseController
         );
         $data['schedules'] = array_values(array_filter(
             $data['schedules'],
-            static fn(array $row): bool => in_array((int) $row['sport_id'], $managerSportIds, true)
+            static fn(array $row): bool => in_array((int) $row['sport_id'], $coordinatorSportIds, true)
         ));
         $data['allLocations'] = $this->repository()->allLocations();
         return view('schedules/index', $data);
@@ -30,10 +30,10 @@ class SchedulesController extends BaseController
     {
         $data = $this->scoringService()->commonData();
         $eventId = (int) ($data['activeEvent']['id'] ?? 0);
-        $managerSportIds = $this->managerSportIds();
+        $coordinatorSportIds = $this->coordinatorSportIds();
         $data['sports'] = array_values(array_filter(
             $data['sports'],
-            static fn(array $sport): bool => in_array((int) $sport['id'], $managerSportIds, true)
+            static fn(array $sport): bool => in_array((int) $sport['id'], $coordinatorSportIds, true)
         ));
         $requestedSport = $this->request->getGet('sport');
         $hasRequestedSport = is_scalar($requestedSport) && trim((string) $requestedSport) !== '';
@@ -95,7 +95,7 @@ class SchedulesController extends BaseController
             return redirect()->back()->with('error', 'Add and activate an event first.');
         }
 
-        $sportId = $this->managerPostedSportId();
+        $sportId = $this->coordinatorPostedSportId();
         $locationId = $this->postPositiveInt('location_id');
         $format = $this->postString('tournament_format');
         $rawStart = trim($this->postString('start_time'));
@@ -211,7 +211,7 @@ class SchedulesController extends BaseController
             return ['error' => 'Add and activate an event first.'];
         }
 
-        $sportId = $this->managerPostedSportId();
+        $sportId = $this->coordinatorPostedSportId();
         $locationId = $this->postPositiveInt('location_id');
         $date = trim($this->postString('match_date'));
         $status = $this->postString('status') ?: 'scheduled';
@@ -295,15 +295,15 @@ class SchedulesController extends BaseController
     }
 
 
-    private function managerPostedSportId(): int
+    private function coordinatorPostedSportId(): int
     {
         $sportId = $this->postPositiveInt('sport_id');
-        $managerSportIds = $this->managerSportIds();
-        if ($sportId === 0 && count($managerSportIds) === 1) {
-            $sportId = (int) $managerSportIds[0];
+        $coordinatorSportIds = $this->coordinatorSportIds();
+        if ($sportId === 0 && count($coordinatorSportIds) === 1) {
+            $sportId = (int) $coordinatorSportIds[0];
         }
 
-        return $sportId > 0 && in_array($sportId, $managerSportIds, true) ? $sportId : 0;
+        return $sportId > 0 && in_array($sportId, $coordinatorSportIds, true) ? $sportId : 0;
     }
 
     private function stageData(string $stage): ?array

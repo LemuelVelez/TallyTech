@@ -8,7 +8,7 @@ class UsersController extends BaseController
         return $this->tournamentManagers();
     }
 
-    public function sportsManagers()
+    public function sportsCoordinators()
     {
         $repo = $this->repository();
         $event = $repo->activeEvent();
@@ -16,18 +16,14 @@ class UsersController extends BaseController
         return view('users/index', [
             'title' => 'Sports Coordinators',
             'manageMode' => 'sports_coordinator',
-            'roleType' => 'manager',
-            'roleOptions' => ['manager'],
-            'users' => $repo->usersByRole('manager'),
+            'roleType' => 'sports_coordinator',
+            'roleOptions' => ['sports_coordinator'],
+            'users' => $repo->usersByRole('sports_coordinator'),
             'sports' => $repo->sports((int) ($event['id'] ?? 0)),
             'activeEvent' => $event,
         ]);
     }
 
-    public function facilitators()
-    {
-        return redirect()->to('/users');
-    }
 
     public function store()
     {
@@ -44,16 +40,16 @@ class UsersController extends BaseController
         return $this->deleteRole($id, $this->managedRoleForActor());
     }
 
-    public function storeSportsManager(){return $this->storeRole('manager');}
-    public function storeFacilitator(){return $this->storeRole('facilitator');}
-    public function updateSportsManager(int $id){return $this->updateRole($id,'manager');}
-    public function updateFacilitator(int $id){return $this->updateRole($id,'facilitator');}
-    public function deleteSportsManager(int $id){return $this->deleteRole($id,'manager');}
-    public function deleteFacilitator(int $id){return $this->deleteRole($id,'facilitator');}
+    public function storeSportsCoordinator(){return $this->storeRole('sports_coordinator');}
+    public function storeTournamentManager(){return $this->storeRole('tournament_manager');}
+    public function updateSportsCoordinator(int $id){return $this->updateRole($id,'sports_coordinator');}
+    public function updateTournamentManager(int $id){return $this->updateRole($id,'tournament_manager');}
+    public function deleteSportsCoordinator(int $id){return $this->deleteRole($id,'sports_coordinator');}
+    public function deleteTournamentManager(int $id){return $this->deleteRole($id,'tournament_manager');}
 
     public function resetPassword(int $id)
     {
-        if ((string) session()->get('role') === 'manager' && ! $this->managerCanManageFacilitator($id)) {
+        if ((string) session()->get('role') === 'sports_coordinator' && ! $this->coordinatorCanManageTournamentManager($id)) {
             return redirect()->back()->with('error', 'You can only manage Tournament Managers assigned within your sports.');
         }
         try {
@@ -68,21 +64,21 @@ class UsersController extends BaseController
     {
         $repo = $this->repository();
         $event = $repo->activeEvent();
-        $managerSportIds = $this->managerSportIds();
-        $users = array_values(array_filter($repo->usersByRole('facilitator'), static function (array $user) use ($managerSportIds): bool {
+        $coordinatorSportIds = $this->coordinatorSportIds();
+        $users = array_values(array_filter($repo->usersByRole('tournament_manager'), static function (array $user) use ($coordinatorSportIds): bool {
             $userSportIds = array_map('intval', array_column($user['sports'] ?? [], 'id'));
-            return $userSportIds !== [] && array_diff($userSportIds, $managerSportIds) === [];
+            return $userSportIds !== [] && array_diff($userSportIds, $coordinatorSportIds) === [];
         }));
         $sports = array_values(array_filter(
             $repo->sports((int) ($event['id'] ?? 0)),
-            static fn(array $sport): bool => in_array((int) $sport['id'], $managerSportIds, true)
+            static fn(array $sport): bool => in_array((int) $sport['id'], $coordinatorSportIds, true)
         ));
 
         return view('users/index', [
             'title' => 'User Management',
             'manageMode' => 'tournament_manager',
-            'roleType' => 'facilitator',
-            'roleOptions' => ['facilitator'],
+            'roleType' => 'tournament_manager',
+            'roleOptions' => ['tournament_manager'],
             'users' => $users,
             'sports' => $sports,
             'activeEvent' => $event,
@@ -91,7 +87,7 @@ class UsersController extends BaseController
 
     private function managedRoleForActor(): string
     {
-        return (string) session()->get('role') === 'admin' ? 'manager' : 'facilitator';
+        return (string) session()->get('role') === 'admin' ? 'sports_coordinator' : 'tournament_manager';
     }
 
     private function storeRole(string $role)
@@ -103,12 +99,12 @@ class UsersController extends BaseController
         } catch (\Throwable $e) {
             return redirect()->back()->withInput()->with('error', $this->safeErrorMessage($e, 'The account could not be created.'));
         }
-        return redirect()->back()->with('success', $this->roleLabel($role) . ' account added. Generated password: ' . $payload['generated_password']);
+        return redirect()->back()->with('success', role_label($role) . ' account added. Generated password: ' . $payload['generated_password']);
     }
 
     private function updateRole(int $id, string $role)
     {
-        if ($role === 'facilitator' && ! $this->managerCanManageFacilitator($id)) {
+        if ($role === 'tournament_manager' && ! $this->coordinatorCanManageTournamentManager($id)) {
             return redirect()->back()->with('error', 'You can only manage Tournament Managers assigned within your sports.');
         }
         $payload = $this->userPayload($role, false);
@@ -118,17 +114,17 @@ class UsersController extends BaseController
         } catch (\Throwable $e) {
             return redirect()->back()->with('error', $this->safeErrorMessage($e, 'The account could not be updated.'));
         }
-        return redirect()->back()->with('success', $this->roleLabel($role) . ' account updated.');
+        return redirect()->back()->with('success', role_label($role) . ' account updated.');
     }
 
     private function deleteRole(int $id, string $role)
     {
-        if ($role === 'facilitator' && ! $this->managerCanManageFacilitator($id)) {
+        if ($role === 'tournament_manager' && ! $this->coordinatorCanManageTournamentManager($id)) {
             return redirect()->back()->with('error', 'You can only manage Tournament Managers assigned within your sports.');
         }
         $ids = array_map('intval', array_column($this->repository()->usersByRole($role), 'id'));
         if (! in_array($id, $ids, true)) return redirect()->back()->with('error', 'Account not found for this role.');
-        return $this->deleteManagedUser($id, $this->roleLabel($role));
+        return $this->deleteManagedUser($id, role_label($role));
     }
 
     private function deleteManagedUser(int $id, string $label)
@@ -141,10 +137,6 @@ class UsersController extends BaseController
         return redirect()->back()->with('success', $label . ' account removed.');
     }
 
-    private function roleLabel(string $role): string
-    {
-        return $role === 'manager' ? 'Sports Coordinator' : ($role === 'facilitator' ? 'Tournament Manager' : 'User');
-    }
 
     private function generatedPassword(): string
     {
@@ -176,7 +168,7 @@ class UsersController extends BaseController
     private function userPayload(string $role, bool $creating): array
     {
         $actorRole = (string) session()->get('role');
-        if (($actorRole === 'admin' && $role !== 'manager') || ($actorRole === 'manager' && $role !== 'facilitator')) {
+        if (($actorRole === 'admin' && $role !== 'sports_coordinator') || ($actorRole === 'sports_coordinator' && $role !== 'tournament_manager')) {
             return ['error' => 'You are not allowed to create this account role.'];
         }
 
@@ -191,14 +183,14 @@ class UsersController extends BaseController
         $sportIds = $this->postedSportIds();
         if (is_string($sportIds)) return ['error' => $sportIds];
         if ($sportIds === []) {
-            return ['error' => $role === 'manager'
+            return ['error' => $role === 'sports_coordinator'
                 ? 'Sports Coordinators require at least one sport.'
                 : 'Tournament Managers require at least one assigned sport.'];
         }
 
-        if ($role === 'facilitator') {
-            $managerSportIds = $this->managerSportIds();
-            if ($managerSportIds === [] || array_diff($sportIds, $managerSportIds) !== []) {
+        if ($role === 'tournament_manager') {
+            $coordinatorSportIds = $this->coordinatorSportIds();
+            if ($coordinatorSportIds === [] || array_diff($sportIds, $coordinatorSportIds) !== []) {
                 return ['error' => 'Tournament Manager sports must be a non-empty subset of your assigned sports.'];
             }
         }

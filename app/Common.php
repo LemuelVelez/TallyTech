@@ -39,3 +39,17 @@ if (! function_exists('ui_icon')) {
         return '<svg class="' . $safeClass . '" aria-hidden="true" focusable="false"><use href="' . $href . '"></use></svg>';
     }
 }
+
+if (! function_exists('role_label')) {
+    /** Show the user-facing name of an account role. */
+    function role_label(string $role, bool $plural = false): string
+    {
+        $labels = [
+            'admin' => ['Admin', 'Admins'],
+            'sports_coordinator' => ['Sports Coordinator', 'Sports Coordinators'],
+            'tournament_manager' => ['Tournament Manager', 'Tournament Managers'],
+        ];
+
+        return $labels[$role][$plural ? 1 : 0] ?? ucfirst($role);
+    }
+}

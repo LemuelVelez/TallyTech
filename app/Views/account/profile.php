@@ -20,7 +20,7 @@ $fields = [
 </form>
 <script>document.querySelector('[data-profile-photo]')?.addEventListener('change', function(){ const f=this.files?.[0]; if(!f)return; const u=URL.createObjectURL(f); const img=document.querySelector('[data-profile-preview]'); img.onload=()=>URL.revokeObjectURL(u); img.src=u; });</script>
 <?php else: ?>
-<div class="profile-grid"><div class="profile-wide"><img class="profile-avatar-preview" src="<?= esc($avatar,'attr') ?>" alt="Profile picture"><h2><?= esc($profile['display_name']) ?></h2><p><?= esc(['admin'=>'Admin - TSC','manager'=>'Sports Coordinator','facilitator'=>'Tournament Manager'][$profile['role']]??$profile['role']) ?></p></div>
+<div class="profile-grid"><div class="profile-wide"><img class="profile-avatar-preview" src="<?= esc($avatar,'attr') ?>" alt="Profile picture"><h2><?= esc($profile['display_name']) ?></h2><p><?= esc(role_label((string) $profile['role'])) ?></p></div>
 <?php foreach($fields as $field=>$label): ?><div><strong><?= esc($label) ?></strong><p><?= esc($profile[$field]?:'—') ?></p></div><?php endforeach; ?>
 <div class="profile-wide"><strong>Bio</strong><p><?= nl2br(esc($profile['bio']?:'—')) ?></p></div></div>
 <?php endif; ?>

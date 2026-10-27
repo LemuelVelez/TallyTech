@@ -72,7 +72,7 @@ final class ScoringServiceTest extends TestCase
         $this->assertSame([], $data['sports']);
     }
 
-    public function testSportScoresCanBeRestrictedToManagerAssignedSports(): void
+    public function testSportScoresCanBeRestrictedToCoordinatorAssignedSports(): void
     {
         $event = ['id' => 17, 'name' => 'ISF 2026'];
         $sports = [
@@ -271,21 +271,21 @@ final class ScoringServiceTest extends TestCase
         $this->assertNull($officialSchedules[0]['loser_name']);
     }
 
-    public function testDashboardUsesRepositoryCountsForManagerUser(): void
+    public function testDashboardUsesRepositoryCountsForCoordinatorUser(): void
     {
         $event = ['id' => 17, 'name' => 'ISF 2026'];
         $counts = ['teams' => 8, 'sports' => 12, 'pending' => 2, 'approved' => 1, 'official' => 9];
         $repository = $this->createMock(ScoringRepositoryInterface::class);
         $repository->method('activeEvent')->willReturn($event);
         $repository->expects($this->once())->method('ranking')->with(17, false)->willReturn([]);
-        $repository->expects($this->once())->method('dashboardCounts')->with(17, 'manager', 42)->willReturn($counts);
+        $repository->expects($this->once())->method('dashboardCounts')->with(17, 'sports_coordinator', 42)->willReturn($counts);
         $repository->expects($this->once())->method('notifications')->with(5)->willReturn([]);
         $repository->expects($this->never())->method('results');
 
-        $data = (new ScoringService($repository))->dashboard('manager', 42);
+        $data = (new ScoringService($repository))->dashboard('sports_coordinator', 42);
 
         $this->assertSame($event, $data['activeEvent']);
-        $this->assertSame('manager', $data['role']);
+        $this->assertSame('sports_coordinator', $data['role']);
         $this->assertSame($counts, $data['counts']);
         $this->assertArrayNotHasKey('results', $data);
     }
@@ -294,7 +294,7 @@ final class ScoringServiceTest extends TestCase
     {
         foreach ([
             ['admin', 1, ['teams' => 8, 'sports' => 12, 'pending' => 4, 'approved' => 3, 'official' => 9]],
-            ['facilitator', 73, ['teams' => 8, 'sports' => 12, 'pending' => 1, 'approved' => 0, 'official' => 9]],
+            ['tournament_manager', 73, ['teams' => 8, 'sports' => 12, 'pending' => 1, 'approved' => 0, 'official' => 9]],
         ] as [$role, $userId, $counts]) {
             $repository = $this->createMock(ScoringRepositoryInterface::class);
             $repository->method('activeEvent')->willReturn(['id' => 17, 'name' => 'ISF 2026']);

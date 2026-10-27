@@ -30,7 +30,7 @@ class ReportsController extends BaseController
         $rawSportId = $this->request->getGet('sport_id');
         $sportId = is_scalar($rawSportId) && preg_match('/^[1-9]\d*$/', (string) $rawSportId) ? (int) $rawSportId : 0;
         $inputError = null;
-        if (in_array((string) session()->get('role'), ['manager', 'facilitator'], true)) {
+        if (in_array((string) session()->get('role'), ['sports_coordinator', 'tournament_manager'], true)) {
             $hasRequestedSport = is_scalar($rawSportId) && trim((string) $rawSportId) !== '';
             if ($sportIds === []) {
                 $inputError = 'Your assigned sports are not available for the selected event.';
@@ -87,7 +87,7 @@ class ReportsController extends BaseController
     {
         [$type, $filters, $inputError] = $this->input();
         if ($inputError !== null) {
-            $target = in_array((string) session()->get('role'), ['manager', 'facilitator'], true) && (int) $filters['sport_id'] === 0 ? '/dashboard' : '/reports';
+            $target = in_array((string) session()->get('role'), ['sports_coordinator', 'tournament_manager'], true) && (int) $filters['sport_id'] === 0 ? '/dashboard' : '/reports';
             return redirect()->to($target)->with('error', $inputError);
         }
         $repository = $this->repository();
@@ -119,7 +119,7 @@ class ReportsController extends BaseController
     {
         [$type, $filters, $inputError] = $this->input();
         if ($inputError !== null) {
-            $target = in_array((string) session()->get('role'), ['manager', 'facilitator'], true) && (int) $filters['sport_id'] === 0 ? '/dashboard' : '/reports';
+            $target = in_array((string) session()->get('role'), ['sports_coordinator', 'tournament_manager'], true) && (int) $filters['sport_id'] === 0 ? '/dashboard' : '/reports';
             return redirect()->to($target)->with('error', $inputError);
         }
         $repository = $this->repository();
@@ -151,7 +151,7 @@ class ReportsController extends BaseController
     {
         [$type, $filters, $inputError] = $this->input();
         if ($inputError !== null) {
-            $target = in_array((string) session()->get('role'), ['manager', 'facilitator'], true) && (int) $filters['sport_id'] === 0 ? '/dashboard' : '/reports';
+            $target = in_array((string) session()->get('role'), ['sports_coordinator', 'tournament_manager'], true) && (int) $filters['sport_id'] === 0 ? '/dashboard' : '/reports';
             return redirect()->to($target)->with('error', $inputError);
         }
         $repository = $this->repository();
@@ -179,7 +179,7 @@ class ReportsController extends BaseController
 
     private function actorSports(array $sports): array
     {
-        if (! in_array((string) session()->get('role'), ['manager', 'facilitator'], true)) return $sports;
+        if (! in_array((string) session()->get('role'), ['sports_coordinator', 'tournament_manager'], true)) return $sports;
         $assignedSportIds = $this->assignedSportIdsForCurrentUser();
         return array_values(array_filter(
             $sports,
@@ -189,7 +189,7 @@ class ReportsController extends BaseController
 
     private function teamRanking($repository, int $eventId): array
     {
-        if (! in_array((string) session()->get('role'), ['manager', 'facilitator'], true)) {
+        if (! in_array((string) session()->get('role'), ['sports_coordinator', 'tournament_manager'], true)) {
             return $repository->ranking($eventId, false);
         }
 

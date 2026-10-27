@@ -60,11 +60,11 @@ body {
 *::-webkit-scrollbar-button { width: 0; height: 0; display: none; }
 
 /* Keep the viewport scrollbar aligned with the active role theme. */
-body.role-manager, body.role-facilitator { scrollbar-color: var(--accent) var(--scroll-track); }
-body.role-manager::-webkit-scrollbar-thumb,
-body.role-facilitator::-webkit-scrollbar-thumb { background-color: var(--accent); }
-body.role-manager::-webkit-scrollbar-thumb:hover, body.role-manager::-webkit-scrollbar-thumb:active,
-body.role-facilitator::-webkit-scrollbar-thumb:hover, body.role-facilitator::-webkit-scrollbar-thumb:active { background-color: var(--accent-dark); }
+body.role-sports_coordinator, body.role-tournament_manager { scrollbar-color: var(--accent) var(--scroll-track); }
+body.role-sports_coordinator::-webkit-scrollbar-thumb,
+body.role-tournament_manager::-webkit-scrollbar-thumb { background-color: var(--accent); }
+body.role-sports_coordinator::-webkit-scrollbar-thumb:hover, body.role-sports_coordinator::-webkit-scrollbar-thumb:active,
+body.role-tournament_manager::-webkit-scrollbar-thumb:hover, body.role-tournament_manager::-webkit-scrollbar-thumb:active { background-color: var(--accent-dark); }
 body { margin: 0; min-width: 0; background: var(--bg); color: var(--text); font-size: 16px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
 body.nav-open { overflow: hidden; }
 a { color: inherit; text-decoration: none; }

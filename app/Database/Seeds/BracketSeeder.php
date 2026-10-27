@@ -55,14 +55,14 @@ class BracketSeeder extends Seeder
         try {
             $now = date('Y-m-d H:i:s');
 
-            $facilitatorId = $this->ensureUser([
-                'username' => 'facilitator',
-                'password_hash' => password_hash('Facilitator_123', PASSWORD_DEFAULT),
-                'display_name' => 'Game Facilitator',
-                'role' => 'facilitator',
+            $tournamentManagerId = $this->ensureUser([
+                'username' => 'tournament.sports_coordinator',
+                'password_hash' => password_hash('TournamentManager_123', PASSWORD_DEFAULT),
+                'display_name' => 'Sample Tournament Manager',
+                'role' => 'tournament_manager',
                 'status' => 'active',
                 'created_at' => $now,
-            ], 'Facilitator_123');
+            ], 'TournamentManager_123');
             $adminId = $this->ensureUser([
                 'username' => 'admin',
                 'password_hash' => password_hash('Admin_123', PASSWORD_DEFAULT),
@@ -107,11 +107,11 @@ class BracketSeeder extends Seeder
                 'Cheerdance Mixed' => $this->ensureSport($eventId, 'Cheerdance', 'Mixed', 'judged', 1, null, $now),
             ];
 
-            $this->seedBasketballSingleElimination($eventId, $sports['Basketball Men'], $locations['Main Gymnasium'], $teams, $facilitatorId, $adminId, $now);
-            $this->seedVolleyballMenSingleElimination($eventId, $sports['Volleyball Men'], $locations['Covered Gymnasium'], $teams, $facilitatorId, $adminId, $now);
-            $this->seedVolleyballWomenDoubleElimination($eventId, $sports['Volleyball Women'], $locations['Covered Gymnasium'], $teams, $facilitatorId, $adminId, $now);
-            $this->seedBadmintonSingleElimination($eventId, $sports['Badminton Men'], $locations['Main Gymnasium'], $teams, $facilitatorId, $adminId, $now);
-            $this->seedCheerdanceChampionship($eventId, $sports['Cheerdance Mixed'], $locations['Auditorium'], $teams, $facilitatorId, $now);
+            $this->seedBasketballSingleElimination($eventId, $sports['Basketball Men'], $locations['Main Gymnasium'], $teams, $tournamentManagerId, $adminId, $now);
+            $this->seedVolleyballMenSingleElimination($eventId, $sports['Volleyball Men'], $locations['Covered Gymnasium'], $teams, $tournamentManagerId, $adminId, $now);
+            $this->seedVolleyballWomenDoubleElimination($eventId, $sports['Volleyball Women'], $locations['Covered Gymnasium'], $teams, $tournamentManagerId, $adminId, $now);
+            $this->seedBadmintonSingleElimination($eventId, $sports['Badminton Men'], $locations['Main Gymnasium'], $teams, $tournamentManagerId, $adminId, $now);
+            $this->seedCheerdanceChampionship($eventId, $sports['Cheerdance Mixed'], $locations['Auditorium'], $teams, $tournamentManagerId, $now);
 
             if (! $this->db->transComplete()) {
                 throw new RuntimeException('Unable to complete bracket seed transaction.');
@@ -129,7 +129,7 @@ class BracketSeeder extends Seeder
         CLI::write('✅ Bracket seed data synchronized successfully (' . $this->changes . ' change' . ($this->changes === 1 ? '' : 's') . ').', 'green');
     }
 
-    private function seedBasketballSingleElimination(int $eventId, int $sportId, int $locationId, array $teams, int $facilitatorId, int $adminId, string $now): void
+    private function seedBasketballSingleElimination(int $eventId, int $sportId, int $locationId, array $teams, int $tournamentManagerId, int $adminId, string $now): void
     {
         $m1 = $this->ensureBracketSchedule([
             'event_id' => $eventId,
@@ -198,11 +198,11 @@ class BracketSeeder extends Seeder
             'created_at' => $now,
         ]);
 
-        $this->ensureMatchResult($eventId, $m1, $teams['CBA'], 86, null, $teams['CCS-CAF'], 78, null, $facilitatorId, $adminId, '2026-08-15 10:20:00');
-        $this->ensureMatchResult($eventId, $m2, $teams['COE-CTED'], 75, null, $teams['SCJE-CLAMS'], 82, null, $facilitatorId, $adminId, '2026-08-15 11:50:00');
+        $this->ensureMatchResult($eventId, $m1, $teams['CBA'], 86, null, $teams['CCS-CAF'], 78, null, $tournamentManagerId, $adminId, '2026-08-15 10:20:00');
+        $this->ensureMatchResult($eventId, $m2, $teams['COE-CTED'], 75, null, $teams['SCJE-CLAMS'], 82, null, $tournamentManagerId, $adminId, '2026-08-15 11:50:00');
     }
 
-    private function seedVolleyballMenSingleElimination(int $eventId, int $sportId, int $locationId, array $teams, int $facilitatorId, int $adminId, string $now): void
+    private function seedVolleyballMenSingleElimination(int $eventId, int $sportId, int $locationId, array $teams, int $tournamentManagerId, int $adminId, string $now): void
     {
         $m1 = $this->ensureBracketSchedule([
             'event_id' => $eventId,
@@ -271,11 +271,11 @@ class BracketSeeder extends Seeder
             'created_at' => $now,
         ]);
 
-        $this->ensureMatchResult($eventId, $m1, $teams['CBA'], 3, [25, 20, 25, 25], $teams['SCJE-CLAMS'], 1, [18, 25, 21, 19], $facilitatorId, $adminId, '2026-08-16 09:15:00');
-        $this->ensureMatchResult($eventId, $m2, $teams['CCS-CAF'], 2, [25, 18, 22, 25, 12], $teams['COE-CTED'], 3, [21, 25, 25, 19, 15], $facilitatorId, $adminId, '2026-08-16 11:10:00');
+        $this->ensureMatchResult($eventId, $m1, $teams['CBA'], 3, [25, 20, 25, 25], $teams['SCJE-CLAMS'], 1, [18, 25, 21, 19], $tournamentManagerId, $adminId, '2026-08-16 09:15:00');
+        $this->ensureMatchResult($eventId, $m2, $teams['CCS-CAF'], 2, [25, 18, 22, 25, 12], $teams['COE-CTED'], 3, [21, 25, 25, 19, 15], $tournamentManagerId, $adminId, '2026-08-16 11:10:00');
     }
 
-    private function seedVolleyballWomenDoubleElimination(int $eventId, int $sportId, int $locationId, array $teams, int $facilitatorId, int $adminId, string $now): void
+    private function seedVolleyballWomenDoubleElimination(int $eventId, int $sportId, int $locationId, array $teams, int $tournamentManagerId, int $adminId, string $now): void
     {
         $m1 = $this->ensureBracketSchedule([
             'event_id' => $eventId,
@@ -432,14 +432,14 @@ class BracketSeeder extends Seeder
             'created_at' => $now,
         ]);
 
-        $this->ensureMatchResult($eventId, $m1, $teams['COE-CTED'], 3, [25, 22, 25, 25], $teams['SCJE-CLAMS'], 1, [18, 25, 19, 21], $facilitatorId, $adminId, '2026-08-17 09:20:00');
-        $this->ensureMatchResult($eventId, $m2, $teams['CBA'], 2, [25, 20, 22, 25, 13], $teams['CCS-CAF'], 3, [21, 25, 25, 20, 15], $facilitatorId, $adminId, '2026-08-17 11:15:00');
-        $this->ensureMatchResult($eventId, $m3, $teams['SCJE-CLAMS'], 0, [19, 18, 22], $teams['CBA'], 3, [25, 25, 25], $facilitatorId, $adminId, '2026-08-17 12:50:00');
-        $this->ensureMatchResult($eventId, $m4, $teams['COE-CTED'], 3, [25, 21, 25, 25], $teams['CCS-CAF'], 1, [20, 25, 18, 22], $facilitatorId, $adminId, '2026-08-17 15:05:00');
-        $this->ensureMatchResult($eventId, $m5, $teams['CBA'], 2, [25, 20, 25, 21, 12], $teams['CCS-CAF'], 3, [22, 25, 19, 25, 15], $facilitatorId, $adminId, '2026-08-17 17:20:00');
+        $this->ensureMatchResult($eventId, $m1, $teams['COE-CTED'], 3, [25, 22, 25, 25], $teams['SCJE-CLAMS'], 1, [18, 25, 19, 21], $tournamentManagerId, $adminId, '2026-08-17 09:20:00');
+        $this->ensureMatchResult($eventId, $m2, $teams['CBA'], 2, [25, 20, 22, 25, 13], $teams['CCS-CAF'], 3, [21, 25, 25, 20, 15], $tournamentManagerId, $adminId, '2026-08-17 11:15:00');
+        $this->ensureMatchResult($eventId, $m3, $teams['SCJE-CLAMS'], 0, [19, 18, 22], $teams['CBA'], 3, [25, 25, 25], $tournamentManagerId, $adminId, '2026-08-17 12:50:00');
+        $this->ensureMatchResult($eventId, $m4, $teams['COE-CTED'], 3, [25, 21, 25, 25], $teams['CCS-CAF'], 1, [20, 25, 18, 22], $tournamentManagerId, $adminId, '2026-08-17 15:05:00');
+        $this->ensureMatchResult($eventId, $m5, $teams['CBA'], 2, [25, 20, 25, 21, 12], $teams['CCS-CAF'], 3, [22, 25, 19, 25, 15], $tournamentManagerId, $adminId, '2026-08-17 17:20:00');
     }
 
-    private function seedBadmintonSingleElimination(int $eventId, int $sportId, int $locationId, array $teams, int $facilitatorId, int $adminId, string $now): void
+    private function seedBadmintonSingleElimination(int $eventId, int $sportId, int $locationId, array $teams, int $tournamentManagerId, int $adminId, string $now): void
     {
         $m1 = $this->ensureBracketSchedule([
             'event_id' => $eventId,
@@ -508,11 +508,11 @@ class BracketSeeder extends Seeder
             'created_at' => $now,
         ]);
 
-        $this->ensureMatchResult($eventId, $m1, $teams['CBA'], 2, [21, 21], $teams['CCS-CAF'], 0, [15, 18], $facilitatorId, $adminId, '2026-08-18 08:50:00');
-        $this->ensureMatchResult($eventId, $m2, $teams['COE-CTED'], 1, [21, 17, 18], $teams['SCJE-CLAMS'], 2, [19, 21, 21], $facilitatorId, $adminId, '2026-08-18 10:10:00');
+        $this->ensureMatchResult($eventId, $m1, $teams['CBA'], 2, [21, 21], $teams['CCS-CAF'], 0, [15, 18], $tournamentManagerId, $adminId, '2026-08-18 08:50:00');
+        $this->ensureMatchResult($eventId, $m2, $teams['COE-CTED'], 1, [21, 17, 18], $teams['SCJE-CLAMS'], 2, [19, 21, 21], $tournamentManagerId, $adminId, '2026-08-18 10:10:00');
     }
 
-    private function seedCheerdanceChampionship(int $eventId, int $sportId, int $locationId, array $teams, int $facilitatorId, string $now): void
+    private function seedCheerdanceChampionship(int $eventId, int $sportId, int $locationId, array $teams, int $tournamentManagerId, string $now): void
     {
         $scheduleId = $this->ensureBracketSchedule([
             'event_id' => $eventId,
@@ -542,7 +542,7 @@ class BracketSeeder extends Seeder
             'schedule_id' => $scheduleId,
             'type' => 'judged',
             'status' => 'pending',
-            'submitted_by' => $facilitatorId,
+            'submitted_by' => $tournamentManagerId,
             'validated_by' => null,
             'submitted_at' => '2026-08-16 16:00:00',
             'validated_at' => null,
@@ -563,7 +563,7 @@ class BracketSeeder extends Seeder
         int $teamBId,
         float|int $teamBScore,
         ?array $teamBSetScores,
-        int $facilitatorId,
+        int $tournamentManagerId,
         int $adminId,
         string $validatedAt
     ): void {
@@ -572,7 +572,7 @@ class BracketSeeder extends Seeder
             'schedule_id' => $scheduleId,
             'type' => 'match',
             'status' => 'validated',
-            'submitted_by' => $facilitatorId,
+            'submitted_by' => $tournamentManagerId,
             'validated_by' => $adminId,
             'submitted_at' => $validatedAt,
             'validated_at' => $validatedAt,

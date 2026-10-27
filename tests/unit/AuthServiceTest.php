@@ -17,7 +17,7 @@ final class AuthServiceTest extends TestCase
                 'id' => 1,
                 'username' => 'admin',
                 'password_hash' => $hash,
-                'display_name' => 'Administrator',
+                'display_name' => 'Admin',
                 'role' => 'admin',
                 'status' => 'active',
             ]);
@@ -36,7 +36,7 @@ final class AuthServiceTest extends TestCase
             'id' => 1,
             'username' => 'admin',
             'password_hash' => password_hash('Admin@12345', PASSWORD_DEFAULT),
-            'display_name' => 'Administrator',
+            'display_name' => 'Admin',
             'role' => 'admin',
             'status' => 'active',
         ]);
